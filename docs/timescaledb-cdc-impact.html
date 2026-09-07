@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>source DB TimescaleDB 전환 영향 분석</title>
+<style>
+/* ============================================================
+   HW Doc Kit - design tokens & base primitives
+   금지: 이모지, 보라/바이올렛/인디고 계열, 무지개 그라데이션
+   기준색: 한화 오렌지 계열
+   ============================================================ */
+:root{
+  /* brand */
+  --hw:#F37321;          /* 기본 오렌지 */
+  --hw-dk:#D2590F;       /* 진한 오렌지 (호버/강조선) */
+  --hw-dp:#A8420A;       /* 가장 진한 오렌지 (제목 강조) */
+  --hw-lt:#FFB27A;       /* 밝은 오렌지 (보조 채움) */
+  --hw-pale:#FFF1E7;     /* 아주 옅은 오렌지 (배경 톤) */
+  --hw-tint:#FDE3D1;     /* 옅은 오렌지 (테두리/칩) */
+
+  /* ink & surface */
+  --ink:#141414; --ink2:#3F3F3F; --ink3:#6E6E6E; --ink4:#9A9A9A;
+  --bg:#FFFFFF; --bg2:#FAF8F6; --bg3:#F2EEEA;
+  --line:#E4E1DE; --line2:#CFCAC5;
+
+  /* semantic (보라 금지 - 보색은 청록/황토/벽돌색으로) */
+  --ok:#2E7D5B; --ok-bg:#E8F3EE;
+  --warn:#B8791A; --warn-bg:#FBF1DF;
+  --risk:#C0392B; --risk-bg:#FBEAE7;
+  --info:#2A6F97; --info-bg:#E7F0F6;
+
+  --radius:10px; --radius-sm:6px;
+  --shadow:0 1px 2px rgba(20,20,20,.06), 0 8px 24px rgba(20,20,20,.06);
+  --font:"Pretendard","Malgun Gothic","Apple SD Gothic Neo","Segoe UI",system-ui,sans-serif;
+  --mono:"D2Coding","Cascadia Mono","Consolas","JetBrains Mono",ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --hw:#FF8A3D; --hw-dk:#F37321; --hw-dp:#FFB27A; --hw-lt:#7A3E14; --hw-pale:#241812; --hw-tint:#4A2A15;
+  --ink:#F2EFEC; --ink2:#CFC9C3; --ink3:#9E9691; --ink4:#77706B;
+  --bg:#141312; --bg2:#1C1A18; --bg3:#252220;
+  --line:#332F2C; --line2:#464038;
+  --ok:#5CB58C; --ok-bg:#17251F; --warn:#D9A445; --warn-bg:#2A2317;
+  --risk:#E2705F; --risk-bg:#2A1917; --info:#6BA6CC; --info-bg:#161F26;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font); color:var(--ink); background:var(--bg2);
+  -webkit-font-smoothing:antialiased; line-height:1.55;
+  font-variant-numeric:tabular-nums;
+}
+h1,h2,h3,h4{margin:0; line-height:1.25; font-weight:700; letter-spacing:-.01em}
+p{margin:0 0 .6em}
+a{color:var(--hw-dk); text-underline-offset:2px}
+:root[data-theme="dark"] a{color:var(--hw)}
+code,kbd,pre,samp{font-family:var(--mono)}
+hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+
+/* ---------- 공통 프리미티브 ---------- */
+.kicker{
+  font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--hw-dk);
+}
+.rule{height:3px;background:var(--hw);border-radius:2px;width:56px}
+.muted{color:var(--ink3)}
+.small{font-size:13px}
+.mono{font-family:var(--mono);font-size:.92em}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;
+  background:var(--hw-pale);color:var(--hw-dp);border:1px solid var(--hw-tint);
+}
+.chip--ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.chip--warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.chip--risk{background:var(--risk-bg);color:var(--risk);border-color:var(--risk)}
+.chip--info{background:var(--info-bg);color:var(--info);border-color:var(--info)}
+.chip--neutral{background:var(--bg3);color:var(--ink2);border-color:var(--line2)}
+
+.card{
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;
+}
+.card--accent{border-left:4px solid var(--hw)}
+.card__t{font-size:16px;font-weight:700;margin:0 0 6px}
+.card__d{font-size:14px;color:var(--ink2);margin:0}
+
+.kpi{display:flex;gap:14px;flex-wrap:wrap}
+.kpi__item{
+  flex:1 1 0;min-width:140px;background:var(--bg);border:1px solid var(--line);
+  border-top:3px solid var(--hw);border-radius:var(--radius);padding:14px 16px;
+}
+.kpi__v{font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--hw-dp)}
+:root[data-theme="dark"] .kpi__v{color:var(--hw)}
+.kpi__l{font-size:12px;color:var(--ink3);font-weight:600}
+
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--bg)}
+.tbl th,.tbl td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.tbl thead th{background:var(--hw-pale);color:var(--hw-dp);font-size:12.5px;
+  letter-spacing:.03em;text-transform:uppercase;border-color:var(--hw-tint)}
+.tbl tbody tr:nth-child(even){background:var(--bg2)}
+.tbl td.num{text-align:right;font-family:var(--mono)}
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius-sm)}
+
+.note{
+  border:1px solid var(--line);border-left:4px solid var(--ink3);
+  background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-size:14px;
+}
+.note__t{font-weight:700;font-size:13px;margin:0 0 4px;letter-spacing:.02em}
+.note--info{border-left-color:var(--info);background:var(--info-bg)}
+.note--info .note__t{color:var(--info)}
+.note--ok{border-left-color:var(--ok);background:var(--ok-bg)}
+.note--ok .note__t{color:var(--ok)}
+.note--warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.note--warn .note__t{color:var(--warn)}
+.note--risk{border-left-color:var(--risk);background:var(--risk-bg)}
+.note--risk .note__t{color:var(--risk)}
+
+/* 코드 블록 */
+.code{border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg)}
+.code__bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;color:var(--ink3)
+}
+.code__copy{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer
+}
+.code__copy:hover{border-color:var(--hw);color:var(--hw-dk)}
+.code pre{margin:0;padding:12px 14px;overflow-x:auto;font-size:13px;line-height:1.6}
+.code .cm{color:var(--ink4)}
+.code .hl{color:var(--hw-dk);font-weight:700}
+
+/* 단계 흐름 */
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.step{
+  flex:1 1 0;min-width:150px;position:relative;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px
+}
+.step__n{
+  display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:50%;background:var(--hw);color:#fff;font-size:12px;font-weight:800;margin-bottom:6px
+}
+.step__t{font-weight:700;font-size:14px}
+.step__d{font-size:12.5px;color:var(--ink3)}
+
+/* UI 목업 프레임 */
+.ui{border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--bg);box-shadow:var(--shadow)}
+.ui__bar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border-bottom:1px solid var(--line)}
+.ui__dot{width:9px;height:9px;border-radius:50%;background:var(--line2)}
+.ui__addr{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  padding:2px 8px;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+.ui__body{padding:14px}
+.ui-row{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.ui-row:last-child{border-bottom:0}
+.ui-btn{background:var(--hw);color:#fff;border:0;border-radius:5px;padding:6px 14px;font-size:12.5px;font-weight:700}
+.ui-btn--ghost{background:transparent;color:var(--hw-dk);border:1px solid var(--hw)}
+.ui-field{flex:1;border:1px solid var(--line2);border-radius:5px;padding:6px 9px;font-size:12.5px;color:var(--ink3);background:var(--bg2)}
+
+/* 출처 표기 */
+.ref{
+  font-size:.62em;font-weight:800;vertical-align:super;color:var(--hw-dk);
+  background:var(--hw-pale);border:1px solid var(--hw-tint);border-radius:4px;
+  padding:0 4px;margin-left:2px;cursor:pointer;text-decoration:none
+}
+.refs{list-style:none;padding:0;margin:0;font-size:13px}
+.refs li{display:grid;grid-template-columns:26px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.refs li:last-child{border-bottom:0}
+.refs .refs__n{color:var(--hw-dk);font-weight:800;font-family:var(--mono)}
+.refs .refs__src{color:var(--ink);font-weight:600}
+.refs .refs__meta{color:var(--ink3);font-size:12px;font-family:var(--mono);word-break:break-all}
+
+/* 그리드 */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.stack{display:flex;flex-direction:column;gap:12px}
+
+/* ---------- 다이어그램 캔버스 ---------- */
+.dgm{
+  position:relative;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--bg);overflow:hidden;display:flex;flex-direction:column
+}
+.dgm__bar{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:6px 8px;border-bottom:1px solid var(--line);background:var(--bg3);flex:0 0 auto
+}
+.dgm__bar .sp{flex:1}
+.dgm__btn{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--font)
+}
+.dgm__btn:hover{border-color:var(--hw);color:var(--hw-dk)}
+.dgm__btn.is-on{background:var(--hw);border-color:var(--hw);color:#fff}
+.dgm__hint{font-size:11.5px;color:var(--ink4)}
+.dgm__svg{display:block;width:100%;flex:1 1 auto;min-height:0;touch-action:none;cursor:grab;
+  background:radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0/20px 20px}
+.dgm__svg.is-panning{cursor:grabbing}
+.dgm[data-edit="off"] .dgm__bar{display:none}
+
+/* 화면 가득 펼치기 — 툴바의 "넓게" 버튼 / Esc 로 닫는다 */
+.dgm.is-max{
+  position:fixed;inset:14px;z-index:80;
+  width:auto !important;max-width:none !important;height:auto !important;
+  box-shadow:0 12px 48px rgba(20,20,20,.28);border-color:var(--line2)
+}
+html.dgm-locked,html.dgm-locked body{overflow:hidden}
+
+.dgm-node{cursor:move}
+.dgm-node .box{fill:var(--bg);stroke:var(--line2);stroke-width:1.5}
+.dgm-node .lbl{
+  font-family:var(--font);font-size:13.5px;font-weight:700;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;text-align:center;padding:4px 8px;line-height:1.3;overflow:hidden
+}
+.dgm-node .lbl .sub{font-size:11px;font-weight:500;color:var(--ink3);margin-top:2px}
+.dgm-node .lbl[contenteditable="true"]{outline:2px solid var(--hw);background:var(--bg);border-radius:4px}
+.dgm-node.is-sel .box{stroke:var(--hw);stroke-width:2.5}
+.dgm-node[data-tone="primary"] .box{fill:var(--hw);stroke:var(--hw-dk)}
+.dgm-node[data-tone="primary"] .lbl{color:#fff}
+.dgm-node[data-tone="primary"] .lbl .sub{color:rgba(255,255,255,.85)}
+.dgm-node[data-tone="accent"] .box{fill:var(--hw-pale);stroke:var(--hw)}
+.dgm-node[data-tone="accent"] .lbl{color:var(--hw-dp)}
+.dgm-node[data-tone="muted"] .box{fill:var(--bg3);stroke:var(--line2)}
+.dgm-node[data-tone="muted"] .lbl{color:var(--ink3)}
+.dgm-node[data-tone="ok"] .box{fill:var(--ok-bg);stroke:var(--ok)}
+.dgm-node[data-tone="ok"] .lbl{color:var(--ok)}
+.dgm-node[data-tone="warn"] .box{fill:var(--warn-bg);stroke:var(--warn)}
+.dgm-node[data-tone="warn"] .lbl{color:var(--warn)}
+.dgm-node[data-tone="risk"] .box{fill:var(--risk-bg);stroke:var(--risk)}
+.dgm-node[data-tone="risk"] .lbl{color:var(--risk)}
+.dgm-node[data-tone="info"] .box{fill:var(--info-bg);stroke:var(--info)}
+.dgm-node[data-tone="info"] .lbl{color:var(--info)}
+
+.dgm-grp .box{fill:var(--bg2);stroke:var(--line2);stroke-dasharray:6 4;stroke-width:1.5}
+.dgm-grp .gl{font-family:var(--font);font-size:11.5px;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;fill:var(--ink4)}
+.dgm-grp{cursor:move}
+
+.dgm-edge .wire{fill:none;stroke:var(--ink3);stroke-width:1.8}
+.dgm-edge .hit{fill:none;stroke:transparent;stroke-width:14;cursor:pointer}
+.dgm-edge.is-sel .wire{stroke:var(--hw);stroke-width:2.6}
+.dgm-edge[data-style="dash"] .wire{stroke-dasharray:6 4}
+.dgm-edge[data-tone="primary"] .wire{stroke:var(--hw)}
+.dgm-edge[data-tone="risk"] .wire{stroke:var(--risk)}
+.dgm-edge[data-tone="ok"] .wire{stroke:var(--ok)}
+.dgm-edge .elbl{
+  font-family:var(--font);font-size:11.5px;font-weight:600;color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;height:100%;text-align:center;
+}
+.dgm-edge .elbl span{background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--line)}
+
+.dgm__modal{
+  position:absolute;inset:0;background:rgba(0,0,0,.45);display:none;
+  align-items:center;justify-content:center;padding:24px;z-index:9
+}
+.dgm__modal.is-open{display:flex}
+.dgm__modal .pane{background:var(--bg);border-radius:var(--radius);width:min(680px,100%);
+  max-height:100%;display:flex;flex-direction:column;border:1px solid var(--line2)}
+.dgm__modal textarea{
+  flex:1;min-height:240px;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:12px;font-family:var(--mono);font-size:12px;resize:vertical;background:var(--bg2);color:var(--ink)
+}
+.dgm__modal .head,.dgm__modal .foot{display:flex;align-items:center;gap:8px;padding:10px 12px}
+.dgm__modal .head b{font-size:14px}
+.dgm__modal .sp{flex:1}
+
+/* ── 차트 (scripts/make-chart.sh 산출물) ─────────────────────────────────── */
+.cht{ margin:16px 0 18px; padding:14px 14px 10px; border:1px solid var(--line); border-radius:var(--radius); background:var(--bg2) }
+.cht__t{ margin:0 0 8px; font-size:13.5px; font-weight:700; color:var(--ink); letter-spacing:-.01em }
+.cht svg{ display:block; width:100%; height:auto; font-family:inherit }
+.cht rect, .cht circle{ cursor:default }
+.cht rect:hover, .cht circle:hover{ opacity:.75 }
+.cht__c{ margin:8px 0 0; font-size:12px; line-height:1.65; color:var(--ink3) }
+
+/* 인쇄 */
+@media print{
+  .cht{ page-break-inside:avoid; background:transparent }
+  body{background:#fff}
+  .no-print{display:none !important}
+  .dgm__bar{display:none !important}
+  .dgm__svg{background:none}
+  .dgm.is-max{position:static;inset:auto;box-shadow:none}
+}
+
+/* ── 한글 줄바꿈 ─────────────────────────────────────────────────────────────
+   브라우저 기본값은 낱말 한가운데를 끊는다. "남은 결/정" 처럼 갈라지면 제목이
+   읽히지 않는다. keep-all 은 띄어쓰기에서만 줄을 바꾼다.
+   반대로 긴 영문 식별자나 경로는 keep-all 이면 칸을 넘치므로 overflow-wrap 으로 받고,
+   코드·경로 계열은 어디서든 끊어 넘침을 막는다. */
+h1, h2, h3, h4, p, li, td, th, dt, dd,
+.card__d, .step__d, .note, .lead, .sub, figcaption {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.mono, pre, code, .refs__meta { word-break: break-all; overflow-wrap: normal }
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 레이아웃 (사이드 TOC + 본문 단일 컬럼)
+   ============================================================ */
+body{ background:var(--bg2) }
+
+.doc{ display:grid; grid-template-columns:270px minmax(0,1fr); align-items:start; }
+
+/* 사이드바 */
+.side{
+  position:sticky; top:0; height:100vh; overflow:auto;
+  background:var(--bg); border-right:1px solid var(--line); padding:20px 16px 40px;
+}
+.side__brand{ display:flex; align-items:center; gap:9px; margin-bottom:6px }
+.side__brand .bar{ width:5px; height:26px; background:var(--hw); border-radius:2px }
+.side__brand b{ font-size:14.5px; letter-spacing:-.01em }
+.side__meta{ font-size:11.5px; color:var(--ink4); margin:0 0 16px; font-family:var(--mono) }
+.toc{ list-style:none; margin:0; padding:0; font-size:13.5px }
+.toc li{ margin:1px 0 }
+.toc a{
+  display:block; padding:5px 10px; border-radius:6px; color:var(--ink2);
+  text-decoration:none; border-left:2px solid transparent;
+}
+.toc a:hover{ background:var(--bg3); color:var(--ink) }
+.toc a.is-cur{ background:var(--hw-pale); color:var(--hw-dp); font-weight:700; border-left-color:var(--hw) }
+.toc .sub a{ padding-left:22px; font-size:12.5px; color:var(--ink3) }
+.side__foot{ margin-top:18px; padding-top:14px; border-top:1px solid var(--line); display:flex; gap:6px; flex-wrap:wrap }
+.side__foot button{
+  border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:5px;
+  padding:3px 9px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:var(--font);
+}
+.side__foot button:hover{ border-color:var(--hw); color:var(--hw-dk) }
+
+/* 본문 */
+.main{ padding:34px 44px 100px; max-width:1040px; }
+.doc-head{ border-bottom:2px solid var(--hw); padding-bottom:18px; margin-bottom:26px }
+.doc-head h1{ font-size:32px; letter-spacing:-.025em; margin:6px 0 8px }
+.doc-head .sub{ font-size:15px; color:var(--ink2); max-width:80ch }
+.doc-head .meta{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px }
+
+.sec{ margin:0 0 44px; scroll-margin-top:18px }
+.sec > h2{
+  font-size:21px; margin:0 0 4px; display:flex; align-items:baseline; gap:10px;
+}
+.sec > h2 .n{ font-family:var(--mono); font-size:14px; font-weight:800; color:var(--hw) }
+.sec > .why{ font-size:13.5px; color:var(--ink3); margin:0 0 16px; padding-left:2px }
+.sec h3{ font-size:16px; margin:24px 0 10px; padding-left:10px; border-left:3px solid var(--hw-tint) }
+.sec h4{ font-size:14px; margin:16px 0 6px; color:var(--ink2) }
+.sec p, .sec li{ font-size:14.5px }
+.sec ul, .sec ol{ margin:0 0 12px; padding-left:20px }
+.sec li{ margin:3px 0 }
+
+/* 체크리스트 */
+.chk{ list-style:none; padding:0; margin:0 }
+.chk li{
+  display:flex; gap:10px; align-items:flex-start; padding:9px 12px;
+  border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--bg); margin-bottom:6px;
+}
+.chk input{ margin-top:3px; width:15px; height:15px; accent-color:var(--hw); flex:0 0 auto }
+.chk li.is-done{ background:var(--bg2); border-color:var(--line) }
+.chk li.is-done .t{ text-decoration:line-through; color:var(--ink4) }
+.chk .t{ font-weight:600; font-size:14px }
+.chk .d{ font-size:12.5px; color:var(--ink3); display:block; margin-top:2px }
+
+/* 시나리오 (Given/When/Then) */
+.gwt{ border:1px solid var(--line); border-left:4px solid var(--hw); border-radius:var(--radius-sm);
+  background:var(--bg); padding:14px 16px; margin:0 0 12px }
+.gwt__t{ font-weight:700; font-size:14.5px; margin:0 0 8px }
+.gwt dl{ margin:0; display:grid; grid-template-columns:64px 1fr; gap:4px 10px; font-size:13.5px }
+.gwt dt{ font-weight:800; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--hw-dk); padding-top:2px }
+.gwt dd{ margin:0; color:var(--ink2) }
+
+/* 작업 단위 카드 */
+.slice{ border:1px solid var(--line); border-radius:var(--radius); background:var(--bg); overflow:hidden; margin-bottom:12px }
+.slice__h{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg3); border-bottom:1px solid var(--line) }
+.slice__h .no{ font-family:var(--mono); font-weight:800; color:#fff; background:var(--hw);
+  border-radius:5px; padding:1px 8px; font-size:12px }
+.slice__h b{ font-size:14.5px }
+.slice__h .sp{ flex:1 }
+.slice__b{ padding:12px 14px; font-size:13.5px }
+.slice__b dl{ margin:0; display:grid; grid-template-columns:110px 1fr; gap:6px 12px }
+.slice__b dt{ color:var(--ink3); font-size:12.5px; font-weight:700 }
+.slice__b dd{ margin:0; color:var(--ink2) }
+
+/* 의사결정 기록 */
+.adr{ border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; background:var(--bg); margin-bottom:12px }
+.adr__t{ font-size:15px; font-weight:700; margin:0 0 8px }
+.adr dl{ margin:0; display:grid; grid-template-columns:96px 1fr; gap:5px 12px; font-size:13.5px }
+.adr dt{ color:var(--hw-dk); font-weight:700; font-size:12.5px }
+.adr dd{ margin:0; color:var(--ink2) }
+
+.dgm{ margin:0 0 14px; height:520px }
+/* 다이어그램은 본문 글줄 폭에 갇히지 않고 사이드바 오른쪽을 전부 쓴다.
+   270px 사이드바 + 본문 좌우 패딩 88px + 스크롤바 여유 18px 를 뺀 값. */
+@media (min-width:1001px){
+  .dgm{ width:min(calc(100vw - 376px), 1700px); max-width:none }
+}
+.tbl-wrap{ margin-bottom:14px }
+.note{ margin-bottom:12px }
+.code{ margin-bottom:14px }
+
+@media (max-width:1000px){
+  .doc{ grid-template-columns:1fr }
+  .side{ position:static; height:auto; border-right:0; border-bottom:1px solid var(--line) }
+  .main{ padding:24px 20px 60px }
+}
+@media print{
+  @page{ size:A4; margin:14mm }
+  .side{ display:none }
+  .doc{ display:block }
+  .main{ max-width:none; padding:0 }
+  .sec{ page-break-inside:avoid }
+  .dgm{ height:320px; width:auto }
+}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- ================= 사이드바 ================= -->
+  <aside class="side no-print">
+    <div class="side__brand"><span class="bar"></span><b>source DB TimescaleDB 전환 영향 분석</b></div>
+    <p class="side__meta">v0.1 · 2026-09-07 · CDC PoC</p>
+    <ul class="toc"></ul>
+    <div class="side__foot">
+      <button id="bTheme" type="button">테마</button>
+      <button id="bPrint" type="button">인쇄</button>
+      <button id="bReset" type="button">체크 초기화</button>
+    </div>
+  </aside>
+
+  <!-- ================= 본문 ================= -->
+  <main class="main">
+
+    <header class="doc-head">
+      <span class="kicker">Impact Analysis</span>
+      <h1>source DB를 TimescaleDB로 바꾸면 CDC 파이프라인은 어디가 깨지는가</h1>
+      <p class="sub">현재 CDC 원천은 <span class="mono">postgres:16</span> 이고, 센서 저장소 과제에서 같은 PostgreSQL 위에
+        TimescaleDB를 얹는 구성이 검토되고 있습니다. 이 문서는 그 변경이 기존 CDC 파이프라인에 미치는 영향을
+        <b>확장만 설치하는 경우</b>와 <b>테이블을 하이퍼테이블로 전환하는 경우</b>로 나눠 정리하고,
+        코드의 어느 줄이 왜 깨지는지와 무엇을 먼저 확인해야 하는지를 적습니다.</p>
+      <div class="meta">
+        <span class="chip">분석 · 결정 대기</span>
+        <span class="chip chip--neutral">기준 커밋 75be7dc</span>
+        <span class="chip chip--info">embedded-cdc · embedded-cdc-go · cdc-custom</span>
+        <span class="chip chip--warn">확인 필요 3건</span>
+      </div>
+    </header>
+
+    <!-- ---------- 0. 질문과 답 ---------- -->
+    <section class="sec" id="s0">
+      <h2><span class="n">00</span>질문과 답</h2>
+      <p class="why">질문은 한 줄인데 답은 두 갈래입니다. 갈림길은 "TimescaleDB를 설치하느냐"가 아니라 <b>"기존 테이블을 하이퍼테이블로 만드느냐"</b>입니다. 이 구분을 하지 않으면 영향 범위를 실제보다 훨씬 크게 보게 됩니다.</p>
+      <div class="g2">
+        <div class="card card--accent">
+          <p class="card__t">A안 · 확장만 얹고 기존 테이블은 그대로</p>
+          <p class="card__d"><span class="mono">car · computer · grade · member</span> 를 일반 테이블로 두는 한
+            TimescaleDB는 그냥 설치된 확장일 뿐이고, logical decoding 경로에 아무 영향이 없습니다.</p>
+          <p style="margin:8px 0 0"><span class="chip chip--ok">인프라 3줄 변경으로 끝</span></p>
+          <p class="small muted" style="margin:6px 0 0">publication · slot · REPLICA IDENTITY · Debezium 설정 · 핸들러 · V1~V6 실측치가 전부 그대로 유효합니다.</p>
+        </div>
+        <div class="card">
+          <p class="card__t">B안 · 실제로 하이퍼테이블로 전환</p>
+          <p class="card__d">파이프라인이 기대는 전제가 여러 개 동시에 깨집니다. 이름 매칭 · PK · 스냅샷 ·
+            삭제의 의미 · 처리량이 전부 다시 정의되어야 합니다.</p>
+          <p style="margin:8px 0 0"><span class="chip chip--risk">치명 3건 · 주의 5건</span></p>
+          <p class="small muted" style="margin:6px 0 0">그중 두 건은 조용히 <b>target 데이터를 지우거나 갈라지게</b> 합니다. 기동 실패로 드러나지 않습니다.</p>
+        </div>
+      </div>
+
+      <h3>영향 지점 한눈에</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:26%">영향 지점</th><th style="width:22%">A안 · 확장만</th><th>B안 · 하이퍼테이블 전환</th></tr></thead>
+          <tbody>
+            <tr><td>컨테이너 이미지 · 파라미터</td><td><span class="chip chip--warn">변경</span></td><td><span class="chip chip--warn">변경</span> 동일</td></tr>
+            <tr><td>publication 정의</td><td><span class="chip chip--ok">그대로</span></td><td><span class="chip chip--risk">재설계</span> 청크가 주기마다 새로 생긴다</td></tr>
+            <tr><td>이벤트의 테이블 이름</td><td><span class="chip chip--ok">그대로</span></td><td><span class="chip chip--risk">깨짐</span> 청크명으로 도착해 전량 무시된다</td></tr>
+            <tr><td>압축 · 보존 정책의 부작용</td><td><span class="chip chip--ok">해당 없음</span></td><td><span class="chip chip--risk">데이터 손상</span> 대량 DELETE · 보이지 않는 삭제</td></tr>
+            <tr><td>PK · REPLICA IDENTITY</td><td><span class="chip chip--ok">그대로</span></td><td><span class="chip chip--warn">재설계</span> 복합키 + FULL 비용</td></tr>
+            <tr><td>초기 스냅샷</td><td><span class="chip chip--ok">그대로</span></td><td><span class="chip chip--warn">불가</span> 백필 경로 별도 설계</td></tr>
+            <tr><td>처리량 목표</td><td><span class="chip chip--ok">그대로</span></td><td><span class="chip chip--warn">미달</span> 실측 2,467 vs 피크 8,000/초</td></tr>
+            <tr><td>V1~V6 검증 결과</td><td><span class="chip chip--ok">유효</span></td><td><span class="chip chip--risk">재측정</span> 전제가 달라진다</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--info">
+        <p class="note__t">이 분석의 위치</p>
+        센서 저장소 구성 문서 00절은 이미 <b>"기존 CDC 파이프라인 DB 변경 — 센서 저장소는 별도 인스턴스로 분리"</b>를
+        범위 밖으로 못 박고 있습니다<sup class="ref" data-ref="1">1</sup>. 아래 B안 목록은 그 결정을 뒤집자는 제안이 아니라,
+        <b>그 결정의 근거</b>이자 나중에 "센서 데이터도 CDC로 내보내자"는 요구가 왔을 때 꺼낼 목록입니다.
+      </div>
+    </section>
+
+    <!-- ---------- 1. A안 ---------- -->
+    <section class="sec" id="s1">
+      <h2><span class="n">01</span>A안 · 확장만 얹는 경우 바뀌는 것</h2>
+      <p class="why">여기서 바뀌는 것은 인프라 정의 파일 두 개뿐입니다. 애플리케이션 코드는 한 줄도 손대지 않습니다.</p>
+
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:34%">위치</th><th>변경</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">docker-compose.source.yml:22</td><td><span class="mono">postgres:16</span> → <span class="mono">timescale/timescaledb:2.29.2-pg16</span><br><span class="small muted">pg17이 아니라 pg16을 고르는 이유 — 기존 스택이 pg16이고, 메이저 업그레이드를 이 변경에 묶으면 문제가 났을 때 원인이 두 개가 된다</span></td></tr>
+            <tr><td class="mono">docker-compose.source.yml:29</td><td><span class="mono">-c shared_preload_libraries=timescaledb</span> 추가<br><span class="small muted">빠지면 <span class="mono">CREATE EXTENSION</span> 이 그 자리에서 실패한다. <span class="mono">wal_level=logical</span> 과는 충돌하지 않는다</span></td></tr>
+            <tr><td class="mono">docker-compose.source.yml:29</td><td><span class="mono">-c max_worker_processes=16</span> 추가 <span class="chip chip--warn">권장</span><br><span class="small muted">Timescale 백그라운드 잡 워커가 walsender와 워커 슬롯을 나눠 쓴다. 기본값에서는 잡이 조용히 밀릴 수 있다</span></td></tr>
+            <tr><td class="mono">source/init/01-schema.sql</td><td>맨 위에 <span class="mono">CREATE EXTENSION IF NOT EXISTS timescaledb;</span> 한 줄</td></tr>
+            <tr><td>이미지 에디션</td><td><span class="mono">-oss</span> 태그가 아닌 것 <span class="chip chip--info">TSL</span><br><span class="small muted">A안 자체는 압축·집계를 쓰지 않지만, 나중에 쓰려면 태그를 그때 바꿔야 하고 그건 이미지 교체 = 재기동이다</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="code">
+        <div class="code__bar"><span>infra/db/docker-compose.source.yml — A안 변경</span><button class="code__copy" type="button">복사</button></div>
+<pre>  source-postgres:
+<span class="cm">-   image: postgres:16</span>
+<span class="hl">+   image: timescale/timescaledb:2.29.2-pg16</span>
+    container_name: emb-cdc-source-pg
+    command:
+      - postgres
+<span class="hl">+     - -c</span>
+<span class="hl">+     - shared_preload_libraries=timescaledb</span>
+<span class="hl">+     - -c</span>
+<span class="hl">+     - max_worker_processes=16</span>
+      - -c
+      - wal_level=logical          <span class="cm"># 그대로</span>
+      - -c
+      - max_wal_senders=10         <span class="cm"># 그대로</span>
+      - -c
+      - max_replication_slots=10   <span class="cm"># 그대로</span>
+      - -c
+      - wal_sender_timeout=5min    <span class="cm"># 그대로</span>
+</pre>
+      </div>
+
+      <div class="note note--ok">
+        <p class="note__t">A안에서 바뀌지 않는 것 — 이게 결론입니다</p>
+        <span class="mono">CREATE PUBLICATION embedded_cdc_pub FOR TABLE car, computer, grade, member</span>(01-schema.sql:75),
+        네 테이블의 <span class="mono">REPLICA IDENTITY FULL</span>(:33 · :62), replication slot,
+        <span class="mono">table-include-list</span>(application.yml:49), <span class="mono">snapshot-mode: initial</span>(:50),
+        <span class="mono">SlotContinuityGuard</span>, heartbeat 구성, 세 스택의 핸들러와 매퍼 — <b>전부 그대로</b>입니다.
+        V1~V6에서 측정한 지연 · 처리량 · 페일오버 결과도 재측정 없이 유효합니다.
+      </div>
+    </section>
+
+    <!-- ---------- 2. B안 ---------- -->
+    <section class="sec" id="s2">
+      <h2><span class="n">02</span>B안 · 하이퍼테이블로 전환하면 깨지는 지점</h2>
+      <p class="why">아래 8건은 독립된 문제가 아니라 대부분 "하이퍼테이블은 부모 테이블 + 청크의 상속 구조"라는 한 가지 사실에서 파생됩니다. 치명 3건은 <b>기동 실패로 드러나지 않고 조용히 데이터를 어긋나게</b> 합니다.</p>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">B1</span><b>논리 디코딩이 부모가 아니라 청크 이름으로 나온다</b><span class="sp"></span><span class="chip chip--risk">치명</span></div>
+        <div class="slice__b"><dl>
+          <dt>무엇이</dt><dd>WAL의 relation이 <span class="mono">public.sensor_reading</span> 이 아니라 <span class="mono">_timescaledb_internal._hyper_1_1_chunk</span> 로 옵니다. 하이퍼테이블은 선언적 파티셔닝이 아니라 상속 기반이라 <span class="mono">publish_via_partition_root</span> 로 우회할 수도 없습니다.</dd>
+          <dt>연쇄 1 · publication</dt><dd><span class="mono">FOR TABLE &lt;하이퍼테이블&gt;</span> 로는 행이 나오지 않습니다. <span class="mono">FOR ALL TABLES</span> 로 가거나 청크를 계속 추가해야 하는데, 청크는 <b>인터벌마다 새로 생깁니다</b>(센서 문서 기준 6시간).</dd>
+          <dt>연쇄 2 · 필터</dt><dd><span class="mono">table-include-list</span>(application.yml:49)의 정확한 목록이 <span class="mono">_timescaledb_internal\._hyper_.*</span> 정규식으로 바뀝니다.</dd>
+          <dt>연쇄 3 · 디스패치</dt><dd><span class="mono">SourceTable.fromName()</span> 이 <span class="mono">"car"</span> 문자열 <b>정확 일치</b>입니다(SourceTable.java:34, 이름을 뽑는 곳은 DebeziumEventDeserializer.java:50). 청크명이 들어오면 매칭에 실패해 <b>전 이벤트가 무시</b>됩니다. Go 스택도 <span class="mono">decoder.go:31</span> 에서 같은 구조입니다.</dd>
+          <dt>연쇄 4 · 두 정체성</dt><dd>스냅샷(<span class="mono">op=r</span>)은 부모 이름으로, 스트리밍(<span class="mono">op=c/u/d</span>)은 청크 이름으로 옵니다. <b>같은 테이블이 두 이름으로 도착</b>하므로 매핑 계층이 양쪽을 모두 받아야 합니다.</dd>
+          <dt>대응</dt><dd>청크명 → 논리 테이블명 역매핑 계층을 새로 만듭니다. <span class="mono">_timescaledb_catalog.chunk</span> · <span class="mono">hypertable</span> 조인으로 해석해 캐시하거나 청크명에서 하이퍼테이블 id를 추출합니다. 청크가 계속 생기므로 캐시 미스 경로가 반드시 필요합니다.</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">B2</span><b>압축(컬럼스토어) 전환이 대량 DELETE로 보인다</b><span class="sp"></span><span class="chip chip--risk">치명</span></div>
+        <div class="slice__b"><dl>
+          <dt>무엇이</dt><dd>청크 압축은 메타데이터 조작이 아니라 실제 DML입니다. 원본 행을 읽어 <span class="mono">compress_hyper_*</span> 에 넣고 원본 청크를 비웁니다.</dd>
+          <dt>결과</dt><dd><span class="mono">FOR ALL TABLES</span> publication이면 이것이 <b>청크 한 개 분량의 DELETE 이벤트</b>로 흘러가 target을 지웁니다. 압축 테이블 쪽 INSERT는 배열 뭉치라 해석도 불가능합니다.</dd>
+          <dt>왜 안 잡히나</dt><dd>지금의 <span class="mono">halt-on-dead-letter-ratio</span>(기본 0.5)는 <b>실패</b>를 막는 장치입니다. 이 삭제들은 문법적으로 정상이라 <b>성공적으로 적용</b>되고, DLQ에도 남지 않고, 지표에도 이상으로 보이지 않습니다.</dd>
+          <dt>대응</dt><dd><span class="mono">_timescaledb_internal.compress_hyper_%</span> 를 publication 또는 include-list에서 제외하고, 압축 잡이 만든 삭제를 식별해 거릅니다. 선택이 아니라 <b>필수</b>입니다.</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">B3</span><b>보존 정책(drop_chunks)은 CDC에 아예 보이지 않는다</b><span class="sp"></span><span class="chip chip--risk">치명</span></div>
+        <div class="slice__b"><dl>
+          <dt>무엇이</dt><dd><span class="mono">drop_chunks</span> 는 <span class="mono">DROP TABLE</span>, 즉 DDL입니다. 행 삭제 이벤트가 <b>하나도 생기지 않습니다</b>.</dd>
+          <dt>결과</dt><dd>source는 90일치를 유지하는데 target은 무한히 쌓입니다. 시간이 갈수록 갈라지고, <span class="mono">scripts/reconcile.sql</span> 의 건수 대조는 <b>상시 불일치</b>가 됩니다 — 즉 대조 스크립트가 진짜 문제를 가려버립니다.</dd>
+          <dt>대응</dt><dd>target에 별도 보존 잡을 두거나, target도 하이퍼테이블로 만들어 같은 보존 정책을 겁니다. 어느 쪽이든 "source와 target이 같아야 한다"는 대조 기준을 <b>"보존 창 안에서만 같다"</b>로 다시 씁니다.</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">B4</span><b>연속 집계 갱신이 또 하나의 쓰기 소스가 된다</b><span class="sp"></span><span class="chip chip--warn">주의</span></div>
+        <div class="slice__b"><dl>
+          <dt>무엇이</dt><dd>연속 집계는 뷰가 아니라 <span class="mono">_timescaledb_internal._materialized_hypertable_N</span> 이라는 실제 하이퍼테이블이고, refresh마다 대량 INSERT/DELETE가 일어납니다.</dd>
+          <dt>결과</dt><dd><span class="mono">FOR ALL TABLES</span> 면 집계 갱신 트래픽이 전부 CDC로 흘러갑니다. 파이프라인 부하가 적재량이 아니라 <b>잡 스케줄에 따라</b> 튑니다.</dd>
+          <dt>대응</dt><dd>materialization 하이퍼테이블도 제외 목록에 넣습니다. B2와 같은 목록이므로 함께 관리합니다.</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">B5</span><b>PK와 REPLICA IDENTITY 전제가 깨진다</b><span class="sp"></span><span class="chip chip--warn">주의</span></div>
+        <div class="slice__b"><dl>
+          <dt>PK</dt><dd>하이퍼테이블의 유니크 제약은 파티셔닝 컬럼을 포함해야 하므로<sup class="ref" data-ref="9">9</sup> PK가 <span class="mono">(time, tag_id)</span> 복합키가 됩니다. 지금은 네 매퍼가 전부 <span class="mono">row.longValue("id")</span> 단일 long PK를 전제하고 target UPSERT 키도 동일합니다. <b>복합키 지원이 새로 필요합니다.</b></dd>
+          <dt>REPLICA IDENTITY</dt><dd>지금 FULL을 건 이유는 소프트 삭제 판정에 before 전체 이미지가 필요해서입니다(01-schema.sql:29~34 주석). 시계열은 append-only라 그 요구가 없고, 초당 2,000행 규모에서 FULL은 UPDATE/DELETE의 WAL을 배로 불립니다.</dd>
+          <dt>확인 필요</dt><dd>하이퍼테이블에 건 REPLICA IDENTITY가 <b>이후 생성되는 청크에 자동 상속되는지</b>는 버전에 따라 다릅니다. 상속되지 않으면 새 청크마다 걸어줘야 합니다. <span class="chip chip--warn">확인 필요</span></dd>
+          <dt>대응</dt><dd>시계열 테이블은 FULL을 쓰지 않고 DEFAULT + 복합 PK로 갑니다. "삭제 전 값"을 알아야 하는 요구가 따로 있으면 CDC가 아니라 원천 설계에서 풉니다.</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">B6</span><b>초기 스냅샷이 현실적으로 불가능하다</b><span class="sp"></span><span class="chip chip--warn">주의</span></div>
+        <div class="slice__b"><dl>
+          <dt>무엇이</dt><dd><span class="mono">snapshot-mode: initial</span>(application.yml:50)이 90일 × 1.7억 행/일 = <b>약 155억 행</b>을 SELECT로 훑습니다.</dd>
+          <dt>연쇄</dt><dd><span class="mono">never</span> 또는 <span class="mono">no_data</span> + 별도 백필로 가야 하는데, 그러면 <span class="mono">SlotContinuityGuard</span> 가 전제하는 "슬롯 생성 시점부터 연속"과 백필 경계를 <b>어떻게 잇는지</b>를 새로 정의해야 합니다. 지금 로직대로면 <span class="mono">fail-on-capture-gap: true</span>(:54)에 걸려 기동을 거부합니다.</dd>
+          <dt>대응</dt><dd>백필 완료 LSN을 체크포인트 초기값으로 심는 경로를 만들고, 그 경로를 Guard가 정상으로 인정하도록 규칙을 명시합니다. Guard를 끄는 것은 답이 아닙니다 — 그러면 V3에서 잡았던 캡처 갭이 다시 조용해집니다.</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">B7</span><b>처리량이 모자란다</b><span class="sp"></span><span class="chip chip--warn">주의</span></div>
+        <div class="slice__b"><dl>
+          <dt>수치</dt><dd>실측 <b>2,467 events/s</b>(변경 감사를 켜면 1,654)인데 센서 피크는 <b>8,000행/초</b>입니다. 이벤트당 한 문장 UPSERT 구조로는 받지 못합니다.</dd>
+          <dt>연쇄</dt><dd>못 따라가면 슬롯 지연 → WAL 누적 → 원천 디스크 고갈입니다. compose 주석에 적어둔 위험("slot 은 만료되지 않는다")이 실제 시나리오가 됩니다.</dd>
+          <dt>스택 차이</dt><dd>Go 스택(go-pq-cdc)은 standby status update를 이벤트 전달과 <b>같은 고루틴</b>에서 보내는 구조라 적재가 밀리면 응답도 함께 멎습니다 — 이미 <span class="mono">wal_sender_timeout</span> 을 5min으로 올려 대응한 그 문제이고(실측 panic 9회), 이 부하에서 먼저 재발합니다.</dd>
+          <dt>대응</dt><dd>적용을 <span class="mono">COPY</span> 기반 배치로 바꿉니다. <span class="mono">hibernate.jdbc.batch_size: 50</span> 은 이미 설정되어 있지만 "이벤트당 한 문장이라 효과가 없다"고 주석에 적혀 있습니다 — 그 배치 적용을 실제로 넣는 일이 여기에 딸려옵니다.</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">B8</span><b>전환 작업 자체가 이벤트를 만든다</b><span class="sp"></span><span class="chip chip--warn">주의</span></div>
+        <div class="slice__b"><dl>
+          <dt>무엇이</dt><dd>기존 테이블을 <span class="mono">create_hypertable(..., migrate_data =&gt; true)</span> 로 바꾸면 부모 → 청크 행 이동이 <b>DELETE + INSERT로 WAL에 나가</b> target에 그대로 재생됩니다.</dd>
+          <dt>대응</dt><dd>전환은 CDC를 멈추고 → 변환하고 → 슬롯과 오프셋을 재생성하는 순서로 합니다. 돌아가는 파이프라인 위에서 변환하지 않습니다.</dd>
+        </dl></div>
+      </div>
+
+      <h3>cdc-custom(트리거 · outbox) 스택은 다른가</h3>
+      <p>이름 문제(B1)는 겪지 않습니다. 트리거와 <span class="mono">sync_outbox</span> 는 사용자 테이블 수준에서 동작하기 때문입니다.
+        그러나 <b>B3는 동일하게 발생합니다</b> — <span class="mono">drop_chunks</span> 는 DDL이라 트리거를 거치지 않고, outbox에 아무것도 남지 않습니다.
+        압축 역시 내부 경로라 사용자 트리거를 거치지 않을 가능성이 높습니다<span class="chip chip--warn">확인 필요</span>.
+        즉 <b>세 스택 중 어느 것도 B3를 그냥 넘기지 못합니다.</b> 세 스택의 모니터링과 대조 기준을 같게 유지한다는 원칙상, 대응도 세 곳에 함께 들어가야 합니다.</p>
+    </section>
+
+    <!-- ---------- 3. 코드 영향 ---------- -->
+    <section class="sec" id="s3">
+      <h2><span class="n">03</span>B안에서 손대야 하는 코드</h2>
+      <p class="why">"어디를 고쳐야 하나"를 파일 단위로 못 박아 둡니다. 아래가 B안의 실제 작업량입니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:32%">위치</th><th style="width:30%">지금의 전제</th><th>필요한 변경</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">01-schema.sql:75</td><td><span class="mono">FOR TABLE</span> 로 네 테이블 열거</td><td>청크 편입 방식 재설계 + 내부 테이블 제외 목록</td></tr>
+            <tr><td class="mono">01-schema.sql:33,62</td><td>네 테이블에 <span class="mono">REPLICA IDENTITY FULL</span></td><td>시계열 테이블은 DEFAULT + 복합 PK. 청크 상속 여부 확인</td></tr>
+            <tr><td class="mono">application.yml:49</td><td>테이블 이름 정확 열거</td><td>청크 정규식 + 내부 스키마 제외</td></tr>
+            <tr><td class="mono">application.yml:50</td><td><span class="mono">snapshot-mode: initial</span></td><td><span class="mono">never</span> + 백필 경로, 체크포인트 초기값 주입</td></tr>
+            <tr><td class="mono">SourceTable.java:34</td><td>테이블명 문자열 정확 일치</td><td>청크명 → 논리 테이블명 역매핑 + 캐시</td></tr>
+            <tr><td class="mono">DebeziumEventDeserializer.java:50</td><td><span class="mono">source.table</span> 을 그대로 사용</td><td>역매핑 계층을 태워 논리 이름으로 정규화</td></tr>
+            <tr><td class="mono">decoder.go:31,48,62</td><td>Java와 동일 구조</td><td>동일 변경 (세 스택 동일 유지)</td></tr>
+            <tr><td>매퍼 4종 · target 엔티티</td><td>단일 <span class="mono">long id</span> PK</td><td>복합키 지원, UPSERT 키 변경</td></tr>
+            <tr><td class="mono">BatchApplier</td><td>이벤트당 한 문장</td><td><span class="mono">COPY</span> 배치 적용</td></tr>
+            <tr><td class="mono">SlotContinuityGuard</td><td>슬롯 생성 시점부터 연속</td><td>백필 경계를 정상으로 인정하는 규칙 추가</td></tr>
+            <tr><td class="mono">scripts/reconcile.sql</td><td>source · target 전량 건수 일치</td><td>보존 창 기준 비교로 재정의</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small muted">B안은 "설정 몇 줄"이 아니라 <b>매핑 계층 신설 + 적용 경로 재작성 + 대조 기준 재정의</b>입니다. A안(인프라 3줄)과는 규모가 다릅니다.</p>
+    </section>
+
+    <!-- ---------- 4. 확인 필요 ---------- -->
+    <section class="sec" id="s4">
+      <h2><span class="n">04</span>먼저 확인해야 하는 3건</h2>
+      <p class="why">위 목록 중 세 건은 <b>버전과 이미지에 따라 답이 달라져</b> 문서로 단정할 수 없습니다. B안을 검토하게 되면 반나절 스파이크로 이 셋부터 확정합니다. 결과에 따라 B1과 B2의 대응 난이도가 크게 달라집니다.</p>
+
+      <div class="gwt">
+        <p class="gwt__t">Q1 · 하이퍼테이블을 publication에 넣으면 이후 생기는 청크가 자동 편입되는가</p>
+        <dl>
+          <dt>Given</dt><dd>쓰기로 정한 이미지 태그에서 <span class="mono">ALTER PUBLICATION p ADD TABLE sensor_reading</span> 을 실행한다</dd>
+          <dt>When</dt><dd>청크 경계를 넘겨 새 청크가 생성된 뒤 그 청크에 INSERT 한다</dd>
+          <dt>Then</dt><dd><span class="mono">pg_recvlogical</span> 출력에 그 행이 나오는지 본다. 나오면 <span class="mono">FOR ALL TABLES</span> 를 피할 수 있고, B2 · B4의 제외 목록 관리 부담이 크게 줄어든다</dd>
+        </dl>
+      </div>
+      <div class="gwt">
+        <p class="gwt__t">Q2 · 압축 잡이 실제로 DELETE 이벤트를 내보내는가</p>
+        <dl>
+          <dt>Given</dt><dd>행이 든 청크 하나에 <span class="mono">FOR ALL TABLES</span> publication을 걸어 둔다</dd>
+          <dt>When</dt><dd>그 청크를 컬럼스토어로 전환한다</dd>
+          <dt>Then</dt><dd>디코딩 출력에 DELETE가 몇 건 나오는지 센다. 0이 아니면 B2는 <b>대응 없이는 진행 불가</b>로 확정된다</dd>
+        </dl>
+      </div>
+      <div class="gwt">
+        <p class="gwt__t">Q3 · 청크명 역매핑과 relation 증가의 비용은 얼마인가</p>
+        <dl>
+          <dt>Given</dt><dd>90일 · 6시간 인터벌이면 청크가 약 360개, 여기에 압축 청크가 더해진다</dd>
+          <dt>When</dt><dd>커넥터가 청크마다 relation 메시지를 받고 스키마 캐시를 유지한다</dd>
+          <dt>Then</dt><dd>커넥터 메모리와 새 청크 생성 시점의 지연 스파이크를 잰다. 청크 인터벌이 짧을수록 나빠지므로 센서 문서의 6시간 결정과 맞물린다</dd>
+        </dl>
+      </div>
+
+      <h3>진행 전 체크 <span class="chip chk-count">0 / 0</span></h3>
+      <ul class="chk">
+        <li><input type="checkbox" id="k1"><span><span class="t">A안과 B안 중 무엇을 묻고 있는지 먼저 합의</span><span class="d">"TimescaleDB로 바꾼다"는 말이 두 가지를 뜻한다. 여기서 갈리지 않으면 논의가 겉돈다</span></span></li>
+        <li><input type="checkbox" id="k2"><span><span class="t">Q1~Q3 스파이크 실행</span><span class="d">쓰기로 정한 이미지 태그에서. 버전이 다르면 결과가 다르다</span></span></li>
+        <li><input type="checkbox" id="k3"><span><span class="t">센서 데이터를 CDC로 내보낼 요구가 실제로 있는지 확인</span><span class="d">없으면 B안 전체가 불필요하다. 있으면 별도 검증 과제로 세운다</span></span></li>
+        <li><input type="checkbox" id="k4"><span><span class="t">대조 기준(reconcile) 재정의 필요 여부 판단</span><span class="d">B3는 세 스택 모두에 해당한다</span></span></li>
+        <li><input type="checkbox" id="k5"><span><span class="t">A안을 적용한다면 기준선 재측정 한 번</span><span class="d">코드 전제는 안 바뀌지만 이미지가 바뀐다. 기준선을 다시 찍어두는 편이 싸다</span></span></li>
+      </ul>
+    </section>
+
+    <!-- ---------- 5. 권고 ---------- -->
+    <section class="sec" id="s5">
+      <h2><span class="n">05</span>권고</h2>
+      <p class="why">지금 결정할 수 있는 것과, 요구가 생겼을 때로 미룰 것을 나눕니다.</p>
+
+      <div class="adr">
+        <p class="adr__t">ADR-01 · 센서 저장소는 CDC 원천과 별도 인스턴스로 둔다</p>
+        <dl>
+          <dt>배경</dt><dd>같은 인스턴스에 두면 2절의 B1~B8이 <b>기존에 잘 돌던 파이프라인에까지</b> 영향을 줍니다. 센서 적재의 WAL이 기존 슬롯을 통과하고, 압축 · 보존 잡의 부작용을 기존 파이프라인이 함께 떠안습니다.</dd>
+          <dt>결정</dt><dd>센서 저장소 문서 00절의 범위 결정을 유지합니다. 별도 인스턴스로 분리합니다.</dd>
+          <dt>대가</dt><dd>인스턴스가 하나 늘고, 설비 마스터와 CDC 대상 테이블을 조인하려면 애플리케이션 계층이나 FDW가 필요합니다.</dd>
+          <dt>재검토</dt><dd>센서 데이터를 다른 시스템으로 실시간 전파해야 하는 요구가 생기면 재검토합니다. 그때는 CDC가 아니라 적재 API에서 분기하는 쪽(dual write)이 더 싼지 함께 비교합니다.</dd>
+        </dl>
+      </div>
+
+      <div class="adr">
+        <p class="adr__t">ADR-02 · car · computer · grade · member 는 하이퍼테이블로 만들지 않는다</p>
+        <dl>
+          <dt>배경</dt><dd>이 네 테이블은 시계열이 아닙니다. 행 수가 적고 시간축 조회가 없어 하이퍼테이블의 이득(압축 · 청크 프루닝)이 없습니다. 반면 2절의 비용은 전부 발생합니다.</dd>
+          <dt>결정</dt><dd>원천 인스턴스에 TimescaleDB 확장이 설치되더라도 이 네 테이블은 일반 테이블로 둡니다. 즉 <b>A안 범위에서 멈춥니다.</b></dd>
+          <dt>대가</dt><dd>없습니다. 확장이 설치되어 있어도 하이퍼테이블을 만들지 않으면 비용이 발생하지 않습니다.</dd>
+          <dt>재검토</dt><dd><span class="mono">cdc_change_audit</span> 같은 <b>append-only 로그성 테이블</b>이 커지면 그 테이블 하나만 하이퍼테이블로 만드는 것은 검토할 만합니다. 단 그것은 target 쪽 테이블이라 CDC 캡처 대상이 아니어서 2절이 적용되지 않습니다 — 이 구분이 재검토의 전제입니다.</dd>
+        </dl>
+      </div>
+
+      <div class="note note--warn">
+        <p class="note__t">한 문장으로</p>
+        <b>확장을 얹는 것은 인프라 3줄이고, 하이퍼테이블로 바꾸는 것은 파이프라인 재설계입니다.</b>
+        현재 계획(센서 저장소 별도 인스턴스)대로라면 기존 CDC 파이프라인에 실질적 영향은 없습니다.
+        영향이 생기는 유일한 경로는 "센서 하이퍼테이블도 CDC로 내보내자"이며, 그건 별도 검증 과제로 세워야 할 크기입니다.
+      </div>
+    </section>
+
+    <!-- ---------- 6. 참고 ---------- -->
+    <section class="sec" id="s6">
+      <h2><span class="n">06</span>참고 자료</h2>
+      <ol class="refs">
+        <li><span class="refs__n">1</span><span><span class="refs__src">센서 데이터 TimescaleDB 구성 문서 — 00절 범위에서 "기존 CDC 파이프라인 DB 변경"을 제외</span>
+          <span class="refs__meta">doc · docs/timescaledb-sensor-ingest-guide.html</span></span></li>
+        <li><span class="refs__n">2</span><span><span class="refs__src">CDC 원천 DB 컨테이너 정의 — 이미지 · logical decoding 파라미터 · slot 위험 주석</span>
+          <span class="refs__meta">code · src/embedded-cdc/infra/db/docker-compose.source.yml:22,29 (75be7dc)</span></span></li>
+        <li><span class="refs__n">3</span><span><span class="refs__src">원천 스키마 — publication 정의와 네 테이블의 REPLICA IDENTITY FULL, 그 근거 주석</span>
+          <span class="refs__meta">code · src/embedded-cdc/infra/db/source/init/01-schema.sql:29,33,62,75 (75be7dc)</span></span></li>
+        <li><span class="refs__n">4</span><span><span class="refs__src">커넥터 설정 — table-include-list · snapshot-mode · fail-on-capture-gap</span>
+          <span class="refs__meta">code · src/embedded-cdc/dev/cdc-service/src/main/resources/application.yml:49,50,54 (75be7dc)</span></span></li>
+        <li><span class="refs__n">5</span><span><span class="refs__src">테이블 디스패치 — 이름 정확 일치. 청크명이 오면 매칭에 실패하는 지점</span>
+          <span class="refs__meta">code · .../domain/model/SourceTable.java:34, .../infrastructure/cdc/DebeziumEventDeserializer.java:50 (75be7dc)</span></span></li>
+        <li><span class="refs__n">6</span><span><span class="refs__src">Go 스택의 동일 지점 — 이벤트에서 테이블 이름을 뽑는 곳</span>
+          <span class="refs__meta">code · src/embedded-cdc-go/dev/cdc-service/internal/infrastructure/cdc/decoder.go:31,48,62 (75be7dc)</span></span></li>
+        <li><span class="refs__n">7</span><span><span class="refs__src">처리량 · 지연 실측치(2,467 / 1,654 events/s)와 변경 감사 비용 근거</span>
+          <span class="refs__meta">doc · docs/v1-v6-verification-summary.html, docs/staged-load-report.html (75be7dc)</span></span></li>
+        <li><span class="refs__n">8</span><span><span class="refs__src">Go 스택 walsender 타임아웃 · panic 9회와 wal_sender_timeout=5min 조정 경위</span>
+          <span class="refs__meta">code · src/embedded-cdc/infra/db/docker-compose.source.yml:36~44 주석 (75be7dc)</span></span></li>
+        <li><span class="refs__n">9</span><span><span class="refs__src">하이퍼테이블 유니크 인덱스는 파티셔닝 컬럼을 포함해야 한다 — B5의 근거</span>
+          <span class="refs__meta">web · https://docs.timescale.com/use-timescale/latest/hypertables/hypertables-and-unique-indexes/ (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">10</span><span><span class="refs__src">배포 이미지 태그 — 2.29.2-pg16 · pg17 · pg18</span>
+          <span class="refs__meta">web · https://hub.docker.com/r/timescale/timescaledb/tags (확인 2026-09-07)</span></span></li>
+      </ol>
+      <p class="small muted">B1 · B2 · B5의 버전 의존 항목(Q1~Q3)은 이 문서 작성 시점에 실기로 확인하지 않았습니다.
+        4절 스파이크로 확정하기 전까지는 <span class="chip chip--warn">확인 필요</span> 표시가 붙은 상태로 읽어야 합니다.</p>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   HW Doc Kit - 개발용 문서 런타임 (TOC 스크롤스파이 / 체크 상태 / 복사)
+   ============================================================ */
+(function () {
+  'use strict';
+  var KEY = 'hwdoc:' + (document.title || location.pathname);
+
+  /* --- TOC 자동 생성 (비어 있을 때만) --- */
+  var toc = document.querySelector('.toc');
+  if (toc && !toc.children.length) {
+    document.querySelectorAll('.sec').forEach(function (sec) {
+      if (!sec.id) return;
+      var h = sec.querySelector('h2');
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + sec.id;
+      a.textContent = h
+        ? Array.prototype.map.call(h.childNodes, function (x) { return x.textContent.trim(); })
+          .filter(Boolean).join(' ')
+        : sec.id;
+      li.appendChild(a); toc.appendChild(li);
+    });
+  }
+
+  /* --- 스크롤스파이 --- */
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var secs = links.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  if (window.IntersectionObserver && secs.length) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (a) { a.classList.toggle('is-cur', a.getAttribute('href') === '#' + e.target.id); });
+      });
+    }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
+    secs.forEach(function (s) { io.observe(s); });
+  }
+
+  /* --- 체크리스트 상태 저장 --- */
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { }
+  document.querySelectorAll('.chk input[type="checkbox"]').forEach(function (cb, i) {
+    var id = cb.id || ('chk' + i); cb.id = id;
+    if (saved[id]) cb.checked = true;
+    var sync = function () {
+      cb.closest('li').classList.toggle('is-done', cb.checked);
+      saved[id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) { }
+      count();
+    };
+    cb.addEventListener('change', sync);
+    cb.closest('li').classList.toggle('is-done', cb.checked);
+  });
+  function count() {
+    document.querySelectorAll('.chk').forEach(function (ul) {
+      var all = ul.querySelectorAll('input[type="checkbox"]');
+      var done = ul.querySelectorAll('input[type="checkbox"]:checked');
+      var badge = ul.previousElementSibling && ul.previousElementSibling.querySelector('.chk-count');
+      if (badge) badge.textContent = done.length + ' / ' + all.length;
+    });
+  }
+  count();
+
+  /* --- 코드 복사 --- */
+  document.querySelectorAll('.code__copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var pre = b.closest('.code').querySelector('pre');
+      try { navigator.clipboard.writeText(pre.innerText); } catch (e) { }
+      var t = b.textContent; b.textContent = '복사됨';
+      setTimeout(function () { b.textContent = t; }, 1200);
+    });
+  });
+
+  /* --- 사이드 버튼 --- */
+  function bind(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+  bind('bTheme', function () {
+    var r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  bind('bPrint', function () { window.print(); });
+  bind('bReset', function () {
+    if (!confirm('체크 상태를 모두 초기화할까요?')) return;
+    try { localStorage.removeItem(KEY); } catch (e) { }
+    location.reload();
+  });
+})();
+</script>
+</body>
+</html>

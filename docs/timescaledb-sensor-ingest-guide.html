@@ -1,0 +1,1943 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>센서 데이터 TimescaleDB 구성 문서</title>
+<style>
+/* ============================================================
+   HW Doc Kit - design tokens & base primitives
+   금지: 이모지, 보라/바이올렛/인디고 계열, 무지개 그라데이션
+   기준색: 한화 오렌지 계열
+   ============================================================ */
+:root{
+  /* brand */
+  --hw:#F37321;          /* 기본 오렌지 */
+  --hw-dk:#D2590F;       /* 진한 오렌지 (호버/강조선) */
+  --hw-dp:#A8420A;       /* 가장 진한 오렌지 (제목 강조) */
+  --hw-lt:#FFB27A;       /* 밝은 오렌지 (보조 채움) */
+  --hw-pale:#FFF1E7;     /* 아주 옅은 오렌지 (배경 톤) */
+  --hw-tint:#FDE3D1;     /* 옅은 오렌지 (테두리/칩) */
+
+  /* ink & surface */
+  --ink:#141414; --ink2:#3F3F3F; --ink3:#6E6E6E; --ink4:#9A9A9A;
+  --bg:#FFFFFF; --bg2:#FAF8F6; --bg3:#F2EEEA;
+  --line:#E4E1DE; --line2:#CFCAC5;
+
+  /* semantic (보라 금지 - 보색은 청록/황토/벽돌색으로) */
+  --ok:#2E7D5B; --ok-bg:#E8F3EE;
+  --warn:#B8791A; --warn-bg:#FBF1DF;
+  --risk:#C0392B; --risk-bg:#FBEAE7;
+  --info:#2A6F97; --info-bg:#E7F0F6;
+
+  --radius:10px; --radius-sm:6px;
+  --shadow:0 1px 2px rgba(20,20,20,.06), 0 8px 24px rgba(20,20,20,.06);
+  --font:"Pretendard","Malgun Gothic","Apple SD Gothic Neo","Segoe UI",system-ui,sans-serif;
+  --mono:"D2Coding","Cascadia Mono","Consolas","JetBrains Mono",ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --hw:#FF8A3D; --hw-dk:#F37321; --hw-dp:#FFB27A; --hw-lt:#7A3E14; --hw-pale:#241812; --hw-tint:#4A2A15;
+  --ink:#F2EFEC; --ink2:#CFC9C3; --ink3:#9E9691; --ink4:#77706B;
+  --bg:#141312; --bg2:#1C1A18; --bg3:#252220;
+  --line:#332F2C; --line2:#464038;
+  --ok:#5CB58C; --ok-bg:#17251F; --warn:#D9A445; --warn-bg:#2A2317;
+  --risk:#E2705F; --risk-bg:#2A1917; --info:#6BA6CC; --info-bg:#161F26;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font); color:var(--ink); background:var(--bg2);
+  -webkit-font-smoothing:antialiased; line-height:1.55;
+  font-variant-numeric:tabular-nums;
+}
+h1,h2,h3,h4{margin:0; line-height:1.25; font-weight:700; letter-spacing:-.01em}
+p{margin:0 0 .6em}
+a{color:var(--hw-dk); text-underline-offset:2px}
+:root[data-theme="dark"] a{color:var(--hw)}
+code,kbd,pre,samp{font-family:var(--mono)}
+hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+
+/* ---------- 공통 프리미티브 ---------- */
+.kicker{
+  font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--hw-dk);
+}
+.rule{height:3px;background:var(--hw);border-radius:2px;width:56px}
+.muted{color:var(--ink3)}
+.small{font-size:13px}
+.mono{font-family:var(--mono);font-size:.92em}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;
+  background:var(--hw-pale);color:var(--hw-dp);border:1px solid var(--hw-tint);
+}
+.chip--ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.chip--warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.chip--risk{background:var(--risk-bg);color:var(--risk);border-color:var(--risk)}
+.chip--info{background:var(--info-bg);color:var(--info);border-color:var(--info)}
+.chip--neutral{background:var(--bg3);color:var(--ink2);border-color:var(--line2)}
+
+.card{
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;
+}
+.card--accent{border-left:4px solid var(--hw)}
+.card__t{font-size:16px;font-weight:700;margin:0 0 6px}
+.card__d{font-size:14px;color:var(--ink2);margin:0}
+
+.kpi{display:flex;gap:14px;flex-wrap:wrap}
+.kpi__item{
+  flex:1 1 0;min-width:140px;background:var(--bg);border:1px solid var(--line);
+  border-top:3px solid var(--hw);border-radius:var(--radius);padding:14px 16px;
+}
+.kpi__v{font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--hw-dp)}
+:root[data-theme="dark"] .kpi__v{color:var(--hw)}
+.kpi__l{font-size:12px;color:var(--ink3);font-weight:600}
+
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--bg)}
+.tbl th,.tbl td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.tbl thead th{background:var(--hw-pale);color:var(--hw-dp);font-size:12.5px;
+  letter-spacing:.03em;text-transform:uppercase;border-color:var(--hw-tint)}
+.tbl tbody tr:nth-child(even){background:var(--bg2)}
+.tbl td.num{text-align:right;font-family:var(--mono)}
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius-sm)}
+
+.note{
+  border:1px solid var(--line);border-left:4px solid var(--ink3);
+  background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-size:14px;
+}
+.note__t{font-weight:700;font-size:13px;margin:0 0 4px;letter-spacing:.02em}
+.note--info{border-left-color:var(--info);background:var(--info-bg)}
+.note--info .note__t{color:var(--info)}
+.note--ok{border-left-color:var(--ok);background:var(--ok-bg)}
+.note--ok .note__t{color:var(--ok)}
+.note--warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.note--warn .note__t{color:var(--warn)}
+.note--risk{border-left-color:var(--risk);background:var(--risk-bg)}
+.note--risk .note__t{color:var(--risk)}
+
+/* 코드 블록 */
+.code{border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg)}
+.code__bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;color:var(--ink3)
+}
+.code__copy{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer
+}
+.code__copy:hover{border-color:var(--hw);color:var(--hw-dk)}
+.code pre{margin:0;padding:12px 14px;overflow-x:auto;font-size:13px;line-height:1.6}
+.code .cm{color:var(--ink4)}
+.code .hl{color:var(--hw-dk);font-weight:700}
+
+/* 단계 흐름 */
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.step{
+  flex:1 1 0;min-width:150px;position:relative;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px
+}
+.step__n{
+  display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:50%;background:var(--hw);color:#fff;font-size:12px;font-weight:800;margin-bottom:6px
+}
+.step__t{font-weight:700;font-size:14px}
+.step__d{font-size:12.5px;color:var(--ink3)}
+
+/* UI 목업 프레임 */
+.ui{border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--bg);box-shadow:var(--shadow)}
+.ui__bar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border-bottom:1px solid var(--line)}
+.ui__dot{width:9px;height:9px;border-radius:50%;background:var(--line2)}
+.ui__addr{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  padding:2px 8px;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+.ui__body{padding:14px}
+.ui-row{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.ui-row:last-child{border-bottom:0}
+.ui-btn{background:var(--hw);color:#fff;border:0;border-radius:5px;padding:6px 14px;font-size:12.5px;font-weight:700}
+.ui-btn--ghost{background:transparent;color:var(--hw-dk);border:1px solid var(--hw)}
+.ui-field{flex:1;border:1px solid var(--line2);border-radius:5px;padding:6px 9px;font-size:12.5px;color:var(--ink3);background:var(--bg2)}
+
+/* 출처 표기 */
+.ref{
+  font-size:.62em;font-weight:800;vertical-align:super;color:var(--hw-dk);
+  background:var(--hw-pale);border:1px solid var(--hw-tint);border-radius:4px;
+  padding:0 4px;margin-left:2px;cursor:pointer;text-decoration:none
+}
+.refs{list-style:none;padding:0;margin:0;font-size:13px}
+.refs li{display:grid;grid-template-columns:26px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.refs li:last-child{border-bottom:0}
+.refs .refs__n{color:var(--hw-dk);font-weight:800;font-family:var(--mono)}
+.refs .refs__src{color:var(--ink);font-weight:600}
+.refs .refs__meta{color:var(--ink3);font-size:12px;font-family:var(--mono);word-break:break-all}
+
+/* 그리드 */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.stack{display:flex;flex-direction:column;gap:12px}
+
+/* ---------- 다이어그램 캔버스 ---------- */
+.dgm{
+  position:relative;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--bg);overflow:hidden;display:flex;flex-direction:column
+}
+.dgm__bar{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:6px 8px;border-bottom:1px solid var(--line);background:var(--bg3);flex:0 0 auto
+}
+.dgm__bar .sp{flex:1}
+.dgm__btn{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--font)
+}
+.dgm__btn:hover{border-color:var(--hw);color:var(--hw-dk)}
+.dgm__btn.is-on{background:var(--hw);border-color:var(--hw);color:#fff}
+.dgm__hint{font-size:11.5px;color:var(--ink4)}
+.dgm__svg{display:block;width:100%;flex:1 1 auto;min-height:0;touch-action:none;cursor:grab;
+  background:radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0/20px 20px}
+.dgm__svg.is-panning{cursor:grabbing}
+.dgm[data-edit="off"] .dgm__bar{display:none}
+
+/* 화면 가득 펼치기 — 툴바의 "넓게" 버튼 / Esc 로 닫는다 */
+.dgm.is-max{
+  position:fixed;inset:14px;z-index:80;
+  width:auto !important;max-width:none !important;height:auto !important;
+  box-shadow:0 12px 48px rgba(20,20,20,.28);border-color:var(--line2)
+}
+html.dgm-locked,html.dgm-locked body{overflow:hidden}
+
+.dgm-node{cursor:move}
+.dgm-node .box{fill:var(--bg);stroke:var(--line2);stroke-width:1.5}
+.dgm-node .lbl{
+  font-family:var(--font);font-size:13.5px;font-weight:700;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;text-align:center;padding:4px 8px;line-height:1.3;overflow:hidden
+}
+.dgm-node .lbl .sub{font-size:11px;font-weight:500;color:var(--ink3);margin-top:2px}
+.dgm-node .lbl[contenteditable="true"]{outline:2px solid var(--hw);background:var(--bg);border-radius:4px}
+.dgm-node.is-sel .box{stroke:var(--hw);stroke-width:2.5}
+.dgm-node[data-tone="primary"] .box{fill:var(--hw);stroke:var(--hw-dk)}
+.dgm-node[data-tone="primary"] .lbl{color:#fff}
+.dgm-node[data-tone="primary"] .lbl .sub{color:rgba(255,255,255,.85)}
+.dgm-node[data-tone="accent"] .box{fill:var(--hw-pale);stroke:var(--hw)}
+.dgm-node[data-tone="accent"] .lbl{color:var(--hw-dp)}
+.dgm-node[data-tone="muted"] .box{fill:var(--bg3);stroke:var(--line2)}
+.dgm-node[data-tone="muted"] .lbl{color:var(--ink3)}
+.dgm-node[data-tone="ok"] .box{fill:var(--ok-bg);stroke:var(--ok)}
+.dgm-node[data-tone="ok"] .lbl{color:var(--ok)}
+.dgm-node[data-tone="warn"] .box{fill:var(--warn-bg);stroke:var(--warn)}
+.dgm-node[data-tone="warn"] .lbl{color:var(--warn)}
+.dgm-node[data-tone="risk"] .box{fill:var(--risk-bg);stroke:var(--risk)}
+.dgm-node[data-tone="risk"] .lbl{color:var(--risk)}
+.dgm-node[data-tone="info"] .box{fill:var(--info-bg);stroke:var(--info)}
+.dgm-node[data-tone="info"] .lbl{color:var(--info)}
+
+.dgm-grp .box{fill:var(--bg2);stroke:var(--line2);stroke-dasharray:6 4;stroke-width:1.5}
+.dgm-grp .gl{font-family:var(--font);font-size:11.5px;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;fill:var(--ink4)}
+.dgm-grp{cursor:move}
+
+.dgm-edge .wire{fill:none;stroke:var(--ink3);stroke-width:1.8}
+.dgm-edge .hit{fill:none;stroke:transparent;stroke-width:14;cursor:pointer}
+.dgm-edge.is-sel .wire{stroke:var(--hw);stroke-width:2.6}
+.dgm-edge[data-style="dash"] .wire{stroke-dasharray:6 4}
+.dgm-edge[data-tone="primary"] .wire{stroke:var(--hw)}
+.dgm-edge[data-tone="risk"] .wire{stroke:var(--risk)}
+.dgm-edge[data-tone="ok"] .wire{stroke:var(--ok)}
+.dgm-edge .elbl{
+  font-family:var(--font);font-size:11.5px;font-weight:600;color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;height:100%;text-align:center;
+}
+.dgm-edge .elbl span{background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--line)}
+
+.dgm__modal{
+  position:absolute;inset:0;background:rgba(0,0,0,.45);display:none;
+  align-items:center;justify-content:center;padding:24px;z-index:9
+}
+.dgm__modal.is-open{display:flex}
+.dgm__modal .pane{background:var(--bg);border-radius:var(--radius);width:min(680px,100%);
+  max-height:100%;display:flex;flex-direction:column;border:1px solid var(--line2)}
+.dgm__modal textarea{
+  flex:1;min-height:240px;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:12px;font-family:var(--mono);font-size:12px;resize:vertical;background:var(--bg2);color:var(--ink)
+}
+.dgm__modal .head,.dgm__modal .foot{display:flex;align-items:center;gap:8px;padding:10px 12px}
+.dgm__modal .head b{font-size:14px}
+.dgm__modal .sp{flex:1}
+
+/* ── 차트 (scripts/make-chart.sh 산출물) ─────────────────────────────────── */
+.cht{ margin:16px 0 18px; padding:14px 14px 10px; border:1px solid var(--line); border-radius:var(--radius); background:var(--bg2) }
+.cht__t{ margin:0 0 8px; font-size:13.5px; font-weight:700; color:var(--ink); letter-spacing:-.01em }
+.cht svg{ display:block; width:100%; height:auto; font-family:inherit }
+.cht rect, .cht circle{ cursor:default }
+.cht rect:hover, .cht circle:hover{ opacity:.75 }
+.cht__c{ margin:8px 0 0; font-size:12px; line-height:1.65; color:var(--ink3) }
+
+/* 인쇄 */
+@media print{
+  .cht{ page-break-inside:avoid; background:transparent }
+  body{background:#fff}
+  .no-print{display:none !important}
+  .dgm__bar{display:none !important}
+  .dgm__svg{background:none}
+  .dgm.is-max{position:static;inset:auto;box-shadow:none}
+}
+
+/* ── 한글 줄바꿈 ─────────────────────────────────────────────────────────────
+   브라우저 기본값은 낱말 한가운데를 끊는다. "남은 결/정" 처럼 갈라지면 제목이
+   읽히지 않는다. keep-all 은 띄어쓰기에서만 줄을 바꾼다.
+   반대로 긴 영문 식별자나 경로는 keep-all 이면 칸을 넘치므로 overflow-wrap 으로 받고,
+   코드·경로 계열은 어디서든 끊어 넘침을 막는다. */
+h1, h2, h3, h4, p, li, td, th, dt, dd,
+.card__d, .step__d, .note, .lead, .sub, figcaption {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.mono, pre, code, .refs__meta { word-break: break-all; overflow-wrap: normal }
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 레이아웃 (사이드 TOC + 본문 단일 컬럼)
+   ============================================================ */
+body{ background:var(--bg2) }
+
+.doc{ display:grid; grid-template-columns:270px minmax(0,1fr); align-items:start; }
+
+/* 사이드바 */
+.side{
+  position:sticky; top:0; height:100vh; overflow:auto;
+  background:var(--bg); border-right:1px solid var(--line); padding:20px 16px 40px;
+}
+.side__brand{ display:flex; align-items:center; gap:9px; margin-bottom:6px }
+.side__brand .bar{ width:5px; height:26px; background:var(--hw); border-radius:2px }
+.side__brand b{ font-size:14.5px; letter-spacing:-.01em }
+.side__meta{ font-size:11.5px; color:var(--ink4); margin:0 0 16px; font-family:var(--mono) }
+.toc{ list-style:none; margin:0; padding:0; font-size:13.5px }
+.toc li{ margin:1px 0 }
+.toc a{
+  display:block; padding:5px 10px; border-radius:6px; color:var(--ink2);
+  text-decoration:none; border-left:2px solid transparent;
+}
+.toc a:hover{ background:var(--bg3); color:var(--ink) }
+.toc a.is-cur{ background:var(--hw-pale); color:var(--hw-dp); font-weight:700; border-left-color:var(--hw) }
+.toc .sub a{ padding-left:22px; font-size:12.5px; color:var(--ink3) }
+.side__foot{ margin-top:18px; padding-top:14px; border-top:1px solid var(--line); display:flex; gap:6px; flex-wrap:wrap }
+.side__foot button{
+  border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:5px;
+  padding:3px 9px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:var(--font);
+}
+.side__foot button:hover{ border-color:var(--hw); color:var(--hw-dk) }
+
+/* 본문 */
+.main{ padding:34px 44px 100px; max-width:1040px; }
+.doc-head{ border-bottom:2px solid var(--hw); padding-bottom:18px; margin-bottom:26px }
+.doc-head h1{ font-size:32px; letter-spacing:-.025em; margin:6px 0 8px }
+.doc-head .sub{ font-size:15px; color:var(--ink2); max-width:80ch }
+.doc-head .meta{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px }
+
+.sec{ margin:0 0 44px; scroll-margin-top:18px }
+.sec > h2{
+  font-size:21px; margin:0 0 4px; display:flex; align-items:baseline; gap:10px;
+}
+.sec > h2 .n{ font-family:var(--mono); font-size:14px; font-weight:800; color:var(--hw) }
+.sec > .why{ font-size:13.5px; color:var(--ink3); margin:0 0 16px; padding-left:2px }
+.sec h3{ font-size:16px; margin:24px 0 10px; padding-left:10px; border-left:3px solid var(--hw-tint) }
+.sec h4{ font-size:14px; margin:16px 0 6px; color:var(--ink2) }
+.sec p, .sec li{ font-size:14.5px }
+.sec ul, .sec ol{ margin:0 0 12px; padding-left:20px }
+.sec li{ margin:3px 0 }
+
+/* 체크리스트 */
+.chk{ list-style:none; padding:0; margin:0 }
+.chk li{
+  display:flex; gap:10px; align-items:flex-start; padding:9px 12px;
+  border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--bg); margin-bottom:6px;
+}
+.chk input{ margin-top:3px; width:15px; height:15px; accent-color:var(--hw); flex:0 0 auto }
+.chk li.is-done{ background:var(--bg2); border-color:var(--line) }
+.chk li.is-done .t{ text-decoration:line-through; color:var(--ink4) }
+.chk .t{ font-weight:600; font-size:14px }
+.chk .d{ font-size:12.5px; color:var(--ink3); display:block; margin-top:2px }
+
+/* 시나리오 (Given/When/Then) */
+.gwt{ border:1px solid var(--line); border-left:4px solid var(--hw); border-radius:var(--radius-sm);
+  background:var(--bg); padding:14px 16px; margin:0 0 12px }
+.gwt__t{ font-weight:700; font-size:14.5px; margin:0 0 8px }
+.gwt dl{ margin:0; display:grid; grid-template-columns:64px 1fr; gap:4px 10px; font-size:13.5px }
+.gwt dt{ font-weight:800; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--hw-dk); padding-top:2px }
+.gwt dd{ margin:0; color:var(--ink2) }
+
+/* 작업 단위 카드 */
+.slice{ border:1px solid var(--line); border-radius:var(--radius); background:var(--bg); overflow:hidden; margin-bottom:12px }
+.slice__h{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg3); border-bottom:1px solid var(--line) }
+.slice__h .no{ font-family:var(--mono); font-weight:800; color:#fff; background:var(--hw);
+  border-radius:5px; padding:1px 8px; font-size:12px }
+.slice__h b{ font-size:14.5px }
+.slice__h .sp{ flex:1 }
+.slice__b{ padding:12px 14px; font-size:13.5px }
+.slice__b dl{ margin:0; display:grid; grid-template-columns:110px 1fr; gap:6px 12px }
+.slice__b dt{ color:var(--ink3); font-size:12.5px; font-weight:700 }
+.slice__b dd{ margin:0; color:var(--ink2) }
+
+/* 의사결정 기록 */
+.adr{ border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; background:var(--bg); margin-bottom:12px }
+.adr__t{ font-size:15px; font-weight:700; margin:0 0 8px }
+.adr dl{ margin:0; display:grid; grid-template-columns:96px 1fr; gap:5px 12px; font-size:13.5px }
+.adr dt{ color:var(--hw-dk); font-weight:700; font-size:12.5px }
+.adr dd{ margin:0; color:var(--ink2) }
+
+.dgm{ margin:0 0 14px; height:520px }
+/* 다이어그램은 본문 글줄 폭에 갇히지 않고 사이드바 오른쪽을 전부 쓴다.
+   270px 사이드바 + 본문 좌우 패딩 88px + 스크롤바 여유 18px 를 뺀 값. */
+@media (min-width:1001px){
+  .dgm{ width:min(calc(100vw - 376px), 1700px); max-width:none }
+}
+.tbl-wrap{ margin-bottom:14px }
+.note{ margin-bottom:12px }
+.code{ margin-bottom:14px }
+
+@media (max-width:1000px){
+  .doc{ grid-template-columns:1fr }
+  .side{ position:static; height:auto; border-right:0; border-bottom:1px solid var(--line) }
+  .main{ padding:24px 20px 60px }
+}
+@media print{
+  @page{ size:A4; margin:14mm }
+  .side{ display:none }
+  .doc{ display:block }
+  .main{ max-width:none; padding:0 }
+  .sec{ page-break-inside:avoid }
+  .dgm{ height:320px; width:auto }
+}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- ================= 사이드바 ================= -->
+  <aside class="side no-print">
+    <div class="side__brand"><span class="bar"></span><b>센서 데이터 TimescaleDB 구성 문서</b></div>
+    <p class="side__meta">v0.1 · 2026-09-07 · 데이터플랫폼</p>
+    <ul class="toc"></ul>
+    <div class="side__foot">
+      <button id="bTheme" type="button">테마</button>
+      <button id="bPrint" type="button">인쇄</button>
+      <button id="bReset" type="button">체크 초기화</button>
+    </div>
+  </aside>
+
+  <!-- ================= 본문 ================= -->
+  <main class="main">
+
+    <header class="doc-head">
+      <span class="kicker">Development Document</span>
+      <h1>필드 센서 데이터 실시간 저장소를 TimescaleDB로 구성합니다</h1>
+      <p class="sub">현장 설비에서 초당 수천 건씩 들어오는 센서 값을 일반 PostgreSQL 테이블에 계속 쌓으면
+        디스크와 인덱스가 먼저 무너집니다. 이 문서는 같은 PostgreSQL 위에 TimescaleDB 확장을 얹어
+        적재 · 압축 · 집계 · 삭제를 정책으로 자동화하는 구성을 정의하고, 무엇을 어떤 순서로 만들어
+        어떤 수치로 완료를 판정할지까지 적습니다.</p>
+      <div class="meta">
+        <span class="chip">백엔드 1명 · DBA 0.5명</span>
+        <span class="chip chip--neutral">예상 6일</span>
+        <span class="chip chip--info">PostgreSQL 17 + TimescaleDB 2.29.2</span>
+        <span class="chip chip--warn">규모 파라미터 미확정</span>
+      </div>
+    </header>
+
+    <!-- ---------- 0. 범위 ---------- -->
+    <section class="sec" id="s0">
+      <h2><span class="n">00</span>범위와 전제</h2>
+      <p class="why">TimescaleDB는 설치하면 빨라지는 물건이 아니라, 청크 크기와 압축 시점과 보존 기간을 정하는 일입니다. 그 값을 정하는 것이 이 과제의 실체이고 나머지는 건드리지 않습니다.</p>
+      <div class="g2">
+        <div class="card card--accent">
+          <p class="card__t">이번에 만드는 것</p>
+          <ul style="margin:6px 0 0">
+            <li>TimescaleDB 확장 설치와 PostgreSQL 파라미터 확정</li>
+            <li>원본 하이퍼테이블 <span class="mono">sensor_reading</span> 과 멱등 배치 적재 경로</li>
+            <li>컬럼스토어 전환 정책과 보존 정책</li>
+            <li>1분 · 1시간 두 단계 연속 집계</li>
+            <li>적재 지연과 잡 실패 지표를 기존 Prometheus · Grafana에 연결</li>
+          </ul>
+        </div>
+        <div class="card">
+          <p class="card__t">이번에 하지 않는 것</p>
+          <ul style="margin:6px 0 0">
+            <li>엣지 게이트웨이 펌웨어와 수집망 변경 — 현재 HTTP 배치 전송을 그대로 받습니다</li>
+            <li>이상 탐지 · 예측 모델 — 집계 테이블까지만 만듭니다</li>
+            <li>다중 노드 분산 — TimescaleDB 2.14에서 멀티노드 지원이 제거되어 선택지가 아닙니다<sup class="ref" data-ref="9">9</sup></li>
+            <li>기존 CDC 파이프라인 DB 변경 — 센서 저장소는 별도 인스턴스로 분리합니다<sup class="ref" data-ref="12">12</sup></li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>규모 전제</h3>
+      <p>아래 값이 뒤의 모든 계산(청크 인터벌, 압축 시점, 디스크 산정)의 입력입니다.
+        <b>측정값이 아니라 설계 시작점</b>이므로 작업 단위 S1에서 실제 수집망 통계로 교체하고, 그때 이 표를 갱신합니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">항목</th><th style="width:22%">값</th><th>근거 · 산출식</th></tr></thead>
+          <tbody>
+            <tr><td>센서 태그 수</td><td class="num mono">2,000</td><td>설비 200대 × 태그 10개 <span class="chip chip--warn">가정</span></td></tr>
+            <tr><td>수집 주기</td><td class="num mono">1초</td><td>게이트웨이 기본 설정 <span class="chip chip--warn">가정</span></td></tr>
+            <tr><td>평균 적재율</td><td class="num mono">2,000 행/초</td><td>2,000 태그 ÷ 1초</td></tr>
+            <tr><td>피크 적재율</td><td class="num mono">8,000 행/초</td><td>설비 이벤트 시 250ms 버스트 = 평균의 4배 <span class="chip chip--warn">가정</span></td></tr>
+            <tr><td>일 적재 행 수</td><td class="num mono">172,800,000</td><td>2,000 × 86,400</td></tr>
+            <tr><td>행 크기(로우스토어)</td><td class="num mono">약 60 B</td><td>튜플 헤더 24B + time 8 + tag_id 4 + value 8 + quality 2 + 정렬 여유</td></tr>
+            <tr><td>일 디스크 증가</td><td class="num mono">약 10.4 GB</td><td>172,800,000 × 60B <span class="chip chip--warn">추정</span></td></tr>
+            <tr><td>원본 보존</td><td class="num mono">90일</td><td>설비 고장 분석 소급 범위 <span class="chip chip--warn">확인 필요</span></td></tr>
+            <tr><td>지연 도착 상한</td><td class="num mono">7일</td><td>게이트웨이 로컬 버퍼 용량 <span class="chip chip--warn">확인 필요</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--warn">
+        <p class="note__t">전제 · 에디션 선택이 3~5절 전체를 좌우합니다</p>
+        컬럼스토어(하이퍼코어) 압축, 연속 집계, 보존 · 압축 정책은 <b>TimescaleDB Community Edition(TSL)</b> 기능입니다.
+        Apache 2 에디션(<span class="mono">-oss</span> 태그 이미지)에는 하이퍼테이블만 있고 이 문서의 압축 · 집계 구성이 전부 동작하지 않습니다<sup class="ref" data-ref="10">10</sup>.
+        서비스형으로 재판매하지 않는 사내 사용은 TSL로 무상 사용이 가능하므로 <span class="mono">-oss</span> 가 아닌 태그를 씁니다.
+        이 판단을 S1에서 법무 확인과 함께 못 박고, 이미지 태그를 고정합니다.
+      </div>
+    </section>
+
+    <!-- ---------- 1. 시나리오 ---------- -->
+    <section class="sec" id="s1">
+      <h2><span class="n">01</span>개발 시나리오</h2>
+      <p class="why">구현 전에 무엇을 성공으로 볼지 문장으로 고정합니다. 아래 ID는 4절 작업 분할과 6절 테스트에서 그대로 참조합니다.</p>
+
+      <h3>정상 흐름</h3>
+      <div class="gwt">
+        <p class="gwt__t">SC-01 · 실시간 배치가 원본 하이퍼테이블에 적재된다</p>
+        <dl>
+          <dt>Given</dt><dd><span class="mono">sensor_reading</span> 하이퍼테이블이 청크 인터벌 6시간으로 생성되어 있다</dd>
+          <dt>When</dt><dd>게이트웨이가 500건 묶음을 <span class="mono">POST /readings</span> 로 보낸다</dd>
+          <dt>Then</dt><dd>500행이 현재 시각이 속한 청크 한 개에 적재되고, 수신에서 커밋까지 p99가 2초 이내다</dd>
+        </dl>
+      </div>
+      <div class="gwt">
+        <p class="gwt__t">SC-02 · 1분 연속 집계가 확정 구간만 갱신한다</p>
+        <dl>
+          <dt>Given</dt><dd><span class="mono">reading_1m</span> 연속 집계가 <span class="mono">start_offset 3시간 / end_offset 5분</span> 정책으로 등록되어 있다</dd>
+          <dt>When</dt><dd>집계 잡이 실행된다</dd>
+          <dt>Then</dt><dd>최근 5분 구간은 갱신되지 않고, 그보다 이전 3시간 구간의 버킷만 다시 계산된다</dd>
+        </dl>
+      </div>
+
+      <h3>예외 흐름</h3>
+      <div class="gwt">
+        <p class="gwt__t">SC-03 · 게이트웨이 복구 후 3시간 지연 데이터가 과거 청크로 들어간다</p>
+        <dl>
+          <dt>Given</dt><dd>게이트웨이가 3시간 끊겼다가 복구되어 로컬 버퍼 2,160만 건을 밀어 넣는다</dd>
+          <dt>When</dt><dd>해당 구간의 청크가 아직 로우스토어다(컬럼스토어 전환 기준 8일 이내)</dd>
+          <dt>Then</dt><dd>전량이 원래 계측 시각의 청크에 적재되고, 같은 시간 동안 실시간 적재의 p99 지연이 2초를 넘지 않는다</dd>
+        </dl>
+      </div>
+      <div class="gwt">
+        <p class="gwt__t">SC-04 · 같은 (tag_id, time) 재전송이 행을 늘리지 않는다</p>
+        <dl>
+          <dt>Given</dt><dd>태그 101의 <span class="mono">2026-09-07 02:00:00Z</span> 값 23.4가 이미 적재되어 있다</dd>
+          <dt>When</dt><dd>게이트웨이 ack 유실로 같은 시각 · 같은 태그가 값 99.9로 재전송된다</dd>
+          <dt>Then</dt><dd>행 수는 1로 유지되고 값은 23.4로 남으며, 중복 카운터가 1 증가한다</dd>
+        </dl>
+      </div>
+      <div class="gwt">
+        <p class="gwt__t">SC-05 · 보존 기간이 지난 원본은 삭제되고 집계는 남는다</p>
+        <dl>
+          <dt>Given</dt><dd>원본 보존 90일, <span class="mono">reading_1h</span> 보존 5년 정책이 등록되어 있다</dd>
+          <dt>When</dt><dd>보존 잡이 91일 전 청크를 대상으로 실행된다</dd>
+          <dt>Then</dt><dd>원본 청크는 삭제되고, 같은 구간의 <span class="mono">reading_1h</span> 행은 그대로 조회된다</dd>
+        </dl>
+      </div>
+    </section>
+
+    <!-- ---------- 2. 구조 ---------- -->
+    <section class="sec" id="s2">
+      <h2><span class="n">02</span>목표 구조</h2>
+      <p class="why">박스를 끌어 배치를 바꿀 수 있습니다. 구조가 바뀌면 JSON 버튼으로 내보내 이 파일의 dgm-data 블록에 붙여넣습니다.</p>
+
+      <h3>컴포넌트 구성</h3>
+      <div class="dgm" data-edit="on">
+        <script type="application/json" class="dgm-data">
+{
+  "groups": [
+    {"id":"gA","label":"신규 개발 범위","x":300,"y":10,"w":880,"h":300}
+  ],
+  "nodes": [
+    {"id":"gw","label":"엣지 게이트웨이","sub":"설비 200대 · 기존","x":40,"y":40,"w":200,"h":58,"tone":"muted"},
+    {"id":"api","label":"수집 API","sub":"배치 500건 · 검증","x":320,"y":40,"w":220,"h":58,"tone":"accent"},
+    {"id":"ht","label":"sensor_reading","sub":"하이퍼테이블 · 청크 6시간","x":620,"y":40,"w":240,"h":62,"tone":"primary","shape":"store"},
+    {"id":"a1m","label":"reading_1m","sub":"연속 집계 · 1분 버킷","x":940,"y":40,"w":220,"h":62,"tone":"accent","shape":"store"},
+    {"id":"graf","label":"Grafana","sub":"기존 대시보드","x":1220,"y":40,"w":190,"h":58,"tone":"muted"},
+    {"id":"rej","label":"sensor_reject","sub":"검증 실패 격리","x":320,"y":180,"w":220,"h":58,"tone":"risk","shape":"store"},
+    {"id":"job","label":"백그라운드 잡","sub":"압축 · 보존 · 집계 갱신","x":620,"y":180,"w":240,"h":58,"tone":"accent","shape":"note"},
+    {"id":"a1h","label":"reading_1h","sub":"연속 집계 · 1시간 롤업","x":940,"y":180,"w":220,"h":62,"tone":"accent","shape":"store"}
+  ],
+  "edges": [
+    {"from":"gw","to":"api","label":"HTTP 배치"},
+    {"from":"api","to":"ht","label":"배치 적재","tone":"primary"},
+    {"from":"api","to":"rej","label":"검증 실패","tone":"risk","style":"dash"},
+    {"from":"ht","to":"a1m","label":"집계","tone":"primary"},
+    {"from":"a1m","to":"a1h","label":"롤업"},
+    {"from":"a1m","to":"graf"},
+    {"from":"a1h","to":"graf"},
+    {"from":"job","to":"ht","label":"압축 · 보존","style":"dash"}
+  ]
+}
+        </script>
+      </div>
+      <p class="small muted">원본 하이퍼테이블은 대시보드가 직접 읽지 않습니다. 조회를 전부 연속 집계로 보내야
+        압축된 청크를 훑는 무거운 쿼리가 실시간 적재를 방해하지 않습니다.</p>
+
+      <h3>배치 한 건이 지나는 순서</h3>
+      <div class="dgm" data-edit="on" style="height:360px">
+        <script type="application/json" class="dgm-data">
+{
+  "nodes": [
+    {"id":"n1","label":"배치 수신","sub":"500건 · JSON","x":30,"y":40,"w":190,"h":56,"tone":"primary"},
+    {"id":"n2","label":"스키마 · 범위 검증","sub":"tag_id 존재 · 값 상하한","x":300,"y":40,"w":210,"h":56},
+    {"id":"n3","label":"대상 청크 판정","sub":"계측시각이 최근 8일 이내인가","x":590,"y":34,"w":220,"h":70,"shape":"diamond"},
+    {"id":"n4","label":"로우스토어 청크 적재","sub":"ON CONFLICT DO NOTHING","x":890,"y":40,"w":240,"h":58,"tone":"ok"},
+    {"id":"n5","label":"컬럼스토어 청크 적재","sub":"부분 감압 후 삽입 · 느림","x":890,"y":190,"w":240,"h":58,"tone":"warn"},
+    {"id":"n6","label":"sensor_reject 격리","sub":"3회 재시도 후","x":300,"y":190,"w":210,"h":56,"tone":"risk"},
+    {"id":"n7","label":"커밋 · 지연 지표 기록","sub":"수신시각 빼기 계측시각","x":1210,"y":40,"w":200,"h":58,"tone":"ok"},
+    {"id":"n8","label":"재압축 잡 예약","sub":"convert_to_columnstore","x":1210,"y":190,"w":200,"h":58,"tone":"accent"}
+  ],
+  "edges": [
+    {"from":"n1","to":"n2","tone":"primary"},
+    {"from":"n2","to":"n6","label":"검증 실패","tone":"risk","style":"dash"},
+    {"from":"n2","to":"n3","tone":"primary"},
+    {"from":"n3","to":"n4","label":"최근 8일","tone":"primary"},
+    {"from":"n3","to":"n5","label":"그 이전","style":"dash"},
+    {"from":"n4","to":"n7","tone":"ok"},
+    {"from":"n5","to":"n7","tone":"ok"},
+    {"from":"n5","to":"n8","style":"dash"}
+  ]
+}
+        </script>
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">이 그림에서 가장 비싼 경로</p>
+        <span class="mono">n5</span> 입니다. 컬럼스토어로 전환된 청크에 뒤늦은 행이 들어오면 해당 세그먼트를 풀었다가
+        다시 담아야 하고, 삽입된 행이 자동으로 재압축되지도 않습니다<sup class="ref" data-ref="3">3</sup>.
+        그래서 <b>압축 전환 기준을 지연 도착 상한보다 앞당기면 안 됩니다.</b>
+        지연 상한 7일에 하루를 더해 전환 기준을 8일로 잡은 것이 ADR-02 입니다.
+      </div>
+    </section>
+
+    <!-- ---------- 3. 구현 방식 비교 ---------- -->
+    <section class="sec" id="s3">
+      <h2><span class="n">03</span>구현 방식 비교와 선택</h2>
+      <p class="why">왜 TimescaleDB인가에 답이 없으면 반년 뒤 같은 논의를 다시 합니다. 탈락안도 이유와 함께 남깁니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:20%">방식</th><th style="width:26%">장점</th><th style="width:32%">단점</th><th>적합도</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>A. 순수 PostgreSQL</b><br><span class="small muted">선언적 파티셔닝 + pg_partman</span></td>
+              <td>확장 추가 없음, 운영 · 백업 체계 그대로</td>
+              <td>압축이 없어 보존 90일이면 936GB, 롤업 뷰와 파티션 생성 · 삭제를 전부 직접 구현</td>
+              <td><span class="chip chip--neutral">보류</span></td>
+            </tr>
+            <tr>
+              <td><b>B. PostgreSQL + TimescaleDB</b><br><span class="small muted">선택안 · Community Edition</span></td>
+              <td>같은 SQL · 같은 드라이버 · 같은 백업, 압축 · 집계 · 보존이 정책 3줄</td>
+              <td>확장 버전과 PostgreSQL 메이저 업그레이드가 서로 묶임, TSL 라이선스 확인 필요</td>
+              <td><span class="chip chip--ok">채택</span></td>
+            </tr>
+            <tr>
+              <td><b>C. 전용 시계열 DB</b><br><span class="small muted">InfluxDB · ClickHouse</span></td>
+              <td>압축률과 대량 집계 성능 우위</td>
+              <td>설비 마스터 테이블과 조인 불가, 운영 · 모니터링 · 백업 체계를 하나 더 떠안음</td>
+              <td><span class="chip chip--risk">탈락</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="adr">
+        <p class="adr__t">ADR-01 · 원본은 하이퍼테이블 한 개에 좁은 스키마로 둔다</p>
+        <dl>
+          <dt>배경</dt><dd>설비가 증설될 때마다 태그가 늘어납니다. 태그마다 컬럼을 두는 넓은 스키마는 증설 때마다 <span class="mono">ALTER TABLE</span> 이 필요하고, 그 시점에 적재가 멈춥니다.</dd>
+          <dt>결정</dt><dd><span class="mono">(time, tag_id, value, quality)</span> 네 컬럼으로 고정하고, 태그 메타(설비 · 단위 · 상하한)는 별도 <span class="mono">sensor_tag</span> 일반 테이블에 두어 조회 시 조인합니다.</dd>
+          <dt>대가</dt><dd>행 수가 태그 배수로 늘고, 한 시점의 여러 태그를 가로로 볼 때 <span class="mono">FILTER</span> 피벗이 필요합니다.</dd>
+          <dt>재검토</dt><dd>태그가 200개 미만으로 고정되고 조회의 80% 이상이 다중 태그 동시 조회가 되면 넓은 스키마를 재검토합니다.</dd>
+        </dl>
+      </div>
+
+      <h3>청크 인터벌을 6시간으로 정한 근거</h3>
+      <p>공식 기준은 "현재 적재 중인 청크의 인덱스가 <span class="mono">shared_buffers</span> 의 25% 안에 들어올 것"입니다<sup class="ref" data-ref="7">7</sup>.
+        호스트 메모리 32GB · <span class="mono">shared_buffers = 8GB</span> 를 전제로 하면 한도는 2,048MB이고,
+        <span class="mono">(tag_id, time DESC)</span> 인덱스는 행당 약 36B(키 12B + 아이템 포인터 · 페이지 여유)로 잡습니다.</p>
+      <figure class="cht">
+        <figcaption class="cht__t">청크 인터벌 후보별 활성 청크 인덱스 크기 (산출값)</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="청크 인터벌 후보별 활성 청크 인덱스 크기 (산출값)">
+          <rect x="76" y="190.2" width="780.0" height="55.8" fill="var(--hw-pale)" stroke="var(--hw-tint)" stroke-dasharray="4 3"/>
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">2,000</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">4,000</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">6,000</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">8,000</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">MB</text>
+          <text x="154.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">1시간</text>
+          <text x="310.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">3시간</text>
+          <text x="466.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">6시간</text>
+          <text x="622.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">12시간</text>
+          <text x="778.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">1일</text>
+          <rect x="130.6" y="238.9" width="43.8" height="7.1" fill="var(--hw)" rx="1.5"><title>1시간 · (tag_id, time DESC) 인덱스 259MB</title></rect>
+          <text x="152.5" y="234.9" text-anchor="middle" font-size="12" fill="var(--ink2)">259</text>
+          <rect x="286.6" y="224.8" width="43.8" height="21.2" fill="var(--hw)" rx="1.5"><title>3시간 · (tag_id, time DESC) 인덱스 778MB</title></rect>
+          <text x="308.5" y="220.8" text-anchor="middle" font-size="12" fill="var(--ink2)">778</text>
+          <rect x="442.6" y="203.6" width="43.8" height="42.4" fill="var(--hw)" rx="1.5"><title>6시간 · (tag_id, time DESC) 인덱스 1,555MB</title></rect>
+          <text x="464.5" y="199.6" text-anchor="middle" font-size="12" fill="var(--ink2)">1,555</text>
+          <rect x="598.6" y="161.3" width="43.8" height="84.7" fill="var(--hw)" rx="1.5"><title>12시간 · (tag_id, time DESC) 인덱스 3,110MB</title></rect>
+          <text x="620.5" y="157.3" text-anchor="middle" font-size="12" fill="var(--ink2)">3,110</text>
+          <rect x="754.6" y="76.5" width="43.8" height="169.5" fill="var(--hw)" rx="1.5"><title>1일 · (tag_id, time DESC) 인덱스 6,221MB</title></rect>
+          <text x="776.5" y="72.5" text-anchor="middle" font-size="12" fill="var(--ink2)">6,221</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="641.2" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="669.2" y="11" font-size="12.5" fill="var(--ink2)">(tag_id, time DESC) 인덱스</text>
+          <text x="82" y="178.2" font-size="12" fill="var(--hw-dk)" paint-order="stroke" stroke="var(--bg2)" stroke-width="3.5" stroke-linejoin="round">shared_buffers 8GB의 25%</text>
+        </svg>
+        <p class="cht__c">12시간부터 25% 한도를 넘어선다. 6시간(1,555MB)이 한도의 76%로 여유를 남기는 가장 큰 값이라 이 값을 골랐다. 평균 2,000행/초 · 인덱스 행당 36B 가정에서 계산한 값이며 실측이 아니다. 막대에 커서를 올리면 값이 뜬다.</p>
+      </figure>
+
+      <h3>압축 전환을 미루면 디스크가 어떻게 되나</h3>
+      <p>일 10.4GB가 그대로 쌓이는 경우와, 8일이 지난 청크를 컬럼스토어로 전환해 90% 압축되는 경우를 비교합니다.
+        압축률은 데이터 형태에 따라 크게 달라지므로 여기서는 보수적으로 90%를 씁니다<span class="chip chip--warn">추정</span>.</p>
+      <figure class="cht">
+        <figcaption class="cht__t">컬럼스토어 전환 유무에 따른 누적 디스크 사용량 (산출값)</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="컬럼스토어 전환 유무에 따른 누적 디스크 사용량 (산출값)">
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">200</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">400</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">600</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">800</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">GB</text>
+          <text x="76.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">8일</text>
+          <text x="206.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">16일</text>
+          <text x="336.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">24일</text>
+          <text x="466.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">32일</text>
+          <text x="596.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">40일</text>
+          <text x="726.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">48일</text>
+          <text x="856.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">56일</text>
+          <polyline points="76.0,223.3 206.0,221.1 336.0,218.8 466.0,216.5 596.0,214.3 726.0,212.0 856.0,209.7 " fill="none" stroke="var(--hw)" stroke-width="2.4"/>
+          <polygon points="76.0,246.0 76.0,223.3 206.0,221.1 336.0,218.8 466.0,216.5 596.0,214.3 726.0,212.0 856.0,209.7 856.0,246.0" fill="var(--hw)" opacity=".12"/>
+          <circle cx="76.0" cy="223.3" r="3.4" fill="var(--hw)"><title>8일 · 8일 후 컬럼스토어 전환 83.2GB</title></circle>
+          <circle cx="206.0" cy="221.1" r="3.4" fill="var(--hw)"><title>16일 · 8일 후 컬럼스토어 전환 91.5GB</title></circle>
+          <circle cx="336.0" cy="218.8" r="3.4" fill="var(--hw)"><title>24일 · 8일 후 컬럼스토어 전환 99.8GB</title></circle>
+          <circle cx="466.0" cy="216.5" r="3.4" fill="var(--hw)"><title>32일 · 8일 후 컬럼스토어 전환 108GB</title></circle>
+          <circle cx="596.0" cy="214.3" r="3.4" fill="var(--hw)"><title>40일 · 8일 후 컬럼스토어 전환 116GB</title></circle>
+          <circle cx="726.0" cy="212.0" r="3.4" fill="var(--hw)"><title>48일 · 8일 후 컬럼스토어 전환 124GB</title></circle>
+          <circle cx="856.0" cy="209.7" r="3.4" fill="var(--hw)"><title>56일 · 8일 후 컬럼스토어 전환 133GB</title></circle>
+          <text x="856.0" y="200.7" text-anchor="middle" font-size="12" font-weight="700" fill="var(--hw)">133</text>
+          <polyline points="76.0,223.3 206.0,200.7 336.0,178.0 466.0,155.3 596.0,132.6 726.0,110.0 856.0,87.3 " fill="none" stroke="var(--info)" stroke-width="2.4"/>
+          <polygon points="76.0,246.0 76.0,223.3 206.0,200.7 336.0,178.0 466.0,155.3 596.0,132.6 726.0,110.0 856.0,87.3 856.0,246.0" fill="var(--info)" opacity=".12"/>
+          <circle cx="76.0" cy="223.3" r="3.4" fill="var(--info)"><title>8일 · 로우스토어 유지 83.2GB</title></circle>
+          <circle cx="206.0" cy="200.7" r="3.4" fill="var(--info)"><title>16일 · 로우스토어 유지 166GB</title></circle>
+          <circle cx="336.0" cy="178.0" r="3.4" fill="var(--info)"><title>24일 · 로우스토어 유지 249GB</title></circle>
+          <circle cx="466.0" cy="155.3" r="3.4" fill="var(--info)"><title>32일 · 로우스토어 유지 332GB</title></circle>
+          <circle cx="596.0" cy="132.6" r="3.4" fill="var(--info)"><title>40일 · 로우스토어 유지 416GB</title></circle>
+          <circle cx="726.0" cy="110.0" r="3.4" fill="var(--info)"><title>48일 · 로우스토어 유지 499GB</title></circle>
+          <circle cx="856.0" cy="87.3" r="3.4" fill="var(--info)"><title>56일 · 로우스토어 유지 582GB</title></circle>
+          <text x="856.0" y="78.3" text-anchor="middle" font-size="12" font-weight="700" fill="var(--info)">582</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="755.2" y="6" width="22" height="4" rx="2" fill="var(--info)"/>
+          <text x="783.2" y="11" font-size="12.5" fill="var(--ink2)">로우스토어 유지</text>
+          <rect x="616.4" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="644.4" y="11" font-size="12.5" fill="var(--ink2)">8일 후 컬럼스토어 전환</text>
+        </svg>
+        <p class="cht__c">전환 정책이 없으면 56일째에 582GB, 걸어 두면 133GB로 4.4배 차이가 난다. 최근 8일치는 양쪽 다 로우스토어라 첫 점이 겹치고 격차는 9일째부터 벌어진다. 일 10.4GB 적재 · 압축률 90% 가정의 계산값이며 실측이 아니다. 점에 커서를 올리면 값이 뜬다.</p>
+      </figure>
+
+      <div class="adr">
+        <p class="adr__t">ADR-02 · 청크 6시간 · 컬럼스토어 전환 8일 · 원본 보존 90일</p>
+        <dl>
+          <dt>배경</dt><dd>세 값은 서로 묶여 있습니다. 청크가 크면 인덱스가 메모리를 넘고, 전환이 이르면 지연 데이터가 압축 청크를 때리고, 보존이 길면 디스크가 모자랍니다.</dd>
+          <dt>결정</dt><dd>청크 인터벌 6시간(하루 4청크), 컬럼스토어 전환 8일(지연 상한 7일 + 1일), 원본 보존 90일, 1분 집계 2년, 1시간 집계 5년.</dd>
+          <dt>대가</dt><dd>하루 4개씩 90일이면 청크가 360개입니다. 전 구간을 훑는 쿼리는 청크 수만큼 계획 부담이 늘므로, 대시보드 조회는 반드시 연속 집계를 보게 합니다.</dd>
+          <dt>재검토</dt><dd>평균 적재율이 4,000행/초를 넘거나 <span class="mono">shared_buffers</span> 가 바뀌면 청크 인터벌을 다시 산출합니다. 게이트웨이 로컬 버퍼가 7일보다 커지면 전환 기준을 함께 미룹니다.</dd>
+        </dl>
+      </div>
+
+      <div class="code">
+        <div class="code__bar"><span>01-schema.sql — 이 문서의 핵심 산출물</span><button class="code__copy" type="button">복사</button></div>
+<pre><span class="cm">-- 확장은 데이터베이스마다 한 번. shared_preload_libraries 에 timescaledb 가</span>
+<span class="cm">-- 올라가 있지 않으면 이 줄에서 바로 실패한다(7절 "자주 나는 오류" 참고).</span>
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+<span class="cm">-- 태그 메타. 일반 테이블이다 — 행이 2,000개뿐이고 시계열이 아니다.</span>
+CREATE TABLE sensor_tag (
+    tag_id     INT         PRIMARY KEY,
+    equip_code TEXT        NOT NULL,
+    name       TEXT        NOT NULL,
+    unit       TEXT        NOT NULL,
+    min_value  DOUBLE PRECISION,
+    max_value  DOUBLE PRECISION
+);
+
+<span class="cm">-- 원본 계측값. 2.20.0 부터는 CREATE TABLE 한 문장으로 하이퍼테이블이 된다.</span>
+<span class="cm">-- 그 이전 버전이면 일반 테이블을 만든 뒤 create_hypertable() 로 변환한다.</span>
+CREATE TABLE sensor_reading (
+    time     TIMESTAMPTZ      NOT NULL,   <span class="cm">-- 계측 시각. UTC 로만 저장한다</span>
+    tag_id   INT              NOT NULL REFERENCES sensor_tag(tag_id),
+    value    DOUBLE PRECISION NOT NULL,
+    quality  SMALLINT         NOT NULL DEFAULT 0  <span class="cm">-- 0=정상, 1=센서이상, 2=보정값</span>
+) WITH (
+    <span class="hl">tsdb.hypertable</span>,
+    tsdb.partition_column = 'time',
+    <span class="hl">tsdb.chunk_interval = '6 hours'</span>,   <span class="cm">-- 위 산출 근거 참고</span>
+    tsdb.segmentby = 'tag_id',            <span class="cm">-- 압축 시 태그별로 묶는다</span>
+    tsdb.orderby   = 'time DESC'
+);
+
+<span class="cm">-- 멱등 적재의 근거. 하이퍼테이블의 유니크 인덱스는 파티셔닝 컬럼(time)을</span>
+<span class="cm">-- 반드시 포함해야 한다. tag_id 단독 유니크는 생성 자체가 거부된다.</span>
+CREATE UNIQUE INDEX sensor_reading_uq
+    ON sensor_reading (<span class="hl">tag_id, time</span>);
+
+<span class="cm">-- 검증 실패 격리. 시계열이 아니라 운영자가 들여다보는 표라 일반 테이블로 둔다.</span>
+CREATE TABLE sensor_reject (
+    id         BIGSERIAL   PRIMARY KEY,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    payload    JSONB       NOT NULL,
+    reason     TEXT        NOT NULL
+);</pre>
+      </div>
+
+      <div class="code">
+        <div class="code__bar"><span>02-policies.sql — 압축 · 보존 · 집계</span><button class="code__copy" type="button">복사</button></div>
+<pre><span class="cm">-- 1) 컬럼스토어 전환: 8일이 지난 청크를 열 지향으로 재배치한다.</span>
+<span class="cm">--    add_columnstore_policy 는 2.18.0 부터의 이름이다. 그 이전 버전 문서에서</span>
+<span class="cm">--    보이는 add_compression_policy 와 같은 일을 한다.</span>
+CALL add_columnstore_policy('sensor_reading', after =&gt; INTERVAL '8 days');
+
+<span class="cm">-- 2) 원본 보존: 90일이 지난 청크를 통째로 DROP 한다.</span>
+<span class="cm">--    DELETE 가 아니라 청크 삭제라 VACUUM 부담이 없다.</span>
+SELECT add_retention_policy('sensor_reading', drop_after =&gt; INTERVAL '90 days');
+
+<span class="cm">-- 3) 1분 집계. materialized_only = false 로 두면 아직 집계되지 않은</span>
+<span class="cm">--    최근 구간을 원본에서 실시간으로 메워 조회한다.</span>
+CREATE MATERIALIZED VIEW reading_1m
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
+SELECT time_bucket(INTERVAL '1 minute', time) AS bucket,
+       tag_id,
+       avg(value)   FILTER (WHERE quality = 0) AS avg_value,
+       min(value)   FILTER (WHERE quality = 0) AS min_value,
+       max(value)   FILTER (WHERE quality = 0) AS max_value,
+       count(*)                                AS sample_cnt,
+       count(*)     FILTER (WHERE quality &lt;&gt; 0) AS bad_cnt
+FROM sensor_reading
+GROUP BY bucket, tag_id
+<span class="hl">WITH NO DATA</span>;   <span class="cm">-- 생성 시점에 90일치를 한 번에 계산하면 DB 가 멎는다</span>
+
+<span class="cm">-- end_offset 5분: 아직 들어오는 중인 최근 5분은 건드리지 않는다.</span>
+<span class="cm">-- start_offset 3시간: 그 이전 3시간은 매번 다시 계산해 지연 도착분을 반영한다.</span>
+SELECT add_continuous_aggregate_policy('reading_1m',
+    start_offset      =&gt; INTERVAL '3 hours',
+    end_offset        =&gt; INTERVAL '5 minutes',
+    schedule_interval =&gt; INTERVAL '1 minute');
+
+<span class="cm">-- 4) 1시간 롤업. 원본이 아니라 1분 집계를 다시 집계한다(계층 연속 집계).</span>
+CREATE MATERIALIZED VIEW reading_1h
+WITH (timescaledb.continuous) AS
+SELECT time_bucket(INTERVAL '1 hour', bucket) AS bucket,
+       tag_id,
+       avg(avg_value) AS avg_value,
+       min(min_value) AS min_value,
+       max(max_value) AS max_value,
+       sum(sample_cnt) AS sample_cnt
+FROM reading_1m
+GROUP BY 1, 2
+WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy('reading_1h',
+    start_offset      =&gt; INTERVAL '1 day',
+    end_offset        =&gt; INTERVAL '1 hour',
+    schedule_interval =&gt; INTERVAL '10 minutes');
+
+<span class="cm">-- 5) 집계 테이블에도 보존을 건다. 원본 90일 &lt; 1분 2년 &lt; 1시간 5년.</span>
+SELECT add_retention_policy('reading_1m', drop_after =&gt; INTERVAL '2 years');
+SELECT add_retention_policy('reading_1h', drop_after =&gt; INTERVAL '5 years');</pre>
+      </div>
+      <p class="small muted">함수 이름과 인자는 TimescaleDB 2.29.2 기준입니다<sup class="ref" data-ref="1">1</sup><sup class="ref" data-ref="2">2</sup><sup class="ref" data-ref="3">3</sup><sup class="ref" data-ref="4">4</sup><sup class="ref" data-ref="5">5</sup><sup class="ref" data-ref="6">6</sup>.
+        압축 정책 함수가 <span class="mono">CALL</span> 이고 나머지가 <span class="mono">SELECT</span> 인 것은 오타가 아니라 실제로 프로시저와 함수로 나뉘어 있기 때문입니다.</p>
+    </section>
+
+    <!-- ---------- 4. 작업 분할 ---------- -->
+    <section class="sec" id="s4">
+      <h2><span class="n">04</span>작업 분할</h2>
+      <p class="why">각 단위는 단독으로 배포 · 검증이 가능해야 하고, 반나절에서 이틀 안에 끝나야 합니다.</p>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">S1</span><b>확장 설치와 규모 파라미터 확정</b><span class="sp"></span><span class="chip chip--neutral">0.5일</span></div>
+        <div class="slice__b"><dl>
+          <dt>산출물</dt><dd>compose 파일, <span class="mono">shared_preload_libraries</span> 포함 파라미터 세트, 00절 규모 전제 표의 실측 갱신</dd>
+          <dt>완료 조건</dt><dd><span class="mono">SELECT extversion FROM pg_extension WHERE extname='timescaledb'</span> 이 2.29.2 를 반환하고, 실제 게이트웨이 태그 수 · 주기가 표에 반영됨</dd>
+          <dt>검증 방법</dt><dd><span class="mono">docker compose up -d --wait &amp;&amp; make version</span></dd>
+          <dt>의존</dt><dd>없음 — 여기서 시작합니다</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">S2</span><b>스키마 · 하이퍼테이블 · 멱등 적재 쿼리</b><span class="sp"></span><span class="chip chip--neutral">1일</span></div>
+        <div class="slice__b"><dl>
+          <dt>산출물</dt><dd><span class="mono">01-schema.sql</span>, 배치 INSERT 쿼리 1개, Repository 메서드 1개</dd>
+          <dt>완료 조건</dt><dd>SC-04 통과 — 같은 <span class="mono">(tag_id, time)</span> 재전송에도 행이 1로 유지</dd>
+          <dt>검증 방법</dt><dd><span class="mono">./gradlew test --tests *SensorReadingIdempotencyTest</span></dd>
+          <dt>의존</dt><dd>S1</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">S3</span><b>수집 API 배치 적재 경로</b><span class="sp"></span><span class="chip chip--neutral">1.5일</span></div>
+        <div class="slice__b"><dl>
+          <dt>산출물</dt><dd><span class="mono">POST /readings</span>, 스키마 · 상하한 검증, <span class="mono">sensor_reject</span> 격리, 적재 지연 지표</dd>
+          <dt>완료 조건</dt><dd>SC-01 통과, 손상 페이로드 1건이 나머지 499건의 적재를 막지 않음</dd>
+          <dt>검증 방법</dt><dd><span class="mono">make seed</span> 로 정상 499건 + 손상 1건 투입 후 <span class="mono">make verify</span></dd>
+          <dt>의존</dt><dd>S2</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">S4</span><b>컬럼스토어 · 보존 정책</b><span class="sp"></span><span class="chip chip--neutral">0.5일</span></div>
+        <div class="slice__b"><dl>
+          <dt>산출물</dt><dd><span class="mono">02-policies.sql</span> 의 1 · 2번, 잡 실행 결과 조회 쿼리</dd>
+          <dt>완료 조건</dt><dd>과거 청크를 강제 전환했을 때 <span class="mono">hypertable_columnstore_stats</span> 의 압축 후 크기가 압축 전의 20% 이하</dd>
+          <dt>검증 방법</dt><dd><span class="mono">make compress</span> 후 <span class="mono">make size</span></dd>
+          <dt>의존</dt><dd>S2</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">S5</span><b>연속 집계 2단</b><span class="sp"></span><span class="chip chip--neutral">1일</span></div>
+        <div class="slice__b"><dl>
+          <dt>산출물</dt><dd><span class="mono">reading_1m</span>, <span class="mono">reading_1h</span> 와 각 갱신 정책</dd>
+          <dt>완료 조건</dt><dd>SC-02 · SC-05 통과 — 최근 5분은 갱신 대상에서 제외되고, 원본 청크 삭제 후에도 집계 행이 남음</dd>
+          <dt>검증 방법</dt><dd><span class="mono">CALL refresh_continuous_aggregate('reading_1m', NULL, NULL)</span> 후 버킷 수 대조</dd>
+          <dt>의존</dt><dd>S3</dd>
+        </dl></div>
+      </div>
+
+      <div class="slice">
+        <div class="slice__h"><span class="no">S6</span><b>모니터링 연동</b><span class="sp"></span><span class="chip chip--neutral">1일</span></div>
+        <div class="slice__b"><dl>
+          <dt>산출물</dt><dd>적재 지연 · 거부 건수 · 잡 실패 지표, Grafana 패널 4개, 경보 규칙 2개</dd>
+          <dt>완료 조건</dt><dd>백그라운드 잡을 일부러 실패시켰을 때 5분 안에 경보가 뜸</dd>
+          <dt>검증 방법</dt><dd><span class="mono">SELECT * FROM timescaledb_information.job_errors</span> 에 행이 생기고 경보가 발화</dd>
+          <dt>의존</dt><dd>S4, S5</dd>
+        </dl></div>
+      </div>
+
+      <div class="note note--info">
+        <p class="note__t">첫 주 목표</p>
+        S1부터 S3까지 끝내면 "실제 게이트웨이 데이터가 하이퍼테이블에 중복 없이 쌓인다"까지 확인됩니다.
+        여기서 한 번 멈추고 실제 수집망을 하루 붙여 규모 전제 표를 실측으로 교체한 뒤 S4로 넘어갑니다.
+        전제가 틀린 채로 압축 · 보존 정책을 먼저 걸면 나중에 청크를 다시 만들어야 합니다.
+      </div>
+    </section>
+
+    <!-- ---------- 5. 고려사항 ---------- -->
+    <section class="sec" id="s5">
+      <h2><span class="n">05</span>고려사항과 체크리스트</h2>
+      <p class="why">여기 적힌 것 대부분은 첫날에는 문제가 되지 않고 3주쯤 지나서 드러납니다. 항목을 클릭하면 체크 상태가 브라우저에 저장됩니다.</p>
+
+      <h3>경계 조건</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">상황</th><th style="width:36%">그대로 두면</th><th>대응</th></tr></thead>
+          <tbody>
+            <tr><td>지연 데이터가 압축된 청크로 도착</td><td>세그먼트 감압 · 재삽입이 반복되어 적재가 느려지고, 삽입분이 압축되지 않은 채 남아 청크가 부푼다</td><td>전환 기준(8일)을 지연 상한(7일)보다 뒤에 둔다. 그래도 들어온 구간은 <span class="mono">convert_to_columnstore</span> 로 야간에 재압축</td></tr>
+            <tr><td>같은 (tag_id, time) 재전송</td><td>같은 시점 값이 2행이 되어 평균이 흔들린다</td><td><span class="mono">UNIQUE (tag_id, time)</span> + <span class="mono">ON CONFLICT DO NOTHING</span>. 하이퍼테이블 유니크 인덱스는 파티셔닝 컬럼 <span class="mono">time</span> 을 반드시 포함해야 한다<sup class="ref" data-ref="8">8</sup></td></tr>
+            <tr><td>시간대 · 서머타임</td><td>로컬 시각으로 저장하면 집계 버킷이 겹치거나 비어 하루치가 어긋난다</td><td>저장은 전부 <span class="mono">timestamptz</span>(UTC). 일 단위 집계에서만 <span class="mono">time_bucket(INTERVAL '1 day', time, 'Asia/Seoul')</span> 로 시간대를 명시</td></tr>
+            <tr><td>보존 잡이 집계 갱신보다 먼저 실행</td><td>원본 청크가 사라진 구간이 집계에 영구적인 구멍으로 남는다</td><td>보존 기준(90일)을 집계 <span class="mono">start_offset</span>(3시간)보다 훨씬 크게 두고, 두 잡의 <span class="mono">next_start</span> 를 <span class="mono">timescaledb_information.jobs</span> 로 확인</td></tr>
+            <tr><td>백그라운드 워커 부족</td><td>압축 · 보존 · 집계 잡이 대기열에 밀려 조용히 실행되지 않는다. 디스크가 찰 때까지 아무도 모른다</td><td><span class="mono">timescaledb.max_background_workers</span> = DB 수 + 동시 실행 잡 수. 잡별 마지막 성공 시각을 경보로 감시</td></tr>
+            <tr><td>품질 코드 무시</td><td>센서 이상값 · 보정값까지 평균에 섞여 지표가 낮게 나온다</td><td>집계에 <span class="mono">FILTER (WHERE quality = 0)</span> 을 걸고, 제외 건수를 <span class="mono">bad_cnt</span> 로 함께 남긴다</td></tr>
+            <tr><td>초기 백필과 실시간 적재 경합</td><td>과거 데이터 대량 투입이 현재 청크의 인덱스를 밀어내 실시간 지연이 튄다</td><td>백필은 야간에 <span class="mono">COPY</span> 로 청크 단위 진행. 백필 구간의 압축 정책은 백필이 끝난 뒤 건다</td></tr>
+            <tr><td>값 정밀도</td><td>계측값을 <span class="mono">numeric</span> 으로 두면 저장과 집계 비용이 몇 배가 된다</td><td>계측값은 <span class="mono">double precision</span> 유지. 정산 · 과금에 쓰이는 파생값만 <span class="mono">numeric</span> 으로 별도 저장</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>착수 전 체크 <span class="chip chk-count">0 / 0</span></h3>
+      <ul class="chk">
+        <li><input type="checkbox" id="c1"><span><span class="t">규모 전제 표의 가정값을 수집망 실측으로 교체</span><span class="d">태그 수 · 주기 · 피크 배수. 이 값이 청크 인터벌을 결정한다</span></span></li>
+        <li><input type="checkbox" id="c2"><span><span class="t">지연 도착 상한 확정</span><span class="d">게이트웨이 로컬 버퍼 용량 확인. 압축 전환 시점이 여기에 종속된다</span></span></li>
+        <li><input type="checkbox" id="c3"><span><span class="t">원본 보존 기간을 현업과 합의</span><span class="d">90일 가정. 고장 분석 소급 범위와 감사 요건을 함께 확인</span></span></li>
+        <li><input type="checkbox" id="c4"><span><span class="t">에디션과 이미지 태그 고정</span><span class="d">Community(TSL) 사용 가능 여부를 법무 확인. -oss 태그면 압축 · 집계가 동작하지 않는다</span></span></li>
+        <li><input type="checkbox" id="c5"><span><span class="t">백업 · 복구 절차 재확인</span><span class="d">압축 청크를 포함한 물리 백업 복원 리허설 1회. pg_dump 는 대상 규모에서 현실적이지 않다</span></span></li>
+        <li><input type="checkbox" id="c6"><span><span class="t">접근 권한 분리</span><span class="d">설비 코드 · 라인 식별자가 영업 정보에 해당하는지 확인하고, 대시보드용 계정은 연속 집계에만 SELECT 를 준다</span></span></li>
+        <li><input type="checkbox" id="c7"><span><span class="t">기존 CDC 인스턴스와 분리 배치 확인</span><span class="d">같은 호스트에 올리면 shared_buffers 를 두 워크로드가 나눠 쓴다</span></span></li>
+      </ul>
+    </section>
+
+    <!-- ---------- 6. 테스트 ---------- -->
+    <section class="sec" id="s6">
+      <h2><span class="n">06</span>테스트 전략</h2>
+      <p class="why">이 과제의 버그는 대부분 "시간이 지나야" 드러납니다. 시계를 앞으로 돌릴 수 있어야 테스트가 성립합니다.</p>
+
+      <h3>레벨별 범위</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:12%">레벨</th><th style="width:26%">대상</th><th style="width:22%">도구</th><th style="width:14%">실행 시점</th><th>통과 기준</th></tr></thead>
+          <tbody>
+            <tr><td><span class="chip chip--ok">단위</span></td><td>버킷 경계 계산, 품질 코드 필터, 배치 분할</td><td>JUnit 5 · AssertJ</td><td>매 커밋</td><td>적재 · 집계 로직 라인 커버리지 85% 이상</td></tr>
+            <tr><td><span class="chip chip--info">통합</span></td><td>하이퍼테이블 적재, 멱등성, 연속 집계 갱신, 보존 후 집계 잔존</td><td>Testcontainers <span class="mono">timescale/timescaledb:2.29.2-pg17</span></td><td>PR</td><td>SC-01 ~ SC-05 전부 통과</td></tr>
+            <tr><td><span class="chip chip--warn">계약</span></td><td>게이트웨이 페이로드 스키마</td><td>JSON Schema 검증</td><td>PR</td><td>필수 필드 누락 · 타입 불일치 시 빌드 실패</td></tr>
+            <tr><td><span class="chip chip--neutral">부하</span></td><td>피크 8,000행/초를 30분 유지</td><td>k6 또는 <span class="mono">pgbench -f</span> 사용자 스크립트</td><td>스프린트 종료</td><td>적재 p99 2초 이내, 손실 0건, 워커 대기열 0</td></tr>
+            <tr><td><span class="chip chip--risk">장애 주입</span></td><td>DB 재기동, 디스크 90% 도달, 압축 청크에 지연 적재</td><td><span class="mono">docker compose stop</span> · <span class="mono">fallocate</span></td><td>전환 직전</td><td>재기동 후 손실 0건 · 중복 0건, 디스크 경보가 5분 내 발화</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>반드시 넣어야 하는 테스트 <span class="chip chk-count">0 / 0</span></h3>
+      <ul class="chk">
+        <li><input type="checkbox" id="t1"><span><span class="t">같은 (tag_id, time) 2회 적재 시 행 수 불변</span><span class="d">SC-04 — 멱등성의 핵심 근거</span></span></li>
+        <li><input type="checkbox" id="t2"><span><span class="t">3시간 전 시각의 배치가 원래 청크로 들어간다</span><span class="d">SC-03 — 지연 도착 경로</span></span></li>
+        <li><input type="checkbox" id="t3"><span><span class="t">최근 5분 버킷은 정책 갱신 대상에서 제외된다</span><span class="d">SC-02 — end_offset 검증</span></span></li>
+        <li><input type="checkbox" id="t4"><span><span class="t">원본 청크 삭제 후에도 같은 구간 집계 행이 조회된다</span><span class="d">SC-05 — 보존과 집계의 독립성</span></span></li>
+        <li><input type="checkbox" id="t5"><span><span class="t">버킷 경계값(00초, 59.999초)이 옆 버킷으로 새지 않는다</span><span class="d">off-by-one 방지</span></span></li>
+        <li><input type="checkbox" id="t6"><span><span class="t">quality가 0이 아닌 행은 avg에서 빠지고 bad_cnt에만 잡힌다</span><span class="d">품질 코드 회귀 방지</span></span></li>
+      </ul>
+
+      <div class="code">
+        <div class="code__bar"><span>SensorReadingIdempotencyTest.java</span><button class="code__copy" type="button">복사</button></div>
+<pre>@Testcontainers
+class SensorReadingIdempotencyTest {
+
+    <span class="cm">// 일반 postgres 이미지로는 CREATE EXTENSION 이 실패한다.</span>
+    @Container
+    static final PostgreSQLContainer&lt;?&gt; DB = new PostgreSQLContainer&lt;&gt;(
+            DockerImageName.parse(<span class="hl">"timescale/timescaledb:2.29.2-pg17"</span>)
+                           .asCompatibleSubstituteFor("postgres"));
+
+    @Test
+    <span class="cm">// SC-04: 같은 (tag_id, time) 재전송은 행을 늘리지 않는다</span>
+    void resentReading_doesNotDuplicateRow() {
+        var t = OffsetDateTime.parse("2026-09-07T02:00:00Z");
+
+        repo.insertBatch(List.of(reading(t, 101, 23.4)));
+        repo.insertBatch(List.of(reading(t, 101, <span class="hl">99.9</span>)));  <span class="cm">// 값이 다른 재전송</span>
+
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM sensor_reading WHERE tag_id = 101", Long.class))
+                .isEqualTo(1L);
+        assertThat(jdbc.queryForObject(
+                "SELECT value FROM sensor_reading WHERE tag_id = 101", Double.class))
+                .isEqualTo(23.4);   <span class="cm">// DO NOTHING 이므로 먼저 온 값이 남는다</span>
+        assertThat(meter.count("sensor.reading.duplicate")).isEqualTo(1);
+    }
+}</pre>
+      </div>
+
+      <div class="note note--risk">
+        <p class="note__t">테스트에서 자주 새는 곳</p>
+        <b>시간</b> — 적재 · 집계 코드가 <span class="mono">now()</span> 나 <span class="mono">Instant.now()</span> 를 직접 부르면
+        버킷 경계 테스트가 실행 시각에 따라 붙었다 떨어졌다 합니다. <span class="mono">Clock</span> 을 주입해 테스트에서 고정하십시오.<br>
+        <b>정책 잡</b> — 연속 집계는 백그라운드 잡이 돌아야 갱신됩니다. 테스트에서 기다리지 말고
+        <span class="mono">CALL refresh_continuous_aggregate(...)</span> 를 명시적으로 호출하십시오. 기다리는 테스트는 CI에서 간헐적으로 실패합니다.<br>
+        <b>시간대</b> — 컨테이너 기본 시간대가 UTC라 로컬에서 통과하던 일 단위 집계 테스트가 CI에서 하루 어긋날 수 있습니다.
+        <span class="mono">TZ</span> 를 테스트에서 고정하십시오.
+      </div>
+    </section>
+
+    <!-- ---------- 7. 실습 환경 ---------- -->
+    <section class="sec" id="s7">
+      <h2><span class="n">07</span>로컬 실습 환경</h2>
+      <p class="why">아래 두 파일만으로 SC-01 부터 SC-05 까지 손으로 재현할 수 있습니다. 포트는 기존 CDC 실습 환경(56432 · 56433)과 겹치지 않게 잡았습니다.</p>
+
+      <div class="code">
+        <div class="code__bar"><span>docker-compose.yml</span><button class="code__copy" type="button">복사</button></div>
+<pre>services:
+  timescaledb:
+    <span class="cm"># -oss 태그가 아니어야 압축 · 연속 집계가 동작한다(00절 에디션 참고).</span>
+    image: <span class="hl">timescale/timescaledb:2.29.2-pg17</span>
+    container_name: sensor-tsdb
+    environment:
+      POSTGRES_DB: sensordb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    command:
+      - postgres
+      <span class="cm"># 이 줄이 없으면 CREATE EXTENSION timescaledb 가 실패한다.</span>
+      <span class="cm"># 공식 이미지는 기본으로 넣어 주지만, command 를 덮어쓰면 같이 날아간다.</span>
+      - -c
+      - shared_preload_libraries=timescaledb
+      - -c
+      - shared_buffers=2GB          <span class="cm"># 로컬 기준. 운영은 8GB (3절 산출 근거)</span>
+      - -c
+      - <span class="hl">timescaledb.max_background_workers=8</span>
+      - -c
+      - max_worker_processes=16     <span class="cm"># 백그라운드 워커 + 병렬 워커 합보다 커야 한다</span>
+      - -c
+      - max_parallel_workers=8
+    ports:
+      - "55432:5432"
+    volumes:
+      - sensor-tsdb-data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sensordb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: sensor-grafana
+    depends_on:
+      timescaledb: { condition: service_healthy }
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    ports:
+      - "53000:3000"
+
+  pgadmin:
+    <span class="cm"># 청크 목록과 압축 상태를 눈으로 보는 용도. 학습 효율이 크게 다르다.</span>
+    image: dpage/pgadmin4:8.14
+    container_name: sensor-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: dev@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "55050:80"
+
+volumes:
+  sensor-tsdb-data:</pre>
+      </div>
+
+      <div class="code">
+        <div class="code__bar"><span>Makefile — 번호 순서대로 실행</span><button class="code__copy" type="button">복사</button></div>
+<pre>up:            <span class="cm">## 1. 기동 (init/ 의 01-schema.sql, 02-policies.sql 자동 실행)</span>
+	docker compose up -d --wait
+
+version:       <span class="cm">## 2. 확장 버전 확인 - 기대: 2.29.2</span>
+	docker compose exec timescaledb psql -U postgres -d sensordb -c \
+	  "SELECT extname, extversion FROM pg_extension WHERE extname = 'timescaledb';"
+
+seed:          <span class="cm">## 3. 샘플 투입 - 태그 5개 x 최근 10일치 1분 간격 (72,000행)</span>
+	docker compose exec timescaledb psql -U postgres -d sensordb -c \
+	  "INSERT INTO sensor_reading (time, tag_id, value, quality) \
+	   SELECT g, t, 20 + 10 * random(), CASE WHEN random() &lt; 0.01 THEN 1 ELSE 0 END \
+	   FROM generate_series(now() - INTERVAL '10 days', now(), INTERVAL '1 minute') g \
+	   CROSS JOIN generate_series(101, 105) t \
+	   ON CONFLICT (tag_id, time) DO NOTHING;"
+
+dup:           <span class="cm">## 4. SC-04 재현 - 같은 배치를 한 번 더 넣는다 (행 수가 늘면 실패)</span>
+	$(MAKE) seed
+
+verify:        <span class="cm">## 5. 결과 확인 - 청크 목록과 압축 상태</span>
+	docker compose exec timescaledb psql -U postgres -d sensordb -c \
+	  "SELECT count(*) AS rows FROM sensor_reading;" -c \
+	  "SELECT chunk_name, range_start, is_compressed \
+	   FROM timescaledb_information.chunks \
+	   WHERE hypertable_name = 'sensor_reading' ORDER BY range_start;"
+
+agg:           <span class="cm">## 6. 연속 집계 강제 갱신 후 버킷 수 확인</span>
+	docker compose exec timescaledb psql -U postgres -d sensordb -c \
+	  "CALL refresh_continuous_aggregate('reading_1m', NULL, NULL);" -c \
+	  "SELECT count(*) AS buckets FROM reading_1m;"
+
+compress:      <span class="cm">## 7. 8일 경과분을 지금 강제 전환 (정책을 기다리지 않는다)</span>
+	docker compose exec timescaledb psql -U postgres -d sensordb -c \
+	  "CALL convert_to_columnstore(c) FROM show_chunks('sensor_reading', \
+	   older_than =&gt; INTERVAL '8 days') c;"
+
+size:          <span class="cm">## 8. 압축 효과 확인</span>
+	docker compose exec timescaledb psql -U postgres -d sensordb -c \
+	  "SELECT pg_size_pretty(before_compression_total_bytes) AS before, \
+	          pg_size_pretty(after_compression_total_bytes)  AS after \
+	   FROM hypertable_columnstore_stats('sensor_reading');"
+
+chaos:         <span class="cm">## 9. 장애 주입 - DB 를 20초 중단했다가 복구</span>
+	docker compose stop timescaledb; sleep 20; docker compose start timescaledb
+
+down:
+	docker compose down -v</pre>
+      </div>
+
+      <div class="g2">
+        <div class="note note--ok"><p class="note__t">성공 판정</p>
+          <span class="mono">make seed</span> 를 두 번 돌린 뒤 <span class="mono">make verify</span> 의 행 수가
+          <b>72,005행 그대로</b>이고(늘어나면 멱등 적재 실패), 청크가 <b>41개 안팎</b>으로 나뉘어 있고,
+          <span class="mono">make compress &amp;&amp; make size</span> 의 after 가 before의 20% 이하이면 S2와 S4가 정상입니다.
+          청크 수는 10일 ÷ 6시간 = 40에 현재 진행 중 청크 1개가 더해진 값입니다.</div>
+        <div class="note note--warn"><p class="note__t">자주 나는 오류</p>
+          <b>확장 로드 실패</b> — <span class="mono">command:</span> 로 postgres 인자를 덮어쓰면서
+          <span class="mono">shared_preload_libraries=timescaledb</span> 를 빠뜨리면
+          <span class="mono">CREATE EXTENSION</span> 이 "must be loaded via shared_preload_libraries" 로 실패합니다.<br>
+          <b>파라미터가 안 먹음</b> — 볼륨이 남아 있으면 <span class="mono">init/</span> 스크립트가 다시 돌지 않습니다.
+          스키마를 고쳤으면 <span class="mono">make down</span>(볼륨 삭제) 후 다시 올리십시오.</div>
+      </div>
+    </section>
+
+    <!-- ---------- 8. 도구 ---------- -->
+    <section class="sec" id="s8">
+      <h2><span class="n">08</span>필요한 도구와 라이브러리</h2>
+      <p class="why">버전을 적어두지 않으면 함수 이름이 바뀌었을 때 원인을 못 찾습니다. 이 문서의 SQL은 아래 조합에서만 검증됩니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:22%">용도</th><th style="width:28%">선택</th><th style="width:16%">버전</th><th>비고 · 대안</th></tr></thead>
+          <tbody>
+            <tr><td>데이터베이스</td><td>PostgreSQL</td><td class="mono">17</td><td>2.29.2는 pg16 · 17 · 18을 지원한다<sup class="ref" data-ref="11">11</sup>. 기존 CDC 스택이 pg16이라 맞출 필요가 있으면 <span class="mono">2.29.2-pg16</span></td></tr>
+            <tr><td>시계열 확장</td><td>TimescaleDB Community</td><td class="mono">2.29.2</td><td><span class="mono">-oss</span> 태그는 압축 · 연속 집계가 빠져 있어 쓸 수 없다</td></tr>
+            <tr><td>컨테이너 이미지</td><td><span class="mono">timescale/timescaledb</span></td><td class="mono">2.29.2-pg17</td><td>대안: <span class="mono">timescaledb-ha</span> (Patroni · 복제 포함. 로컬 실습에는 과하다)</td></tr>
+            <tr><td>런타임</td><td>Java (Temurin)</td><td class="mono">21 LTS</td><td>기존 CDC 서비스와 동일하게 맞춘다</td></tr>
+            <tr><td>드라이버</td><td>PostgreSQL JDBC</td><td class="mono">42.7.x</td><td>TimescaleDB 전용 드라이버는 없다. 대량 적재는 <span class="mono">CopyManager</span> 사용</td></tr>
+            <tr><td>통합 테스트</td><td>Testcontainers</td><td class="mono">1.20+</td><td>대안: 로컬 compose 재사용(테스트 간 상태가 남아 비권장)</td></tr>
+            <tr><td>스키마 마이그레이션</td><td>Flyway</td><td class="mono">10.x</td><td>정책 등록 SQL은 반복 실행되므로 <span class="mono">if_not_exists =&gt; true</span> 를 붙여 멱등하게 작성</td></tr>
+            <tr><td>부하 테스트</td><td>k6</td><td class="mono">0.5x</td><td>대안: <span class="mono">pgbench -f</span> (설치 불필요, HTTP 계층은 못 본다)</td></tr>
+            <tr><td>관측</td><td>Prometheus + Grafana</td><td class="mono">기존</td><td>DB 지표는 <span class="mono">postgres_exporter</span>, 잡 실패는 <span class="mono">timescaledb_information.job_errors</span> 를 직접 조회</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---------- 9. 전환과 롤백 ---------- -->
+    <section class="sec" id="s9">
+      <h2><span class="n">09</span>전환과 롤백</h2>
+      <p class="why">기존에 쌓이던 일반 테이블이 있다면 그 위에서 바로 변환하지 않습니다. 새 테이블에 이중 적재한 뒤 읽는 쪽을 옮깁니다.</p>
+      <div class="steps">
+        <div class="step"><span class="step__n">1</span><div class="step__t">이중 적재</div><div class="step__d">수집 API가 기존 테이블과 <span class="mono">sensor_reading</span> 양쪽에 쓴다. 읽기는 아직 기존 테이블</div></div>
+        <div class="step"><span class="step__n">2</span><div class="step__t">과거 데이터 백필</div><div class="step__d">야간에 <span class="mono">COPY</span> 로 일 단위 이관. 백필 구간에는 압축 정책을 아직 걸지 않는다</div></div>
+        <div class="step"><span class="step__n">3</span><div class="step__t">결과 대조</div><div class="step__d">일별 행 수와 태그별 평균을 양쪽에서 비교. 3일 연속 불일치 0건</div></div>
+        <div class="step"><span class="step__n">4</span><div class="step__t">읽기 전환</div><div class="step__d">대시보드와 조회 API가 연속 집계를 보게 한다. 기존 테이블 쓰기는 유지</div></div>
+        <div class="step"><span class="step__n">5</span><div class="step__t">정리</div><div class="step__d">2주 안정 후 압축 · 보존 정책을 켜고 기존 테이블 쓰기를 끊는다</div></div>
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">롤백 기준</p>
+        읽기 전환(4단계) 후 24시간 안에 적재 p99가 2초를 3회 이상 넘거나 대조 불일치가 1건이라도 나오면,
+        기능 플래그 <span class="mono">sensor.store.timescale.read-enabled=false</span> 로 조회를 기존 테이블로 즉시 되돌립니다.
+        쓰기는 양쪽 모두 유지하므로 데이터는 삭제하지 않습니다.<br>
+        <b>되돌릴 수 없는 지점은 5단계입니다.</b> 보존 정책이 한 번 돌아 원본 청크가 삭제되면 그 구간은 복구되지 않습니다.
+        5단계 전에 백업 복원 리허설을 한 번 마쳐야 합니다.
+      </div>
+    </section>
+
+    <!-- ---------- 10. 참고 ---------- -->
+    <section class="sec" id="s10">
+      <h2><span class="n">10</span>참고 자료</h2>
+      <ol class="refs">
+        <li><span class="refs__n">1</span><span><span class="refs__src">create_hypertable() — 기존 테이블을 하이퍼테이블로 변환</span>
+          <span class="refs__meta">web · https://www.tigerdata.com/docs/api/latest/hypertable/create_hypertable (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">2</span><span><span class="refs__src">CREATE TABLE 로 하이퍼테이블 직접 생성 — tsdb.* 옵션과 기본값, 2.20.0 도입</span>
+          <span class="refs__meta">web · https://www.tigerdata.com/docs/reference/timescaledb/hypertables/create_table (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">3</span><span><span class="refs__src">add_columnstore_policy() — 2.18.0 도입, 압축 청크 수정 시 동작</span>
+          <span class="refs__meta">web · https://www.tigerdata.com/docs/api/latest/hypercore/add_columnstore_policy (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">4</span><span><span class="refs__src">연속 집계 CREATE MATERIALIZED VIEW 구문과 WITH NO DATA</span>
+          <span class="refs__meta">web · https://www.tigerdata.com/docs/api/latest/continuous-aggregates/create_materialized_view (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">5</span><span><span class="refs__src">add_continuous_aggregate_policy() — start_offset · end_offset 의미</span>
+          <span class="refs__meta">web · https://www.tigerdata.com/docs/api/latest/continuous-aggregates/add_continuous_aggregate_policy (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">6</span><span><span class="refs__src">add_retention_policy() — drop_after, 하이퍼테이블당 정책 1개 제한</span>
+          <span class="refs__meta">web · https://www.tigerdata.com/docs/api/latest/data-retention/add_retention_policy (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">7</span><span><span class="refs__src">청크 크기 산정 기준 — 적재 중 청크의 인덱스가 shared_buffers 의 25% 이내, 기본값 7일</span>
+          <span class="refs__meta">web · https://www.tigerdata.com/docs/learn/hypertables/sizing-hypertable-chunks (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">8</span><span><span class="refs__src">하이퍼테이블 유니크 인덱스는 파티셔닝 컬럼을 포함해야 한다</span>
+          <span class="refs__meta">web · https://docs.timescale.com/use-timescale/latest/hypertables/hypertables-and-unique-indexes/ (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">9</span><span><span class="refs__src">멀티노드 지원 종료 — 2.13이 마지막, 2.14부터 미지원</span>
+          <span class="refs__meta">web · https://github.com/timescale/timescaledb/blob/2.14.0/docs/MultiNodeDeprecation.md (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">10</span><span><span class="refs__src">에디션 비교 — Apache 2 와 Community(TSL)의 기능 차이</span>
+          <span class="refs__meta">web · https://www.tigerdata.com/docs/get-started/choose-your-path/timescaledb-editions (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">11</span><span><span class="refs__src">배포 이미지 태그 목록 — 2.29.2-pg16 · pg17 · pg18</span>
+          <span class="refs__meta">web · https://hub.docker.com/r/timescale/timescaledb/tags (확인 2026-09-07)</span></span></li>
+        <li><span class="refs__n">12</span><span><span class="refs__src">기존 CDC 원천 DB 컨테이너 설정 — 포트 · 파라미터 지정 방식의 선례</span>
+          <span class="refs__meta">code · src/embedded-cdc/infra/db/docker-compose.source.yml:20 (75be7dc)</span></span></li>
+      </ol>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   HW Doc Kit - diagram engine (의존성 없음, 단일 파일 내장용)
+   drawio 느낌의 조작: 드래그 이동 / 연결 / 라벨 인라인 편집 /
+   팬·줌 / 톤 변경 / 삭제 / Ctrl+Z / JSON 내보내기(붙여넣기로 영구 반영)
+
+   마크업 (자세한 내용은 references/diagram.md):
+     div.dgm[data-edit=on] 안에
+     script[type=application/json][class=dgm-data] 로 노드·엣지 JSON 을 넣습니다.
+   ============================================================ */
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var GRID = 10;
+  var TONES = ['neutral', 'primary', 'accent', 'muted', 'ok', 'warn', 'risk', 'info'];
+
+  function s(n, a) {
+    var e = document.createElementNS(NS, n);
+    for (var k in (a || {})) e.setAttribute(k, a[k]);
+    return e;
+  }
+  function h(t, c, txt) {
+    var e = document.createElement(t);
+    if (c) e.className = c;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+  function btn(label, title) {
+    var b = h('button', 'dgm__btn', label);
+    b.type = 'button';
+    if (title) b.title = title;
+    return b;
+  }
+  function snap(v) { return Math.round(v / GRID) * GRID; }
+
+  function boxShape(n) {
+    var sh = n.shape || 'rect', w = n.w, ht = n.h;
+    if (sh === 'diamond')
+      return s('path', { 'class': 'box', d: 'M' + w / 2 + ',0 L' + w + ',' + ht / 2 + ' L' + w / 2 + ',' + ht + ' L0,' + ht / 2 + ' Z' });
+    if (sh === 'store') {
+      var r = Math.min(14, ht / 4);
+      var d = 'M0,' + r +
+        ' C0,' + (r * .45) + ' ' + (w * .22) + ',0 ' + (w / 2) + ',0' +
+        ' C' + (w * .78) + ',0 ' + w + ',' + (r * .45) + ' ' + w + ',' + r +
+        ' L' + w + ',' + (ht - r) +
+        ' C' + w + ',' + (ht - r * .45) + ' ' + (w * .78) + ',' + ht + ' ' + (w / 2) + ',' + ht +
+        ' C' + (w * .22) + ',' + ht + ' 0,' + (ht - r * .45) + ' 0,' + (ht - r) + ' Z';
+      return s('path', { 'class': 'box', d: d });
+    }
+    if (sh === 'note') {
+      var f = 14;
+      return s('path', { 'class': 'box', d: 'M0,0 L' + (w - f) + ',0 L' + w + ',' + f + ' L' + w + ',' + ht + ' L0,' + ht + ' Z' });
+    }
+    var rx = sh === 'pill' ? ht / 2 : (sh === 'round' ? 12 : 4);
+    return s('rect', { 'class': 'box', x: 0, y: 0, width: w, height: ht, rx: rx });
+  }
+
+  /* 노드 두 개 사이의 직교(엘보) 경로 */
+  function route(a, b) {
+    var ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    var dx = bc.x - ac.x, dy = bc.y - ac.y, p1, p2, dir;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      dir = 'h';
+      p1 = { x: dx > 0 ? a.x + a.w : a.x, y: ac.y };
+      p2 = { x: dx > 0 ? b.x : b.x + b.w, y: bc.y };
+    } else {
+      dir = 'v';
+      p1 = { x: ac.x, y: dy > 0 ? a.y + a.h : a.y };
+      p2 = { x: bc.x, y: dy > 0 ? b.y : b.y + b.h };
+    }
+    var d, mid;
+    if (dir === 'h') {
+      var mx = (p1.x + p2.x) / 2;
+      d = 'M' + p1.x + ',' + p1.y + ' L' + mx + ',' + p1.y + ' L' + mx + ',' + p2.y + ' L' + p2.x + ',' + p2.y;
+      mid = { x: mx, y: (p1.y + p2.y) / 2 };
+    } else {
+      var my = (p1.y + p2.y) / 2;
+      d = 'M' + p1.x + ',' + p1.y + ' L' + p1.x + ',' + my + ' L' + p2.x + ',' + my + ' L' + p2.x + ',' + p2.y;
+      mid = { x: (p1.x + p2.x) / 2, y: my };
+    }
+    return { d: d, mid: mid };
+  }
+
+  /* 원본 JSON 이 바뀌었는지 보는 값. 문서를 고쳐 다시 배포하면 해시가 달라져
+     예전 편집본을 버린다 — 안 그러면 저자가 고친 그림이 영원히 안 보인다. */
+  function srcHash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) + h + s.charCodeAt(i)) | 0; }
+    return String(h);
+  }
+
+  function Diagram(root) {
+    this.root = root;
+    this.editable = root.getAttribute('data-edit') !== 'off';
+
+    /* 저장 키 — data-key 가 있으면 그것을, 없으면 문서 안에서의 순번을 쓴다.
+       순번은 그림을 추가·삭제하면 밀리지만, 그때는 해시도 함께 달라져 저장본이 버려진다. */
+    var all = document.querySelectorAll('.dgm');
+    this.key = 'hwdgm:' + (location.pathname.split('/').pop() || 'doc') + ':'
+      + (root.getAttribute('data-key') || Array.prototype.indexOf.call(all, root));
+
+    var tag = root.querySelector('script.dgm-data');
+    this.srcHash = srcHash(tag ? tag.textContent : '');
+
+    this.data = this.read();
+    var saved = this.loadSaved();
+    if (saved) this.data = saved;
+    this.view = { tx: 0, ty: 0, k: 1 };
+    this.sel = null;          /* {type:'node'|'edge'|'group', id} */
+    this.linkMode = false;
+    this.linkFrom = null;
+    this.undo = [];
+    this.build();
+    this.render();
+    this.fit();
+    this.ready = true;
+    this.markSaved(!!this._restored);
+  }
+
+  Diagram.prototype.read = function () {
+    var tag = this.root.querySelector('script.dgm-data');
+    var d = { nodes: [], edges: [], groups: [] };
+    if (tag) { try { d = JSON.parse(tag.textContent); } catch (e) { console.warn('[dgm] JSON 파싱 실패', e); } }
+    d.nodes = d.nodes || []; d.edges = d.edges || []; d.groups = d.groups || [];
+    d.nodes.forEach(function (n) {
+      n.w = n.w || 170; n.h = n.h || 62;
+      n.shape = n.shape || 'rect'; n.tone = n.tone || 'neutral';
+      n.x = n.x || 0; n.y = n.y || 0;
+    });
+    return d;
+  };
+
+  Diagram.prototype.build = function () {
+    var self = this;
+    var bar = h('div', 'dgm__bar no-print');
+    var mk = function (label, title, fn) { var b = btn(label, title); b.addEventListener('click', fn); bar.appendChild(b); return b; };
+
+    mk('박스', '새 박스 추가', function () { self.addNode(); });
+    this.bLink = mk('연결', '두 박스를 차례로 클릭해 화살표 연결', function () { self.toggleLink(); });
+    mk('색', '선택 항목의 톤 변경', function () { self.cycleTone(); });
+    mk('모양', '선택 박스의 모양 변경', function () { self.cycleShape(); });
+    mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
+    bar.appendChild(h('span', 'sp'));
+    mk('−', '축소', function () { self.zoom(1 / 1.2); });
+    mk('+', '확대', function () { self.zoom(1.2); });
+    mk('맞춤', '화면에 맞추기', function () { self.fit(); });
+    this.bMax = mk('넓게', '화면 가득 펼치기 (Esc 로 닫기)', function () { self.toggleMax(); });
+    mk('JSON', '수정 결과를 JSON으로 복사해 원본 파일에 붙여넣기', function () { self.openJson(); });
+    this.bReset = mk('원래대로', '이 브라우저에 저장된 편집 내용을 지운다', function () { self.resetSaved(); });
+    bar.appendChild(h('span', 'dgm__hint', '드래그 이동 · 더블클릭 라벨수정 · 휠 줌 · 빈 곳 드래그 팬'));
+
+    var svg = s('svg', { 'class': 'dgm__svg' });
+    var defs = s('defs');
+    [['ar-default', 'var(--ink3)'], ['ar-primary', 'var(--hw)'], ['ar-risk', 'var(--risk)'], ['ar-ok', 'var(--ok)']]
+      .forEach(function (m) {
+        var mk2 = s('marker', {
+          id: m[0] + '-' + Math.random().toString(36).slice(2, 7),
+          viewBox: '0 0 10 10', refX: 9, refY: 5,
+          markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'
+        });
+        var p = s('path', { d: 'M0,1 L10,5 L0,9 z' });
+        p.setAttribute('style', 'fill:' + m[1]);
+        mk2.appendChild(p); defs.appendChild(mk2);
+        self['mk_' + m[0].slice(3)] = mk2.getAttribute('id');
+      });
+    svg.appendChild(defs);
+
+    this.gRoot = s('g');
+    this.gGroups = s('g'); this.gEdges = s('g'); this.gNodes = s('g');
+    this.gRoot.appendChild(this.gGroups);
+    this.gRoot.appendChild(this.gEdges);
+    this.gRoot.appendChild(this.gNodes);
+    svg.appendChild(this.gRoot);
+
+    this.svg = svg;
+    this.root.insertBefore(svg, this.root.firstChild);
+    if (this.editable) this.root.insertBefore(bar, svg);
+
+    /* JSON 모달 */
+    var modal = h('div', 'dgm__modal no-print');
+    var pane = h('div', 'pane');
+    var head = h('div', 'head'); head.appendChild(h('b', null, '다이어그램 JSON'));
+    head.appendChild(h('span', 'sp'));
+    var closeB = btn('닫기'); head.appendChild(closeB);
+    var ta = h('textarea'); ta.spellcheck = false;
+    var foot = h('div', 'foot');
+    var copyB = btn('전체 복사'); var applyB = btn('붙여넣은 JSON 적용');
+    foot.appendChild(h('span', 'dgm__hint', '원본 HTML의 dgm-data 블록에 붙여넣으면 수정이 영구 반영됩니다'));
+    foot.appendChild(h('span', 'sp')); foot.appendChild(applyB); foot.appendChild(copyB);
+    pane.appendChild(head); pane.appendChild(ta); pane.appendChild(foot);
+    modal.appendChild(pane); this.root.appendChild(modal);
+    this.modal = modal; this.ta = ta;
+    closeB.addEventListener('click', function () { modal.classList.remove('is-open'); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('is-open'); });
+    copyB.addEventListener('click', function () {
+      ta.select(); ta.setSelectionRange(0, ta.value.length);
+      try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); }
+      copyB.textContent = '복사됨'; setTimeout(function () { copyB.textContent = '전체 복사'; }, 1200);
+    });
+    applyB.addEventListener('click', function () {
+      try {
+        var d = JSON.parse(ta.value);
+        self.push(); self.data = d; self.data.nodes = d.nodes || []; self.data.edges = d.edges || []; self.data.groups = d.groups || [];
+        self.render(); self.fit(); modal.classList.remove('is-open');
+      } catch (e) { alert('JSON 형식이 올바르지 않습니다: ' + e.message); }
+    });
+
+    this.bind();
+  };
+
+  /* ---------- 렌더 ---------- */
+  Diagram.prototype.render = function () {
+    var self = this;
+    this.gGroups.textContent = ''; this.gEdges.textContent = ''; this.gNodes.textContent = '';
+    this.index = {};
+    this.data.nodes.forEach(function (n) { self.index[n.id] = n; });
+
+    this.data.groups.forEach(function (g) {
+      var el = s('g', { 'class': 'dgm-grp', 'data-id': g.id, transform: 'translate(' + g.x + ',' + g.y + ')' });
+      el.appendChild(s('rect', { 'class': 'box', x: 0, y: 0, width: g.w, height: g.h, rx: 10 }));
+      var t = s('text', { 'class': 'gl', x: 12, y: 20 }); t.textContent = g.label || '';
+      el.appendChild(t);
+      self.gGroups.appendChild(el);
+    });
+
+    this.data.edges.forEach(function (e, i) {
+      var a = self.index[e.from], b = self.index[e.to];
+      if (!a || !b) return;
+      var r = route(a, b);
+      var g = s('g', { 'class': 'dgm-edge', 'data-i': i });
+      if (e.tone) g.setAttribute('data-tone', e.tone);
+      if (e.style) g.setAttribute('data-style', e.style);
+      var wire = s('path', { 'class': 'wire', d: r.d });
+      var mid = e.tone === 'primary' ? self.mk_primary : e.tone === 'risk' ? self.mk_risk : e.tone === 'ok' ? self.mk_ok : self.mk_default;
+      if (e.arrow !== false) wire.setAttribute('marker-end', 'url(#' + mid + ')');
+      g.appendChild(s('path', { 'class': 'hit', d: r.d }));
+      g.appendChild(wire);
+      if (e.label) {
+        var txt = String(e.label), wpx = 0;
+        for (var ci = 0; ci < txt.length; ci++) wpx += txt.charCodeAt(ci) > 0x2E80 ? 12.5 : 7;
+        var w = Math.max(34, Math.ceil(wpx) + 22);
+        var fo = s('foreignObject', { x: r.mid.x - w / 2, y: r.mid.y - 11, width: w, height: 22 });
+        var div = h('div', 'elbl'); div.appendChild(h('span', null, e.label));
+        fo.appendChild(div); g.appendChild(fo);
+      }
+      self.gEdges.appendChild(g);
+    });
+
+    this.data.nodes.forEach(function (n) {
+      var g = s('g', { 'class': 'dgm-node', 'data-id': n.id, 'data-tone': n.tone, transform: 'translate(' + n.x + ',' + n.y + ')' });
+      g.appendChild(boxShape(n));
+      var pad = n.shape === 'diamond' ? Math.round(n.w * .18) : 0;
+      var fo = s('foreignObject', { x: pad, y: 0, width: n.w - pad * 2, height: n.h });
+      var lbl = h('div', 'lbl');
+      lbl.appendChild(h('span', 't', n.label || ''));
+      if (n.sub) lbl.appendChild(h('span', 'sub', n.sub));
+      fo.appendChild(lbl); g.appendChild(fo);
+      self.gNodes.appendChild(g);
+    });
+
+    this.paint();
+  };
+
+  /* render 는 모든 변경 뒤에 불린다 — 여기 한 곳만 잡으면 끌기·라벨 편집·추가·삭제가
+     모두 저장된다. 첫 그리기와 되돌리기 때는 건너뛴다. */
+  (function (orig) {
+    Diagram.prototype.render = function () {
+      orig.call(this);
+      if (this.ready && !this._skipSave) this.save();
+    };
+  })(Diagram.prototype.render);
+
+  Diagram.prototype.paint = function () {
+    var self = this;
+    this.gRoot.setAttribute('transform', 'translate(' + this.view.tx + ',' + this.view.ty + ') scale(' + this.view.k + ')');
+    Array.prototype.forEach.call(this.root.querySelectorAll('.is-sel'), function (e) { e.classList.remove('is-sel'); });
+    if (!this.sel) return;
+    var q = this.sel.type === 'edge' ? '.dgm-edge[data-i="' + this.sel.id + '"]'
+      : this.sel.type === 'group' ? '.dgm-grp[data-id="' + this.sel.id + '"]'
+        : '.dgm-node[data-id="' + this.sel.id + '"]';
+    var el = this.root.querySelector(q);
+    if (el) el.classList.add('is-sel');
+  };
+
+  /* ---------- 좌표 ---------- */
+  Diagram.prototype.world = function (ev) {
+    var r = this.svg.getBoundingClientRect();
+    return { x: (ev.clientX - r.left - this.view.tx) / this.view.k, y: (ev.clientY - r.top - this.view.ty) / this.view.k };
+  };
+
+  /* 화면 가득 펼치기. 다른 다이어그램이 펼쳐져 있으면 먼저 닫는다. */
+  Diagram.prototype.toggleMax = function (force) {
+    var self = this;
+    var on = (force == null) ? !this.root.classList.contains('is-max') : !!force;
+    if (on) {
+      var cur = document.querySelector('.dgm.is-max');
+      if (cur && cur !== this.root && cur.__dgm) cur.__dgm.toggleMax(false);
+    }
+    this.root.classList.toggle('is-max', on);
+    document.documentElement.classList.toggle('dgm-locked', on);
+    if (this.bMax) {
+      this.bMax.classList.toggle('is-on', on);
+      this.bMax.textContent = on ? '닫기' : '넓게';
+      this.bMax.title = on ? '원래 크기로 (Esc)' : '화면 가득 펼치기 (Esc 로 닫기)';
+    }
+    (window.requestAnimationFrame || setTimeout)(function () { self.fit(); });
+  };
+
+  Diagram.prototype.fit = function () {
+    var items = this.data.nodes.concat(this.data.groups);
+    var r = this.svg.getBoundingClientRect();
+    // CSS transform:scale() 이 걸린 무대(발표용 .stage) 안에서는 getBoundingClientRect 가
+    // "화면에 보이는" 크기를 돌려준다. 그 값으로 배율을 잡으면 큰 화면에서 상한(1.6배)까지
+    // 확대돼 그림이 잘리고, 작은 화면에서는 필요 이상 줄어든다.
+    // clientWidth/Height 는 변환 전 레이아웃 크기라 무대 배율과 무관하다.
+    var W = this.svg.clientWidth || r.width || 800;
+    var H = this.svg.clientHeight || r.height || 420;
+    if (!items.length) { this.view = { tx: 20, ty: 20, k: 1 }; return this.paint(); }
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    items.forEach(function (n) {
+      x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+      x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h);
+    });
+    var pad = 24, bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
+    var k = Math.min(W / bw, H / bh, 1.6);
+    this.view.k = k;
+    this.view.tx = (W - bw * k) / 2 - (x0 - pad) * k;
+    this.view.ty = (H - bh * k) / 2 - (y0 - pad) * k;
+    this.paint();
+  };
+
+  Diagram.prototype.zoom = function (f, cx, cy) {
+    var r = this.svg.getBoundingClientRect();
+    cx = cx == null ? r.width / 2 : cx; cy = cy == null ? r.height / 2 : cy;
+    var k0 = this.view.k, k1 = Math.max(.25, Math.min(3, k0 * f));
+    this.view.tx = cx - (cx - this.view.tx) * (k1 / k0);
+    this.view.ty = cy - (cy - this.view.ty) * (k1 / k0);
+    this.view.k = k1; this.paint();
+  };
+
+  /* ---------- 편집 내용 보관 (브라우저 안에만) ----------
+     끌어 옮기고 라벨을 고친 결과가 새로고침에도 남는다. 저장 위치는 이 브라우저의
+     localStorage 라 다른 사람에게는 전달되지 않는다 — 문서 자체에 반영하려면
+     JSON 버튼으로 내보내 원본 파일에 붙여넣어야 한다. */
+  Diagram.prototype.save = function () {
+    if (!this.editable || !this.key) return;
+    var self = this;
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(function () {
+      try {
+        localStorage.setItem(self.key, JSON.stringify({ v: self.srcHash, d: self.data }));
+        self.markSaved(true);
+      } catch (e) { /* 사생활 보호 모드 등 — 저장만 안 될 뿐 편집은 된다 */ }
+    }, 250);
+  };
+
+  Diagram.prototype.loadSaved = function () {
+    try {
+      var raw = localStorage.getItem(this.key);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || o.v !== this.srcHash || !o.d) { localStorage.removeItem(this.key); return null; }
+      this._restored = true;
+      return o.d;
+    } catch (e) { return null; }
+  };
+
+  Diagram.prototype.resetSaved = function () {
+    try { localStorage.removeItem(this.key); } catch (e) { }
+    this.data = this.read();
+    this.sel = null;
+    this._skipSave = true;
+    this.render();
+    this._skipSave = false;
+    this.fit();
+    this.markSaved(false);
+  };
+
+  /* 저장됨 표시. 버튼 라벨만 잠깐 바꾼다 — 별도 알림창은 발표 중에 방해가 된다. */
+  Diagram.prototype.markSaved = function (on) {
+    if (!this.bReset) return;
+    this.bReset.classList.toggle('is-on', !!on);
+    this.bReset.title = on ? '이 브라우저에 저장된 편집 내용을 지우고 원래대로' : '원래대로 (저장된 편집 없음)';
+  };
+
+  /* ---------- 편집 ---------- */
+  Diagram.prototype.push = function () {
+    this.undo.push(JSON.stringify(this.data));
+    if (this.undo.length > 40) this.undo.shift();
+  };
+  Diagram.prototype.popUndo = function () {
+    if (!this.undo.length) return;
+    this.data = JSON.parse(this.undo.pop());
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.addNode = function () {
+    this.push();
+    var id = 'n' + Date.now().toString(36).slice(-5);
+    var r = this.svg.getBoundingClientRect();
+    var wx = snap((r.width / 2 - this.view.tx) / this.view.k - 85);
+    var wy = snap((r.height / 2 - this.view.ty) / this.view.k - 31);
+    this.data.nodes.push({ id: id, label: '새 단계', x: wx, y: wy, w: 170, h: 62, shape: 'rect', tone: 'neutral' });
+    this.sel = { type: 'node', id: id };
+    this.render();
+  };
+  Diagram.prototype.toggleLink = function () {
+    this.linkMode = !this.linkMode; this.linkFrom = null;
+    this.bLink.classList.toggle('is-on', this.linkMode);
+  };
+  Diagram.prototype.cycleTone = function () {
+    if (!this.sel) return;
+    this.push();
+    if (this.sel.type === 'node') {
+      var n = this.index[this.sel.id];
+      n.tone = TONES[(TONES.indexOf(n.tone) + 1) % TONES.length];
+    } else if (this.sel.type === 'edge') {
+      var order = [undefined, 'primary', 'ok', 'risk'];
+      var e = this.data.edges[this.sel.id];
+      e.tone = order[(order.indexOf(e.tone) + 1) % order.length];
+    }
+    this.render();
+  };
+  Diagram.prototype.cycleShape = function () {
+    if (!this.sel || this.sel.type !== 'node') return;
+    var SH = ['rect', 'round', 'pill', 'diamond', 'store', 'note'];
+    this.push();
+    var n = this.index[this.sel.id];
+    n.shape = SH[(SH.indexOf(n.shape) + 1) % SH.length];
+    this.render();
+  };
+  Diagram.prototype.remove = function () {
+    if (!this.sel) return;
+    this.push();
+    var self = this;
+    if (this.sel.type === 'node') {
+      this.data.nodes = this.data.nodes.filter(function (n) { return n.id !== self.sel.id; });
+      this.data.edges = this.data.edges.filter(function (e) { return e.from !== self.sel.id && e.to !== self.sel.id; });
+    } else if (this.sel.type === 'edge') {
+      this.data.edges.splice(this.sel.id, 1);
+    } else {
+      this.data.groups = this.data.groups.filter(function (g) { return g.id !== self.sel.id; });
+    }
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.openJson = function () {
+    this.ta.value = JSON.stringify(this.data, null, 2);
+    this.modal.classList.add('is-open');
+  };
+
+  /* ---------- 이벤트 ---------- */
+  Diagram.prototype.bind = function () {
+    var self = this, drag = null, pan = null;
+
+    this.svg.addEventListener('pointerdown', function (ev) {
+      if (ev.target.closest('[contenteditable="true"]')) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      var edgeEl = ev.target.closest('.dgm-edge');
+      var grpEl = ev.target.closest('.dgm-grp');
+
+      if (self.linkMode && nodeEl) {
+        var id = nodeEl.getAttribute('data-id');
+        if (!self.linkFrom) { self.linkFrom = id; self.sel = { type: 'node', id: id }; self.paint(); }
+        else if (self.linkFrom !== id) {
+          self.push();
+          self.data.edges.push({ from: self.linkFrom, to: id, label: '' });
+          self.linkFrom = null; self.toggleLink(); self.render();
+        }
+        return;
+      }
+      if (nodeEl && self.editable) {
+        self.sel = { type: 'node', id: nodeEl.getAttribute('data-id') };
+        var n = self.index[self.sel.id];
+        var w = self.world(ev);
+        drag = { kind: 'node', obj: n, dx: w.x - n.x, dy: w.y - n.y, moved: false };
+        self.push();
+      } else if (grpEl && self.editable) {
+        self.sel = { type: 'group', id: grpEl.getAttribute('data-id') };
+        var g = self.data.groups.filter(function (q) { return q.id === self.sel.id; })[0];
+        var w2 = self.world(ev);
+        drag = { kind: 'group', obj: g, dx: w2.x - g.x, dy: w2.y - g.y, moved: false };
+        self.push();
+      } else if (edgeEl) {
+        self.sel = { type: 'edge', id: +edgeEl.getAttribute('data-i') };
+      } else {
+        self.sel = null;
+        pan = { x: ev.clientX, y: ev.clientY, tx: self.view.tx, ty: self.view.ty };
+        self.svg.classList.add('is-panning');
+      }
+      self.svg.setPointerCapture(ev.pointerId);
+      self.paint();
+    });
+
+    this.svg.addEventListener('pointermove', function (ev) {
+      if (drag) {
+        var w = self.world(ev);
+        drag.obj.x = snap(w.x - drag.dx); drag.obj.y = snap(w.y - drag.dy);
+        drag.moved = true;
+        self.render();
+      } else if (pan) {
+        self.view.tx = pan.tx + (ev.clientX - pan.x);
+        self.view.ty = pan.ty + (ev.clientY - pan.y);
+        self.paint();
+      }
+    });
+
+    var end = function (ev) {
+      if (drag && !drag.moved) self.undo.pop();
+      drag = null; pan = null;
+      self.svg.classList.remove('is-panning');
+      try { self.svg.releasePointerCapture(ev.pointerId); } catch (e) { }
+    };
+    this.svg.addEventListener('pointerup', end);
+    this.svg.addEventListener('pointercancel', end);
+
+    this.svg.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      var r = self.svg.getBoundingClientRect();
+      self.zoom(ev.deltaY < 0 ? 1.12 : 1 / 1.12, ev.clientX - r.left, ev.clientY - r.top);
+    }, { passive: false });
+
+    this.svg.addEventListener('dblclick', function (ev) {
+      if (!self.editable) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      if (nodeEl) return self.edit(nodeEl.querySelector('.lbl .t'), function (v) {
+        self.index[nodeEl.getAttribute('data-id')].label = v;
+      });
+      var edgeEl = ev.target.closest('.dgm-edge');
+      if (edgeEl) {
+        var i = +edgeEl.getAttribute('data-i');
+        var v = prompt('연결 라벨', self.data.edges[i].label || '');
+        if (v !== null) { self.push(); self.data.edges[i].label = v; self.render(); }
+      }
+    });
+
+    this.root.addEventListener('keydown', function (ev) {
+      if (ev.target.getAttribute && ev.target.getAttribute('contenteditable') === 'true') return;
+      if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); self.remove(); }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); self.popUndo(); }
+    });
+    this.root.tabIndex = 0;
+
+    // 폭이 바뀌면 다시 그리는 것만으로는 부족하다 — 좁아진 칸에 옛 배율로 그리면 넘쳐서 잘린다.
+    // fit() 으로 배율까지 다시 잡아야 항상 전체가 보인다.
+    var ro = window.ResizeObserver ? new ResizeObserver(function () { self.fit(); }) : null;
+    if (ro) ro.observe(this.svg);
+  };
+
+  Diagram.prototype.edit = function (el, done) {
+    if (!el) return;
+    var self = this;
+    this.push();
+    el.parentNode.setAttribute('contenteditable', 'true');
+    el.parentNode.focus();
+    var save = function () {
+      el.parentNode.removeAttribute('contenteditable');
+      done(el.textContent.trim());
+      self.render();
+    };
+    el.parentNode.addEventListener('blur', save, { once: true });
+    el.parentNode.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); el.parentNode.blur(); }
+      if (ev.key === 'Escape') { el.parentNode.removeAttribute('contenteditable'); self.popUndo(); }
+      ev.stopPropagation();
+    });
+    var rg = document.createRange(); rg.selectNodeContents(el);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+  };
+
+  function initAll(scope) {
+    var list = (scope || document).querySelectorAll('.dgm');
+    Array.prototype.forEach.call(list, function (el) {
+      if (el.__dgm) return;
+      el.__dgm = new Diagram(el);
+    });
+  }
+  /* Esc 는 펼쳐 놓은 다이어그램을 닫는다. 라벨 편집 중의 Esc 는
+     edit() 안에서 stopPropagation 되므로 여기까지 오지 않는다. */
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var el = document.querySelector('.dgm.is-max');
+    if (el && el.__dgm) { ev.preventDefault(); el.__dgm.toggleMax(false); }
+  });
+
+  window.HWDiagram = { initAll: initAll, Diagram: Diagram };
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', function () { initAll(); });
+  else initAll();
+})();
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 런타임 (TOC 스크롤스파이 / 체크 상태 / 복사)
+   ============================================================ */
+(function () {
+  'use strict';
+  var KEY = 'hwdoc:' + (document.title || location.pathname);
+
+  /* --- TOC 자동 생성 (비어 있을 때만) --- */
+  var toc = document.querySelector('.toc');
+  if (toc && !toc.children.length) {
+    document.querySelectorAll('.sec').forEach(function (sec) {
+      if (!sec.id) return;
+      var h = sec.querySelector('h2');
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + sec.id;
+      a.textContent = h
+        ? Array.prototype.map.call(h.childNodes, function (x) { return x.textContent.trim(); })
+          .filter(Boolean).join(' ')
+        : sec.id;
+      li.appendChild(a); toc.appendChild(li);
+    });
+  }
+
+  /* --- 스크롤스파이 --- */
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var secs = links.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  if (window.IntersectionObserver && secs.length) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (a) { a.classList.toggle('is-cur', a.getAttribute('href') === '#' + e.target.id); });
+      });
+    }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
+    secs.forEach(function (s) { io.observe(s); });
+  }
+
+  /* --- 체크리스트 상태 저장 --- */
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { }
+  document.querySelectorAll('.chk input[type="checkbox"]').forEach(function (cb, i) {
+    var id = cb.id || ('chk' + i); cb.id = id;
+    if (saved[id]) cb.checked = true;
+    var sync = function () {
+      cb.closest('li').classList.toggle('is-done', cb.checked);
+      saved[id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) { }
+      count();
+    };
+    cb.addEventListener('change', sync);
+    cb.closest('li').classList.toggle('is-done', cb.checked);
+  });
+  function count() {
+    document.querySelectorAll('.chk').forEach(function (ul) {
+      var all = ul.querySelectorAll('input[type="checkbox"]');
+      var done = ul.querySelectorAll('input[type="checkbox"]:checked');
+      var badge = ul.previousElementSibling && ul.previousElementSibling.querySelector('.chk-count');
+      if (badge) badge.textContent = done.length + ' / ' + all.length;
+    });
+  }
+  count();
+
+  /* --- 코드 복사 --- */
+  document.querySelectorAll('.code__copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var pre = b.closest('.code').querySelector('pre');
+      try { navigator.clipboard.writeText(pre.innerText); } catch (e) { }
+      var t = b.textContent; b.textContent = '복사됨';
+      setTimeout(function () { b.textContent = t; }, 1200);
+    });
+  });
+
+  /* --- 사이드 버튼 --- */
+  function bind(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+  bind('bTheme', function () {
+    var r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  bind('bPrint', function () { window.print(); });
+  bind('bReset', function () {
+    if (!confirm('체크 상태를 모두 초기화할까요?')) return;
+    try { localStorage.removeItem(KEY); } catch (e) { }
+    location.reload();
+  });
+})();
+</script>
+</body>
+</html>
