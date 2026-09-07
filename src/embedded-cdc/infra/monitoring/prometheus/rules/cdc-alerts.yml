@@ -116,11 +116,14 @@ groups:
       - alert: CdcWalDiskHeadroomLow
         # 나눗셈 양쪽을 모두 집계해 라벨을 벗긴다. 한쪽에만 라벨이 남으면 매칭이 안 돼
         # 결과가 통째로 비고, 경보는 조용히 영원히 안 뜬다.
-        # 마운트포인트를 명시하는 이유: fstype 만으로 거르면 같은 장치가 여러 마운트로
-        # 중복 노출되고 작은 장치까지 섞인다.
+        # 마운트포인트를 데이터 디렉터리에 가까운 순서로 명시하고 마지막을 루트로 못박는다.
+        # 예전 폴백은 fstype 만 보고 max() 를 쳐서 "가장 큰 파일시스템" 을 집었는데, 데이터가
+        # 작은 장치에 있으면 허용시간을 과대평가한다. 실제로 이 환경에서 /var/lib 은 매칭되지
+        # 않아 늘 폴백으로 떨어지고 있었다.
         expr: >
-          (max(node_filesystem_avail_bytes{fstype=~"ext4|xfs", mountpoint="/var/lib"})
-           or max(node_filesystem_avail_bytes{fstype=~"ext4|xfs"}))
+          (max(node_filesystem_avail_bytes{fstype=~"ext4|xfs", mountpoint="/var/lib/postgresql/data"})
+           or max(node_filesystem_avail_bytes{fstype=~"ext4|xfs", mountpoint="/var/lib"})
+           or max(node_filesystem_avail_bytes{fstype=~"ext4|xfs", mountpoint="/"}))
           / clamp_min(max(rate(cdc_wal_lsn_bytes_total{job="source-db"}[10m])), 1) < 3600
         for: 5m
         labels: { severity: critical, verification: V2 }

@@ -1,0 +1,399 @@
+# CDC 검증 리포트 (V1–V6, Custom/outbox)
+uid=cdc-custom-verify  schema=39  refresh=10s  time=now-1h~now
+tags=cdc,cdc-custom,outbox,verification,report
+
+  panel #1 text "이 대시보드 쓰는 법" @ x0 y0 24x8
+    text: **V1~V6 검증 항목을 그대로 섹션으로 나눈 리포트용 대시보드다.** CDC 두 스택과 같은 자리에 같은 질문을 두되, 슬롯·WAL 디코딩·heartbeat 가 없는 방식이라 
+[row] V1 — 기본 캡처 기능 · 통과 기준: 지연 5초 이내 + 필드 단위 변경 식별
+  panel #3 stat "End-to-End 지연 (최대)" @ x0 y7 4x5
+    unit=s  decimals=3
+    thresholds base:green 3:orange 5:red
+    calc lastNotNull
+    A  max(cdc_end_to_end_lag_seconds_max)
+    desc: source 커밋 → target 반영. LATENCY_BUDGET 5초가 통과선이다. 측정치: INSERT 531ms / UPDATE 507ms / DELETE 502ms
+  panel #4 stat "End-to-End 지연 (평균)" @ x4 y7 4x5
+    unit=s  decimals=3
+    thresholds base:green 5:red
+    calc lastNotNull
+    A  sum(rate(cdc_end_to_end_lag_seconds_sum[1m])) / clamp_min(sum(rate(cdc_end_to_end_lag_seconds_count[1m])), 0.001)
+    desc: Timer 의 sum/count 비율. 최대값이 튀는지 평균이 밀리는지 구분한다.
+  panel #5 stat "시계 편차 (앱 왕복 보정)" @ x12 y7 4x5
+    unit=s  decimals=3
+    thresholds base:green 0.5:orange 1:red
+    calc lastNotNull
+    A  abs(max(cdc_clock_skew_seconds)) or abs(max(cdc_clock_epoch_seconds{job="source-db"} - timestamp(cdc_clock_epoch_seconds{job="source-db"})))
+    desc: 지연 판정의 전제. cdc_end_to_end_lag_seconds 는 원천 커밋 시각(DB 시계)과 반영 시각(앱 시계)의 차라, 두 시계가 어긋나면 그 편차가 지연으로 둔갑한다. 1차 실행에서 편차 3,561ms · 재려던 지연 526ms 로 오차가 7배였던 항목이다. 주 경로는 앱
+  panel #6 stat "운영 처리량 (15s 창)" @ x20 y7 4x5
+    decimals=1
+    thresholds base:green
+    calc lastNotNull
+    A  sum(rate(cdc_events_total[15s]))
+    desc: 적재까지 포함한 실제 처리량. 창을 15초로 좁혀 잡는 이유가 있다 — rate(cdc_events_total[1m]) 은 1만 건을 6.7초에 처리한 버스트를 255/s 로 보여줬다. 실제의 6분의 1이다. [1m] 은 추세 감시용이고 버스트 판정에는 못 쓴다. 스크랩 간격이 5초라 
+  panel #75 stat "예산 소진율" @ x8 y7 4x5
+    unit=percent  decimals=1
+    thresholds base:green 80:orange 100:red
+    calc lastNotNull
+    A  max(cdc_end_to_end_lag_seconds_max) / 5 * 100
+    desc: 지연 최대값이 5초 예산의 몇 %인가. V1 의 결론이 "통과" 로 끝나면 안 되는 이유가 이 값이다 — 1만 건 버스트에서 최대 지연 4.97초로 예산의 99% 를 썼다. 평시 500ms 대(10%)와 버스트 99% 는 같은 "통과" 지만 운영 여유가 전혀 다르다. 80% 를 넘는 구
+  panel #76 stat "지연 판정 가능 여부" @ x16 y7 4x5
+    decimals=0
+    thresholds base:red 1:green
+    calc lastNotNull
+    A  (abs(max(cdc_clock_skew_seconds)) or abs(max(cdc_clock_epoch_seconds{job="source-db"} - timestamp(cdc_clock_epoch_seconds{job="source-db"})))) <= bool 0.5
+    desc: 왼쪽 지연 수치를 지금 믿어도 되는지. 편차가 0.5초(목표 지연의 10%) 이하일 때만 "판정 가능" 이다. 게이트를 경보에만 두면(CdcLatencyBudgetExceeded) 시계가 틀어졌을 때 지연 경보가 조용히 사라져 "지연 없음" 으로 보인다. 그래서 판정을 못 하는 상태 자
+  panel #7 timeseries "지연 vs 5초 예산" @ x0 y12 12x8
+    unit=s
+    thresholds base:green 5:red
+    A  max(cdc_end_to_end_lag_seconds_max)  legend="지연 최대"
+    B  sum(rate(cdc_end_to_end_lag_seconds_sum[1m])) / clamp_min(sum(rate(cdc_end_to_end_lag_seconds_count[1m])), 0.001)  legend="지연 평균"
+    C  vector(5)  legend="LATENCY_BUDGET (5s)"
+    desc: 빨간 선이 LATENCY_BUDGET. 예산을 넘은 구간은 시계 편차 패널과 대조해 실제 지연인지 편차인지 가른다.
+  panel #8 timeseries "연산별 처리량 · 창 크기에 따른 버스트 희석" @ x12 y12 12x8
+    decimals=2
+    A  sum by (op) (rate(cdc_events_total[1m]))  legend="{{op}} (1m)"
+    B  sum(rate(cdc_events_total[15s]))  legend="합계 — 15s 창 (버스트 판정용)"
+    C  sum(rate(cdc_events_total[1m]))  legend="합계 — 1m 창 (추세용)"
+    desc: op 레이블로 r(snapshot) / c / u / d 가 구분된다. 여기에 합계 두 줄을 겹쳐 둔 이유는 창 크기가 판정을 바꾸기 때문이다 — 1만 건을 6.7초에 처리한 버스트가 [1m] 창에서는 255/s 로 눌려 보였다. 버스트 구간에서 두 줄이 벌어지는 폭이 곧 희석된 양이고
+  panel #9 timeseries "시계 편차 추이 — 판정용(앱) vs 대체(스크랩)" @ x0 y20 12x7
+    unit=s  decimals=3
+    thresholds base:green 0.5:red
+    A  max(cdc_clock_skew_seconds)  legend="앱 왕복 보정 (판정용)"
+    B  max(cdc_clock_epoch_seconds{job="source-db"} - timestamp(cdc_clock_epoch_seconds{job="source-db"}))  legend="source DB − 스크랩 (대체)"
+    C  max(cdc_clock_epoch_seconds{job="target-db"} - timestamp(cdc_clock_epoch_seconds{job="target-db"}))  legend="target DB − 스크랩 (대체)"
+    D  max(cdc_clock_epoch_seconds{job="source-db"} - timestamp(cdc_clock_epoch_seconds{job="source-db"})) - max(cdc_clock_epoch_seconds{job="target-db"} - timestamp(cdc_clock_epoch_seconds{job="target-db"}))  legend="source DB − target DB"
+    desc: 첫 줄이 실제 판정에 쓰는 값이다. 앱이 30초마다 원천 clock_timestamp() 를 왕복 보정해 잰다(질의 직전·직후 로컬 시각의 중간값과 견줌 — 보정하지 않으면 왕복의 절반이 편차로 계상된다). 나머지 세 줄은 앱이 안 떠 있을 때를 위한 스크랩 기준 대체 경로다. 양수면 
+  panel #10 text "V1 메모 — 보고서에 쓸 문장" @ x12 y20 12x7
+    text: **통과 기준** — 목표 지연은 CDC 두 스택과 같은 `5초` 예산으로 본다. **이 방식에서 지연은 폴링 주기 + 배치 처리 시간이다.** 변경 한 건도 최소 한 주기는 기다
+  panel #59 text "필드 단위 변경 식별 — 이 방식에는 없다" @ x0 y27 14x8
+    text: **CDC 두 스택은 여기에 `cdc_change_audit` 표를 띄운다. 이 방식에는 그 표가 없고, 만들 수도 없다.** outbox 에는 (표, PK, 연산) 만 적히고 값
+    desc: V1 통과 기준의 나머지 절반. 지연은 위 패널이, 필드 식별은 이 표가 답한다. 변경 필드명을 Prometheus 레이블로 올리면 시계열이 (테이블 x 컬럼 조합) 수만큼 생겨 터지므로 지표로는 건수만 내고 내용은 cdc_change_audit 표에 남긴다. 측정치: UPDATE 에서
+  panel #60 timeseries "표별 반영 행 속도 (rows/s)" @ x14 y27 6x8
+    decimals=2
+    A  sum by (table) (rate(cdc_events_total[1m]))  legend="{{table}}"
+    desc: 변경 이력 대신 "어느 표가 흐르고 있나" 를 본다
+  panel #61 stat "트리거 빠진 표" @ x20 y27 4x8
+    decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  count(cdc_source_rows) - (count(count by (table_name) (cdc_trigger_enabled == 1)) or vector(0))  legend="트리거 없음"  instant
+    desc: 원천 표 중 outbox 트리거가 하나도 켜져 있지 않은 표 수. 0 이 아니면 그 표의 변경은 흔적 없이 사라지고 있다
+[row] V2 — Provider Down · 통과 기준: 유실 0건 + 다운 허용시간 산출 (outbox 표 크기 기준)
+  panel #12 stat "outbox 미반영 줄 수" @ x4 y36 4x5
+    unit=none  decimals=0
+    thresholds base:green 100000:orange 1000000:red
+    calc lastNotNull
+    A  max(cdc_outbox_pending)  legend="pending"
+    desc: 컨슈머가 아직 읽지 않은 줄. 슬롯 보유 WAL 에 해당한다. 행당 약 30바이트
+  panel #13 stat "WAL 증가율" @ x12 y36 4x5
+    unit=Bps  decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  rate(cdc_wal_lsn_bytes_total{job="source-db"}[5m])
+    desc: pg_current_wal_lsn() 을 카운터로 노출해 rate() 로 뽑는다. 다운 허용시간 산출의 분모.
+  panel #14 stat "변경 1건당 WAL" @ x16 y36 4x5
+    unit=bytes  decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  (max(rate(cdc_wal_lsn_bytes_total{job="source-db"}[5m])) / clamp_min(sum(rate(cdc_events_total[5m])), 0.001)) and on() (sum(rate(cdc_events_total[5m])) > 0.5)
+    desc: REPLICA IDENTITY FULL 기준 측정치는 165 bytes/변경. DEFAULT 로 바꿔 같은 부하를 걸면 이 값이 V5 비용을 숫자로 보여준다. 분모가 0 으로 수렴하면 clamp_min 하한이 값을 1000배로 부풀리고 lastNotNull 이 그 값을 붙잡아 둔다. 실
+  panel #15 stat "다운 허용시간 (현재 부하 기준)" @ x20 y36 4x5
+    unit=s
+    thresholds base:red 3600:orange 86400:green
+    calc lastNotNull
+    A  ((max(node_filesystem_avail_bytes{fstype=~"ext4|xfs", mountpoint="/var/lib/postgresql/data"}) or max(node_filesystem_avail_bytes{fstype=~"ext4|xfs", mountpoint="/var/lib"}) or max(node_filesystem_avail_bytes{fstype=~"ext4|xfs", mountpoint="/"})) / clamp_min(max(rate(cdc_wal_lsn_bytes_total{job="source-db"}[5m])), 1)) and on() (max(rate(cdc_wal_lsn_bytes_total{job="source-db"}[5m])) > 1024)
+    desc: "지금 컨슈머가 죽으면 현재 WAL 생성 속도로 원천 디스크가 찰 때까지 얼마나 버티나" 다. 다운 중에 재는 값이 아니라 상시 산출값이다. 분모가 현재 WAL 증가율이므로 유휴 구간에서는 수백 일로 뜨고 의미가 없다 — 부하가 걸린 구간에서 읽어야 한다. max_slot_wal_kee
+  panel #77 stat "WAL 디렉터리 크기" @ x8 y36 4x5
+    unit=bytes  decimals=0
+    thresholds base:green 1073741824:orange 5368709120:red
+    overrides 1건
+    calc lastNotNull
+    A  max(cdc_wal_size_bytes{job="source-db"})  legend="pg_wal/ 크기"
+    B  max(cdc_wal_files{job="source-db"})  legend="세그먼트 수"
+    desc: pg_ls_waldir() 합계 — 원천 디스크에 실제로 올라가 있는 WAL 이다. 슬롯 보유 WAL(왼쪽)과 다른 값이라는 점이 핵심이다. 왼쪽은 "컨슈머가 아직 confirm 하지 않은 구간" 이고, 이 값은 "pg_wal/ 이 지금 차지하고 있는 용량" 이다. 디스크를 채우는 것은
+  panel #78 stat "다운 후 정합 (유실 판정)" @ x0 y36 4x5
+    decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  max(abs(sum by (table_name) (cdc_source_rows) - sum by (table_name) (cdc_target_rows)) - (sum by (table_name) (cdc_dlq_rows{status="PENDING"}) or sum by (table_name) (cdc_source_rows * 0)))
+    desc: V2 통과 기준은 두 개인데(유실 0건 + 다운 허용시간 산출) 지금까지 이 섹션은 WAL·디스크만 답하고 유실 쪽은 V6 로 미뤄 두고 있었다. 판정식은 V6 대사와 같다 — |source − target| − DLQ(PENDING). 격리 건은 유실이 아니라 추적되는 미반영이라 뺀다
+  panel #16 timeseries "outbox 적체 · 표 크기 · 워커" @ x0 y41 12x8
+    unit=none  decimals=0
+    overrides 2건
+    A  cdc_outbox_pending  legend="미반영 줄 수"
+    B  cdc_outbox_size_bytes  legend="outbox 표 크기"
+    C  up{job="cdc-service"}  legend="워커 up(1/0)"
+    D  max(cdc_wal_size_bytes{job="source-db"})  legend="pg_wal/ 실제 크기"
+    desc: 워커가 죽은 구간에 줄과 표 크기가 같이 오르고, 복귀 후 줄은 바로 내려가지만 표 크기는 VACUUM 뒤에야 준다 pg_wal/ 실제 크기를 겹쳐 둔 이유는 둘이 같이 오르지 않기 때문이다 — 다운 구간에서 붙잡힌 양이 먼저 오르고, 살아나면 그쪽이 먼저 떨어진 뒤 pg_wal/ 은 
+  panel #17 timeseries "WAL 증가율 vs 디스크 여유" @ x12 y41 12x8
+    overrides 1건
+    A  rate(cdc_wal_lsn_bytes_total{job="source-db"}[5m])  legend="source WAL 증가율 (B/s)"
+    B  rate(cdc_wal_lsn_bytes_total{job="target-db"}[5m])  legend="target WAL 증가율 (B/s)"
+    C  (max(node_filesystem_avail_bytes{fstype=~"ext4|xfs", mountpoint="/var/lib/postgresql/data"}) or max(node_filesystem_avail_bytes{fstype=~"ext4|xfs", mountpoint="/var/lib"}) or max(node_filesystem_avail_bytes{fstype=~"ext4|xfs", mountpoint="/"}))  legend="디스크 여유 (bytes)"
+    desc: 두 선의 비가 곧 다운 허용시간이다. 다운 시간을 2초 / 1분 / 10분으로 늘려가며 증가가 선형인지 확인하면 외삽 근거가 된다.
+  panel #18 table "현재 운영 파라미터 (권고값 대비)" @ x0 y49 12x8
+    A  cdc_guc_value{job="source-db"}  instant
+    desc: 슬롯이 없으므로 max_slot_wal_keep_size 류는 이 방식에 직접 영향이 없다. 같은 자리에 두어 "이 방식은 이 설정에 묶이지 않는다" 를 보인다
+  panel #19 text "V2 메모 — 보고서에 쓸 문장" @ x12 y49 12x8
+    text: **이 시나리오가 이 방식에서 무엇이 되는가** — 워커가 죽어도 트리거는 계속 outbox 에 쓴다. 재기동하면 체크포인트 seq 다음부터 읽고, 같은 행의 반복 변경은 접혀서 
+[row] V3 — 포착 연결고리 끊김 · 통과 기준: 트리거 빠짐 자동 탐지 + 재동기화 절차 문서화
+  panel #21 stat "outbox 최장 대기" @ x4 y58 4x5
+    unit=s  decimals=0
+    thresholds base:green 60:orange 300:red
+    calc lastNotNull
+    A  max(cdc_outbox_oldest_age_seconds) or vector(0)  legend="oldest"
+    desc: 가장 오래된 미반영 줄의 나이. 줄 수가 적어도 이 값이 자라면 워커가 멈춘 것이다
+  panel #22 stat "트리거 걸린 표 수" @ x8 y58 4x5
+    decimals=0
+    thresholds base:red 1:green
+    calc lastNotNull
+    A  count(count by (table_name) (cdc_trigger_enabled == 1)) or vector(0)  legend="표"
+    desc: outbox 트리거가 켜져 있는 표 수. 원천 표 수보다 적으면 그 차이만큼의 표는 포착되지 않는다 — 슬롯 소실에 해당하는 상황
+  panel #23 stat "cdc-service 가동" @ x12 y58 4x5
+    thresholds base:red 1:green
+    calc lastNotNull
+    A  up{job="cdc-service"}
+    desc: SlotContinuityGuard 가 캡처 갭을 탐지해 기동을 거부하면 스크랩이 실패해 0 이 된다. 다만 이것은 간접 신호다 — 앱이 직접 내는 cdc_capture_gap 과 cdc_pipeline_halts_total 을 먼저 볼 것. 앱이 아예 안 뜨는 상황에서는 그 두 지표도
+  panel #24 stat "프로세스 가동시간" @ x16 y58 4x5
+    unit=s
+    thresholds base:red 300:green
+    calc lastNotNull
+    A  process_uptime_seconds{job="cdc-service"}
+    desc: 재시작 루프 감지용. 이 값이 반복해서 0 으로 떨어지면 기동 직후 실패하고 있다는 뜻이다. 사유는 HALT 사유별 패널에서 본다 — 여기서는 "반복되고 있다" 만 알 수 있다.
+  panel #79 stat "재동기화 필요" @ x0 y58 4x5
+    decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  clamp_max((((count(cdc_trigger_enabled == 0) or vector(0)) > bool 0) or ((count(cdc_source_rows) - (count(count by (table_name) (cdc_trigger_enabled == 1)) or vector(0))) > bool 0)), 1)
+    desc: V3 의 판정을 한 칸으로 모은 것. 이 방식에는 복제 슬롯이 없으므로 캡처 연결고리는 outbox 트리거다 — CDC 두 스택에서 "슬롯이 사라졌다" 가 오는 자리에 "트리거가 빠졌다" 가 온다. 둘 중 하나라도 서면 1 이다: (1) 꺼진 트리거가 있다(tgenabled = D), 
+  panel #80 stat "target 초과 행" @ x20 y58 4x5
+    decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  clamp_min(max(sum by (table_name) (cdc_target_rows) - sum by (table_name) (cdc_source_rows)), 0)
+    desc: 재적재로는 지워지지 않는 행. V3 통과 기준의 나머지 절반인 "재동기화 절차" 가 여기서 갈린다 — 재동기화는 멱등 UPSERT 라 중복 적재는 안전하지만, <b>원본에서 사라진 행은 다시 적재해도 지워지지 않는다.</b> 대사 패널이 |source − target| 로 절댓값을 쓰는
+  panel #25 timeseries "포착 연결고리 판정 — 읽을 줄이 있는데 멈춘 시간" @ x0 y63 12x8
+    unit=s  decimals=0
+    thresholds base:green 300:red
+    A  max(cdc_checkpoint_stale_seconds) and on() (max(cdc_outbox_pending) > 0) or vector(0)  legend="정체 (s)"
+    B  vector(300)  legend="임계"
+    desc: outbox 에 줄이 있는데 체크포인트가 안 움직인 시간. 줄이 없으면 0 이라 유휴와 구분된다. 캡처 갭 판정의 등가물이다
+  panel #26 timeseries "outbox 최장 대기 · 재기동 추이" @ x12 y63 12x8
+    decimals=0
+    A  cdc_outbox_oldest_age_seconds  legend="최장 대기(초)"
+    B  up{job="cdc-service"}  legend="sync-service up"
+    C  changes(process_start_time_seconds{job="cdc-service"}[15m])  legend="15분 내 재기동 횟수"
+    desc: 상태 코드가 2 이상으로 올라가거나 가동시간이 반복해 0 으로 떨어지는지 본다.
+  panel #27 table "outbox 상세" @ x0 y71 12x9
+    A  cdc_outbox_pending  instant
+    B  cdc_outbox_oldest_age_seconds  instant
+    C  cdc_outbox_size_bytes  instant
+    D  cdc_checkpoint_seq  instant
+    desc: 미반영 줄 / 최장 대기 / 표 크기 / 반영 seq 를 한 줄로
+  panel #28 text "V3 메모 — 보고서에 쓸 문장" @ x12 y71 12x9
+    text: **이 시나리오가 이 방식에서 무엇이 되는가** — 슬롯이 없으므로 "슬롯 유실" 은 없다. 같은 급의 사고는 **트리거 빠짐**이다. 표를 새로 만들고 트리거를 빠뜨리거나, 누군
+  panel #62 stat "트리거 빠진 표 (직접 신호)" @ x0 y80 6x6
+    decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  count(cdc_source_rows) - (count(count by (table_name) (cdc_trigger_enabled == 1)) or vector(0))  legend="트리거 없음"
+    desc: 0 이 아니면 그 표의 변경은 흔적 없이 사라지고 있다. 이 방식에서 캡처 갭에 해당하는 유일한 확정 신호다
+  panel #63 stat "재기동 누적 (1시간)" @ x6 y80 6x6
+    decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  changes(process_start_time_seconds{job="cdc-service"}[1h]) or vector(0)  legend="재기동"
+    desc: HALT 카운터가 없어 프로세스 기동 시각의 변화로 본다. 0 이 아니면 아래 추이를 볼 것
+  panel #64 timeseries "재기동 추이 (15분 창)" @ x12 y80 12x6
+    decimals=0
+    A  changes(process_start_time_seconds{job="cdc-service"}[15m])  legend="재기동"
+    desc: 재시작 루프면 5분 구간에서 계단이 반복된다
+[row] V4 — 중복 유입 · 통과 기준: 중복 유입 시에도 최종 데이터 정합 유지
+  panel #30 stat "LSN 가드 적용 테이블" @ x0 y87 6x5
+    decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  sum(cdc_guard_lsn_guard)  legend="가드 있음"
+    B  count(cdc_guard_lsn_guard)  legend="전체 테이블"
+    desc: source_lsn 비교가 붙은 테이블 수 / 전체. 가드가 없으면 중복은 무해하지만 늦게 온 오래된 이벤트가 최신 값을 덮어쓸 수 있다.
+  panel #31 stat "DLQ PENDING" @ x6 y87 6x5
+    decimals=0
+    thresholds base:green 1:orange
+    calc lastNotNull
+    A  cdc_dlq_total_pending
+    desc: 격리된 채 대기 중. 유실이 아니라 추적되는 미반영이며 대사 판정식에서 빼고 본다.
+  panel #32 stat "DLQ RETRY_REQUESTED" @ x12 y87 6x5
+    decimals=0
+    thresholds base:green 1:orange
+    calc lastNotNull
+    A  cdc_dlq_total_retry_requested
+    desc: 재처리 대상으로 표시된 건. 재처리는 V4 가 아직 안 보고 있는 중복 유입 경로다.
+  panel #33 stat "체크포인트 정체" @ x18 y87 6x5
+    unit=s
+    thresholds base:green 600:orange
+    calc lastNotNull
+    A  max(cdc_checkpoint_stale_seconds)
+    desc: 마지막 반영 이후 경과 시간. 변경이 없으면 자연히 커지므로 그 자체로는 이상이 아니고, 이벤트가 들어오는데도 커지면 정체다.
+  panel #34 timeseries "이벤트 유입 vs 행 증가 — 중복 흡수 확인" @ x0 y92 12x8
+    decimals=0
+    A  sum(increase(cdc_events_total[1m]))  legend="유입 이벤트 (1m)"
+    B  sum(delta(cdc_target_rows[1m]))  legend="target 행 증가 (1m)"
+    desc: 재기동 직후에는 마지막 처리분 이후 이벤트가 중복으로 다시 온다(정상 동작). 이벤트는 늘지만 행 수가 안 늘면 중복이 제대로 흡수된 것이다.
+  panel #35 timeseries "DLQ 상태별 건수" @ x12 y92 12x8
+    decimals=0
+    A  cdc_dlq_total_pending  legend="PENDING"
+    B  cdc_dlq_total_retry_requested  legend="RETRY_REQUESTED"
+    C  cdc_dlq_total_resolved  legend="RESOLVED"
+    D  cdc_dlq_total_discarded  legend="DISCARDED"
+    E  sum(cdc_dlq_total_rows) or vector(0)  legend="DLQ 누적"
+    desc: PENDING 은 자동으로 집지 않는다. 원인을 고친 뒤 RETRY_REQUESTED 로 표시한 건만 재처리된다.
+  panel #36 table "테이블별 방어 기제" @ x0 y100 12x8
+    A  cdc_guard_lsn_guard  instant
+    B  cdc_guard_soft_delete  instant
+    desc: V4 를 테이블 하나로 통과시키면 안 되는 이유를 그대로 표로 만든 것. lsn_guard=0 인 테이블은 순서 역전에 노출돼 있다.
+  panel #37 text "V4 메모 — 보고서에 쓸 문장" @ x12 y100 12x8
+    text: **이 시나리오가 이 방식에서 무엇이 되는가** — 재기동 후 마지막 배치를 다시 읽는 것이 곧 중복 유입이다. 반영이 "소스의 현재 값을 읽어 UPSERT" 라 같은 줄을 몇 번
+[row] V5 — 값이 빠져서 오는 경우 · 이 방식은 값을 싣지 않는다 (소스에서 현재 값을 읽는다)
+  panel #39 stat "트리거 걸린 표 / 전체" @ x0 y109 6x5
+    decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  count(count by (table_name) (cdc_trigger_enabled == 1)) or vector(0)  legend="트리거"
+    B  count(cdc_source_rows)  legend="전체"
+    desc: REPLICA IDENTITY 의 자리. 이 방식의 포착 전제는 FULL 이 아니라 트리거다
+  panel #40 stat "outbox 표 크기" @ x6 y109 6x5
+    unit=bytes  decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  cdc_outbox_size_bytes  legend="size"
+    desc: TOAST 저장소의 자리. 이 방식은 값을 싣지 않으므로 TOAST 문제가 없다 — 대신 outbox 표 크기를 본다
+  panel #41 stat "접기 비율 (5분)" @ x12 y109 6x5
+    unit=none  decimals=2
+    thresholds base:red 1.1:green
+    calc lastNotNull
+    A  increase(sync_outbox_entries_total[5m]) / clamp_min(increase(sync_folded_rows_total[5m]), 1)  legend="읽은 줄 / 반영 행"
+    desc: 1 에 가까우면 접힌 것이 없다. 같은 행 반복 갱신이 많을수록 커진다
+  panel #42 stat "변경 1건당 WAL (FULL 비용)" @ x18 y109 6x5
+    unit=bytes  decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  (max(rate(cdc_wal_lsn_bytes_total{job="source-db"}[5m])) / clamp_min(sum(rate(cdc_events_total[5m])), 0.001)) and on() (sum(rate(cdc_events_total[5m])) > 0.5)
+    desc: V5 요구(FULL)가 V2 디스크 압력으로 얼마나 돌아오는지. DEFAULT 로 바꿔 같은 부하를 걸면 차이가 이 값으로 나온다. 분모가 0 으로 수렴하면 clamp_min 하한이 값을 1000배로 부풀리고 lastNotNull 이 그 값을 붙잡아 둔다. 실제로 165 bytes/변경
+  panel #43 table "표별 outbox 트리거" @ x0 y114 12x8
+    A  cdc_trigger_enabled  instant
+    desc: enabled=0 이면 그 연산의 변경이 outbox 에 안 들어간다
+  panel #44 timeseries "접기 비율 추이 · 미반영 줄" @ x12 y114 12x8
+    unit=none  decimals=2
+    thresholds base:green
+    overrides 1건
+    A  increase(sync_outbox_entries_total[5m]) / clamp_min(increase(sync_folded_rows_total[5m]), 1)  legend="접기 비율 (5분)"
+    B  cdc_outbox_pending  legend="미반영 줄 수"
+    desc: 접기 비율이 1 에 붙어 있으면 이 방식의 이점이 안 나오는 부하다
+  panel #45 text "V5 메모 — 보고서에 쓸 문장" @ x0 y122 24x7
+    text: **이 시나리오는 이 방식에 없다.** V5 는 "이벤트에 값이 빠져서 오는 경우" 인데, 이 방식은 이벤트에 값을 싣지 않는다 — (표, PK, 연산) 만 적고 반영 시점에 소스
+[row] V6 — 최종 안전성 · 통과 기준: 인위적 유실 주입 시 대사에서 검출
+  panel #47 stat "최대 행 차이 |source − target|" @ x0 y130 6x5
+    decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  max(abs(sum by (table_name) (cdc_source_rows) - sum by (table_name) (cdc_target_rows)))
+    desc: 0 이 아니면 아직 반영 중이거나 유실된 것이다. DLQ 보정 전 원시 차이.
+  panel #48 stat "대사 판정 (DLQ 보정 후)" @ x6 y130 6x5
+    decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  max(abs(sum by (table_name) (cdc_source_rows) - sum by (table_name) (cdc_target_rows)) - (sum by (table_name) (cdc_dlq_rows{status="PENDING"}) or sum by (table_name) (cdc_source_rows * 0)))
+    desc: 판정식: |source − target| − DLQ(PENDING). 0 이 아닌 차이만 남긴다 — 격리 건은 유실이 아니라 추적되는 미반영이므로 뺀다.
+  panel #49 stat "고아 참조" @ x12 y130 6x5
+    decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  sum(cdc_orphan_rows)
+    desc: 건수·체크섬 대사로는 안 잡히는 불일치. 양쪽 건수가 각각 맞아도 참조가 끊어질 수 있다. 수신 측에 FK 를 안 걸어서 DB 가 막아주지 않는다.
+  panel #50 stat "seq 전진 (10분)" @ x18 y130 6x5
+    unit=none  decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  increase(cdc_checkpoint_seq[10m])  legend="seq"
+    desc: outbox 에 줄이 있으면 전진해야 한다. 줄이 없을 때 0 인 것은 정상이다(heartbeat 가 없다)
+  panel #51 timeseries "테이블별 행 차이" @ x0 y135 12x8
+    decimals=0
+    thresholds base:green 1:red
+    A  abs(sum by (table_name) (cdc_source_rows) - sum by (table_name) (cdc_target_rows))  legend="{{table_name}}"
+    desc: exporter 쿼리를 카탈로그 기반으로 짜놔서 publication 에 테이블을 추가하면 다음 스크랩부터 자동으로 대사 대상이 된다. 소프트 삭제도 자동 인식한다.
+  panel #52 timeseries "대사 판정식 — |source − target| − DLQ(PENDING)" @ x12 y135 12x8
+    decimals=0
+    A  abs(sum by (table_name) (cdc_source_rows) - sum by (table_name) (cdc_target_rows)) - (sum by (table_name) (cdc_dlq_rows{status="PENDING"}) or sum by (table_name) (cdc_source_rows * 0))  legend="{{table_name}}"
+    B  vector(0)  legend="판정 경계"
+    desc: 이 값이 0 이 아닌 테이블만 진짜 조사 대상이다. DLQ 로 설명되는 차이는 여기서 이미 빠져 있다.
+  panel #53 table "대사 요약" @ x0 y143 12x8
+    A  sum by (table_name) (cdc_source_rows)  instant
+    B  sum by (table_name) (cdc_target_rows)  instant
+    C  sum by (table_name) (cdc_target_deleted_rows)  instant
+    D  abs(sum by (table_name) (cdc_source_rows) - sum by (table_name) (cdc_target_rows))  instant
+    E  sum by (table_name) (cdc_dlq_rows{status="PENDING"}) or sum by (table_name) (cdc_source_rows * 0)  instant
+    desc: source / target(활성) / 소프트삭제 / DLQ 를 한 표로. 보고서 표로 그대로 옮긴다.
+  panel #54 timeseries "체크포인트 seq 전진 · 고아 참조" @ x12 y143 12x8
+    decimals=0
+    A  increase(cdc_checkpoint_seq[10m])  legend="10분간 seq 전진"
+    B  sum(rate(cdc_events_total[10m]))  legend="이벤트 유입 (events/s)"
+    C  cdc_orphan_rows  legend="고아 참조 {{child_table}}→{{parent_table}}"
+    desc: 접기 때문에 부모·자식의 반영 순서가 원천 커밋 순서와 달라질 수 있어 고아 참조를 이 방식에서 특히 본다
+  panel #55 text "V6 메모 — 보고서에 쓸 문장" @ x0 y151 24x9
+    text: **이 시나리오가 이 방식에서 무엇이 되는가** — 대사는 세 스택이 같다: 건수 대사 + DLQ 보정, 값 변조는 체크섬으로만 잡힌다. 체크섬 대사는 전체 스캔이라 스크랩에 못 
+  panel #65 stat "정체 (읽을 줄이 있는데 멈춘 시간)" @ x0 y160 6x7
+    unit=s  decimals=0
+    thresholds base:green 60:orange 300:red
+    calc lastNotNull
+    A  max(cdc_checkpoint_stale_seconds) and on() (max(cdc_outbox_pending) > 0) or vector(0)  legend="stalled"
+    desc: heartbeat 나이의 자리. outbox 에 줄이 있는데 체크포인트가 안 움직인 시간이다. 줄이 없으면 0
+  panel #66 timeseries "격리 잔량 — 표별 (PENDING)" @ x6 y160 18x7
+    unit=none  decimals=0
+    A  sum by (table_name) (cdc_dlq_rows{status="PENDING"})  legend="{{table_name}} PENDING"
+    B  sum(cdc_dlq_rows{status="PENDING"}) or vector(0)  legend="DLQ PENDING 합계"
+    desc: 대사 불일치가 났을 때 유실인지 격리인지 가르는 값. 판정식 |source − target| − DLQ(PENDING) 은 이미 보정돼 있다
+[row] 워커 결함 판정 — 방식 재검토 논의 진입 기준
+  panel #68 stat "행업 판정" @ x0 y168 6x5
+    decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  ((max(up{job="cdc-service"}) or vector(0)) == bool 1) * ((sum(rate(cdc_events_total[10m])) or vector(0)) == bool 0) * ((max(cdc_outbox_pending) or vector(0)) > bool 0)  legend="행업"
+    desc: 워커는 살아있는데(up=1) 10분간 반영 0건이고 outbox 에 줄이 있으면 1. 세 조건이 동시에 서야 행업이다
+  panel #69 stat "정체 (읽을 줄 있을 때)" @ x6 y168 6x5
+    unit=s  decimals=0
+    thresholds base:green 300:red
+    calc lastNotNull
+    A  max(cdc_checkpoint_stale_seconds) and on() (max(cdc_outbox_pending) > 0) or vector(0)  legend="정체"
+    desc: 오프셋 오염의 자리. 이 방식에는 오염될 오프셋이 없다(잃으면 0 부터). 대신 워커가 멈춘 시간을 본다
+  panel #70 stat "힙 증가 기울기 (6시간)" @ x12 y168 6x5
+    unit=Bps  decimals=0
+    thresholds base:green 1024:orange 10240:red
+    calc lastNotNull
+    A  deriv(sum(jvm_memory_used_bytes{job="cdc-service", area="heap"})[6h:1m])
+    desc: 24시간 부하에서 GC 이후에도 heap 이 단조 증가하는지가 메모리 누수 판정이다. 그 기울기를 6시간 창으로 상시 계산한다. 1 KiB/s ≈ 하루 86 MiB.
+  panel #71 stat "GC 이후 힙 바닥 (1시간)" @ x18 y168 6x5
+    unit=bytes  decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  min_over_time(sum(jvm_memory_used_bytes{job="cdc-service", area="heap"})[1h:1m])
+    desc: 1시간 최소 힙. 누수면 GC 를 해도 이 바닥값이 계단식으로 올라간다. 순간 힙 사용량은 부하에 따라 출렁이므로 바닥값을 봐야 한다.
+  panel #72 timeseries "행업 판정 3요소 — up · 반영 · outbox 줄" @ x0 y173 12x8
+    decimals=2
+    overrides 1건
+    A  max(up{job="cdc-service"})  legend="up (1=살아있음)"
+    B  sum(rate(cdc_events_total[10m]))  legend="반영 (rows/s)"
+    C  max(cdc_outbox_pending)  legend="미반영 줄 수"
+    desc: 셋을 겹쳐 봐야 유휴(줄 0)와 행업(줄이 있는데 반영 0)이 갈린다
+  panel #73 timeseries "JVM 힙 · GC 정지" @ x12 y173 12x8
+    unit=bytes  decimals=3
+    overrides 1건
+    A  sum(jvm_memory_used_bytes{job="cdc-service", area="heap"})  legend="힙 사용"
+    B  min_over_time(sum(jvm_memory_used_bytes{job="cdc-service", area="heap"})[1h:1m])  legend="1시간 힙 바닥"
+    C  rate(jvm_gc_pause_seconds_sum{job="cdc-service"}[1m])  legend="초당 GC 정지 (s/s)"
+    desc: 힙 사용량과 그 바닥값, 그리고 초당 GC 정지 시간. 바닥값이 우상향하면서 GC 정지가 같이 늘면 누수 쪽이고, 힙은 출렁여도 바닥이 평평하면 정상 부하다.
+  panel #74 text "판정 기준 — 이 화면이 무엇을 대신하는가" @ x0 y181 24x7
+    text: 방식 재검토 조건을 "재현 시 판단" 으로만 두면 장애 한 번에 논의가 열린다. 위 네 패널은 그 "재현" 을 숫자로 고정한 것이다. | 판정 | 기준 | 이 화면에서 | |---
+[row] 완료 조건 — 권고 설정값 · 남은 작업
+  panel #57 text "운영 전환시 권고 설정값" @ x0 y189 12x11
+    text: | 항목 | 현재 | 권고 | 근거 | |---|---|---|---| | outbox 트리거 | 4개 표 × ins/upd/del | 유지 + **표 추가 시 체크리스트** | 
+  panel #58 text "이 대시보드로 채운 것 / 아직 남은 것" @ x12 y189 12x11
+    text: ### 이번에 계측으로 들어간 것 | 항목 | 어떻게 | |---|---| | outbox 적체 · 최장 대기 · 표 크기 | `cdc_outbox_pending`, `cdc_ou
