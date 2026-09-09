@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 $engine = if (Get-Command docker -ErrorAction SilentlyContinue) { "docker" } else { "podman" }
 
 function Invoke-SourceSql([string]$sql) {
-    & $engine exec emb-cdc-source-pg psql -U postgres -d sourcedb -c $sql
+    & $engine exec tsdb-lidar-pg psql -U postgres -d lidar -c $sql
 }
 function Invoke-TargetSql([string]$sql) {
     & $engine exec emb-cdc-target-pg psql -U postgres -d targetdb -c $sql

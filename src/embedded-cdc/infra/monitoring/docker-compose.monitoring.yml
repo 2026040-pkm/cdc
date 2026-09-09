@@ -17,16 +17,28 @@
 networks:
   emb-cdc-net:
     name: emb-cdc-net
+  # 원천(lidar TimescaleDB)이 있는 네트워크. lidar 스택(src/timescaledb)이 만든다.
+  tsdb-net:
+    external: true
+    name: tsdb-net
 
 services:
+  # 원천은 lidar 스택의 TimescaleDB 다. 표별 행 수는 publication 에서 읽으므로 DB 가 바뀌어도
+  # 쿼리는 그대로다. 같은 DB 를 lidar 스택의 exporter(tsdb-exporter)도 보지만 지표 이름이
+  # 달라(cdc_* / tsdb_*) 겹치지 않는다.
   source-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
     container_name: emb-cdc-source-exporter
-    networks: [emb-cdc-net]
+    networks: [emb-cdc-net, tsdb-net]
     environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:postgres@source-postgres:5432/sourcedb?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@${SOURCE_DB_HOST:-timescaledb}:${SOURCE_DB_PORT:-5432}/${SOURCE_DB_NAME:-lidar}?sslmode=disable"
       PG_EXPORTER_EXTEND_QUERY_PATH: /etc/pgexporter/queries-source.yaml
       PG_EXPORTER_AUTO_DISCOVER_DATABASES: "false"
+    command:
+      # 원천이 PG17 이다. v0.15 의 bgwriter 수집기는 17 에서 pg_stat_checkpointer 로 옮겨간
+      # checkpoints_timed 컬럼을 읽다 5초마다 실패 로그를 남긴다. 대시보드는 이 수집기의
+      # 지표를 쓰지 않으므로(cdc_* 커스텀 쿼리만 쓴다) 끈다.
+      - --no-collector.stat_bgwriter
     volumes:
       - ./exporter:/etc/pgexporter:ro
     ports:

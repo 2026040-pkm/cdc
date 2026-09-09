@@ -14,7 +14,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 app="$root/dev/cdc-service"
 
-source_url="${CDC_VERIFY_SOURCE_URL:-jdbc:postgresql://localhost:56432/sourcedb}"
+source_url="${CDC_VERIFY_SOURCE_URL:-jdbc:postgresql://localhost:59432/lidar}"
 target_url="${CDC_VERIFY_TARGET_URL:-jdbc:postgresql://localhost:56433/targetdb}"
 
 engine=docker
@@ -24,7 +24,7 @@ command -v docker >/dev/null 2>&1 || engine=podman
 running="$($engine ps --format '{{.Names}}')"
 # cdc-service 까지 확인하는 이유는 V4-b 때문이다. 서비스가 없으면 "가드가 막았다"와
 # "아무 일도 일어나지 않았다"가 같은 결과로 보여 통과가 거짓이 된다.
-for c in emb-cdc-source-pg emb-cdc-target-pg emb-cdc-service; do
+for c in tsdb-lidar-pg emb-cdc-target-pg emb-cdc-service; do
   grep -qx "$c" <<<"$running" || { echo "$c 가 떠 있지 않다. 먼저 ./scripts/up.sh 를 실행할 것" >&2; exit 1; }
 done
 

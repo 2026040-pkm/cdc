@@ -19,7 +19,10 @@
 name: embedded-cdc
 
 include:
-  - path: infra/db/docker-compose.source.yml
+  # 원천은 lidar 스택(src/timescaledb)의 TimescaleDB 다. 그쪽을 먼저 올려야 한다
+  # (scripts/up 이 확인한다). 예전 원천 컨테이너는 파일만 남기고 include 에서 뺐다 —
+  # 되돌리려면 아래 줄을 살리고 dev/docker-compose.app.yml 의 SOURCE_DB_* 를 바꾼다.
+  # - path: infra/db/docker-compose.source.yml
   - path: infra/db/docker-compose.target.yml
   - path: infra/monitoring/docker-compose.monitoring.yml
   - path: dev/docker-compose.app.yml

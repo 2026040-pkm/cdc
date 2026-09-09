@@ -3,7 +3,7 @@
 # 운영 테이블(car, computer)과 embedded_cdc_slot 은 건드리지 않는다.
 param(
     [string]$Tests,          # 예: -Tests "V3*"  (특정 시나리오만)
-    [string]$SourceUrl = "jdbc:postgresql://localhost:56432/sourcedb",
+    [string]$SourceUrl = "jdbc:postgresql://localhost:59432/lidar",
     [string]$TargetUrl = "jdbc:postgresql://localhost:56433/targetdb"
 )
 $ErrorActionPreference = "Stop"
@@ -23,7 +23,7 @@ Write-Host "JAVA_HOME = $($env:JAVA_HOME)"
 # 테스트는 실행 중인 DB 를 전제로 한다. 안 떠 있으면 gradle 이 한참 뒤에야 실패한다
 $engine = if (Get-Command docker -ErrorAction SilentlyContinue) { "docker" } else { "podman" }
 $running = & $engine ps --format "{{.Names}}"
-foreach ($c in @("emb-cdc-source-pg", "emb-cdc-target-pg")) {
+foreach ($c in @("tsdb-lidar-pg", "emb-cdc-target-pg")) {
     if ($running -notcontains $c) { throw "$c 가 떠 있지 않다. 먼저 ./scripts/up.ps1 을 실행할 것" }
 }
 

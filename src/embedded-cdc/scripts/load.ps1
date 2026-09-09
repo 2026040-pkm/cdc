@@ -27,7 +27,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $engine = if (Get-Command docker -ErrorAction SilentlyContinue) { "docker" } else { "podman" }
-$srcContainer = "emb-cdc-source-pg"
+$srcContainer = "tsdb-lidar-pg"
 $tgtContainer = "emb-cdc-target-pg"
 
 & $engine inspect $srcContainer *> $null
@@ -37,10 +37,10 @@ if ($LASTEXITCODE -ne 0) {
 
 # 여러 문장이 담긴 스크립트를 stdin 으로 밀어 넣는다(-f -).
 function Invoke-SourceScript([string]$sql) {
-    $sql | & $engine exec -i $srcContainer psql -v ON_ERROR_STOP=1 -U postgres -d sourcedb -f -
+    $sql | & $engine exec -i $srcContainer psql -v ON_ERROR_STOP=1 -U postgres -d lidar -f -
 }
 function Get-SourceScalar([string]$sql) {
-    (& $engine exec -i $srcContainer psql -tA -U postgres -d sourcedb -c $sql) -join "" -replace '\s', ''
+    (& $engine exec -i $srcContainer psql -tA -U postgres -d lidar -c $sql) -join "" -replace '\s', ''
 }
 function Get-TargetScalar([string]$sql) {
     (& $engine exec -i $tgtContainer psql -tA -U postgres -d targetdb -c $sql) -join "" -replace '\s', ''

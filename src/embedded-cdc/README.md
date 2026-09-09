@@ -4,13 +4,28 @@ Kafka 없이 PostgreSQL → PostgreSQL 을 실시간 동기화하는 로그 기�
 Debezium Embedded Engine 을 Spring Boot(Java 21) 서비스에 내장했다.
 
 ```
-Source PostgreSQL ──logical replication(pgoutput)──▶ cdc-service ──JDBC──▶ Target PostgreSQL
-     (WAL)                                    (Debezium Embedded)        (멱등 UPSERT)
+lidar TimescaleDB ──logical replication(pgoutput)──▶ cdc-service ──JDBC──▶ Target PostgreSQL
+  (src/timescaledb · WAL)                     (Debezium Embedded)        (멱등 UPSERT)
 ```
 
 - **car** : source ↔ target 스키마 동일 → 1:1 복제
 - **computer** : 스키마 다름 → 매핑(full_name/spec/price_krw) + 소프트 삭제 + LSN 순서 가드
+- **lidar_device_state · lidar_status_message · lidar_ingest_reject** : lidar 스택의 일반 표. 컬럼이 같아 컬럼 목록만으로 옮기는 passthrough 핸들러 + LSN 순서 가드
 - **모니터링** : Grafana(+Prometheus, postgres_exporter×2, podman-exporter) — 정합성·처리량·지연·slot lag·컨테이너 리소스
+
+> **원천은 lidar 스택(`../timescaledb`)의 TimescaleDB 다.** 그 DB 에 이 스택의 원천 스키마
+> (`infra/db/source/init/01-schema.sql`)가 그대로 마운트되어 car · computer · grade · member ·
+> cdc_heartbeat 가 만들어지고, lidar 표 세 개가 같은 publication 에 더해진다.
+> 그래서 **lidar 스택을 먼저 올려야 한다** (`../timescaledb/scripts/up.sh`). `up` 이 확인한다.
+>
+> `lidar_status`(하이퍼테이블)는 캡처하지 않는다. 청크가 6시간마다 새 테이블로 생기고 압축·보존이
+> 내부 경로로 행을 옮기고 지워서 행 단위 CDC 가 성립하지 않는다 —
+> [docs/timescaledb-cdc-impact.html](../../docs/timescaledb-cdc-impact.html) B안. 그 데이터는
+> lidar 스택의 소비자가 직접 적재한다. 같은 문서의 ADR-01(센서 저장소는 CDC 원천과 분리)과 어긋나는
+> 구성이라는 점을 알고 쓴다.
+>
+> 예전 원천 컨테이너(`infra/db/docker-compose.source.yml`)는 파일만 남아 있다. 되돌리려면
+> 루트 compose 의 include 주석을 풀고 `dev/docker-compose.app.yml` 의 `SOURCE_DB_*` 를 바꾼다.
 
 전체 설명은 **[docs/architecture.html](docs/architecture.html)** 참고 (브라우저로 열면 된다).
 
@@ -55,7 +70,7 @@ docker compose down -v
 | Grafana | http://localhost:56300 (admin/admin) |
 | Prometheus | http://localhost:56090 |
 | cdc-service | http://localhost:56080/actuator/health |
-| source DB | localhost:56432 · sourcedb · postgres/postgres |
+| source DB | localhost:59432 · lidar · postgres/postgres (lidar 스택의 TimescaleDB) |
 | target DB | localhost:56433 · targetdb · postgres/postgres |
 
 ## 검증 테스트

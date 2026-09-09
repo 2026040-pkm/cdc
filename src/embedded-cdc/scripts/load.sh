@@ -38,11 +38,11 @@ done
 engine=docker
 command -v docker >/dev/null 2>&1 || engine=podman
 
-SRC_CONTAINER="${SRC_CONTAINER:-emb-cdc-source-pg}"
+SRC_CONTAINER="${SRC_CONTAINER:-tsdb-lidar-pg}"
 TGT_CONTAINER="${TGT_CONTAINER:-emb-cdc-target-pg}"
 
 # psql 이 각 문장마다 찍는 "INSERT 0 1000" 태그를 그대로 살려 진행 상황을 본다.
-src() { $engine exec -i "$SRC_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d sourcedb "$@"; }
+src() { $engine exec -i "$SRC_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d lidar "$@"; }
 tgt() { $engine exec -i "$TGT_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d targetdb "$@"; }
 
 scalar() { "$1" -tAc "$2" | tr -d '[:space:]'; }

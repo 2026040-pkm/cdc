@@ -5,7 +5,7 @@ set -euo pipefail
 engine=docker
 command -v docker >/dev/null 2>&1 || engine=podman
 
-src() { $engine exec emb-cdc-source-pg psql -U postgres -d sourcedb -c "$1"; }
+src() { $engine exec tsdb-lidar-pg psql -U postgres -d lidar -c "$1"; }
 tgt() { $engine exec emb-cdc-target-pg psql -U postgres -d targetdb -c "$1"; }
 
 echo "── 1. INSERT ──────────────────────────────────────"

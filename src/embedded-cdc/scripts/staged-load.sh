@@ -24,7 +24,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 engine=docker
 command -v docker >/dev/null 2>&1 || engine=podman
 
-SRC=emb-cdc-source-pg
+SRC=tsdb-lidar-pg
 DST=emb-cdc-target-pg
 
 # 사다리. 인자를 주면 그것을 쓴다.
@@ -37,8 +37,8 @@ fi
 # 한 단계를 기다리는 최대 시간(초). 100만 건이 10분 남짓이라 넉넉히 잡는다.
 WAIT_MAX="${WAIT_MAX:-1800}"
 
-psql_src() { $engine exec -i "$SRC" psql -U postgres -d sourcedb -v ON_ERROR_STOP=1 "$@"; }
-q_src() { $engine exec -i "$SRC" psql -U postgres -d sourcedb -tAc "$1"; }
+psql_src() { $engine exec -i "$SRC" psql -U postgres -d lidar -v ON_ERROR_STOP=1 "$@"; }
+q_src() { $engine exec -i "$SRC" psql -U postgres -d lidar -tAc "$1"; }
 q_dst() { $engine exec -i "$DST" psql -U postgres -d targetdb -tAc "$1"; }
 
 # 원본 세 표의 합계. car 는 하드 삭제라 그대로 세고, 나머지 둘은 수신에서

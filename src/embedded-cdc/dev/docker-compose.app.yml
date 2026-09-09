@@ -1,7 +1,12 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # cdc-service — Debezium Embedded Engine 을 내장한 Spring Boot 서비스
 #
-#   source-postgres (WAL) ──logical replication──▶ cdc-service ──JDBC──▶ target-postgres
+#   lidar TimescaleDB (WAL) ──logical replication──▶ cdc-service ──JDBC──▶ target-postgres
+#
+# 원천은 lidar 스택(src/timescaledb)의 TimescaleDB 다. 그 DB 에 embedded-cdc 의 원천 스키마
+# (car · computer · grade · member)가 그대로 들어 있고, lidar 표 세 개가 publication 에 더해져 있다.
+# 그래서 lidar 스택이 먼저 떠 있어야 한다 — tsdb-net 은 그쪽이 만든 external 네트워크다.
+# 예전 원천(source-postgres, infra/db/docker-compose.source.yml)은 루트 compose 에서 뺐다.
 #
 # offset(어디까지 읽었는지)은 named volume 의 파일에 저장되므로
 # 컨테이너를 재시작해도 멈춘 지점부터 이어서 읽는다.
@@ -11,25 +16,27 @@
 networks:
   emb-cdc-net:
     name: emb-cdc-net
+  tsdb-net:
+    external: true
+    name: tsdb-net
 
 services:
   cdc-service:
-    # 두 DB 가 healthy 가 된 뒤에 올라온다. 원천이 아직 wal_level=logical 로 다시
-    # 뜨기 전에 붙으면 복제 슬롯 생성이 실패한 채로 재시도 루프에 빠진다.
+    # target 이 healthy 가 된 뒤에 올라온다. 원천(lidar TimescaleDB)은 다른 compose 프로젝트라
+    # depends_on 으로 걸 수 없다 — 안 떠 있으면 복제 슬롯 생성이 실패한 채 재시도 루프에 빠진다.
     # (루트 compose 는 include 한 서비스를 덮어쓸 수 없으므로 여기에 둔다)
     depends_on:
-      source-postgres:
-        condition: service_healthy
       target-postgres:
         condition: service_healthy
     build:
       context: ./cdc-service
     image: embedded-cdc/cdc-service:local
     container_name: emb-cdc-service
-    networks: [emb-cdc-net]
+    networks: [emb-cdc-net, tsdb-net]
     environment:
-      SOURCE_DB_HOST: source-postgres
-      SOURCE_DB_PORT: "5432"
+      SOURCE_DB_HOST: ${SOURCE_DB_HOST:-timescaledb}
+      SOURCE_DB_PORT: ${SOURCE_DB_PORT:-5432}
+      SOURCE_DB_NAME: ${SOURCE_DB_NAME:-lidar}
       TARGET_DB_HOST: target-postgres
       TARGET_DB_PORT: "5432"
       # V1 — UPDATE 의 변경 필드를 cdc_change_audit 에 남길 테이블. 세 가지 형태:
@@ -41,6 +48,7 @@ services:
       # car 한 테이블에만 켠다. 성능 비교 측정처럼 조건을 맞춰야 할 때는 빈 값으로:
       #   CDC_AUDIT_CHANGED_FIELDS= docker compose up -d cdc-service
       # (`:-` 가 아니라 `-` 라 명시적으로 빈 값을 주면 그대로 빈 값이 된다)
+      # lidar_device_state 는 초당 ~200 UPDATE 라 여기에 넣으면 감사 표가 그 속도로 자란다.
       CDC_AUDIT_CHANGED_FIELDS: ${CDC_AUDIT_CHANGED_FIELDS-car}
     ports:
       - "56080:8080"

@@ -17,7 +17,15 @@ public enum SourceTable {
     // grade 는 member 의 부모다. 열거 순서는 적용 순서와 무관하다 —
     // 순서는 이벤트의 LSN 이 정하고, BatchApplier 가 그 순서대로 부른다.
     GRADE("grade"),
-    MEMBER("member");
+    MEMBER("member"),
+
+    // lidar 스택(src/timescaledb)의 일반 테이블. 원천이 TimescaleDB 인 lidar DB 로 바뀌면서
+    // 들어왔다. 하이퍼테이블(lidar_status)은 넣지 않는다 — 청크가 주기마다 새 테이블로
+    // 생기고 압축·보존이 내부 경로로 행을 옮기고 지워서, 행 단위 CDC 가 성립하지 않는다
+    // (docs/timescaledb-cdc-impact.html B안). 그 데이터는 lidar 스택의 소비자가 직접 적재한다.
+    LIDAR_DEVICE_STATE("lidar_device_state"),
+    LIDAR_STATUS_MESSAGE("lidar_status_message"),
+    LIDAR_INGEST_REJECT("lidar_ingest_reject");
 
     private final String tableName;
 
