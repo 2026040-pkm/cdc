@@ -1,0 +1,22 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 루트 compose — ot-lidar-status → TimescaleDB 스택의 유일한 진입점
+#
+#   scripts/up.sh (또는 up.ps1)    # 스택을 올리고 Kafka 컨테이너를 tsdb-net 에 alias kafka 로 붙인다
+#   scripts/down.sh [-v]           # Kafka 를 떼고 정지 (-v 면 볼륨까지 삭제 → init SQL 재실행)
+#
+# `docker compose up` 을 직접 쳐도 되지만 그러면 lidar-ingest 가 kafka:9093 을 못 찾는다.
+# 그때는 아래 한 줄을 손으로 실행한다.
+#   podman network connect tsdb-net <kafka-컨테이너> --alias kafka
+#
+# include 안의 상대 경로(build context, 설정 파일 마운트)는 이 파일이 아니라
+# 그 compose 파일 자신의 위치를 기준으로 풀린다. 변수(${KAFKA_*}) 도 마찬가지로
+# 그 파일 옆의 .env 를 보므로, app 쪽은 env_file 로 루트 kafka.env 를 명시한다.
+# (.env 는 저장소 .gitignore 가 무시해서 이름을 따로 붙였다.)
+# ─────────────────────────────────────────────────────────────────────────────
+name: timescaledb
+
+include:
+  - path: infra/db/docker-compose.db.yml
+  - path: infra/monitoring/docker-compose.monitoring.yml
+  - path: dev/docker-compose.app.yml
+    env_file: kafka.env

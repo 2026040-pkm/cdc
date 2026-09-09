@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TimescaleDB — ot-lidar-status 적재 대상 DB (PostgreSQL 17 + TimescaleDB 2.29)
+#
+# init/ 의 SQL 은 볼륨이 처음 만들어질 때 한 번만 실행된다. 스키마를 고쳤으면
+# `down -v` 로 볼륨까지 지우고 다시 올려야 반영된다.
+# ─────────────────────────────────────────────────────────────────────────────
+# 루트 docker-compose.yml 의 include 로만 쓴다 — 단독으로 -f 지정해 올리면 프로젝트가
+# 따로 잡혀 같은 container_name/네트워크를 두고 충돌한다.
+networks:
+  tsdb-net:
+    name: tsdb-net
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:2.29.2-pg17
+    container_name: tsdb-lidar-pg
+    networks: [tsdb-net]
+    environment:
+      POSTGRES_DB: lidar
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      TZ: Asia/Seoul
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb
+      # 사용 통계 외부 전송 끄기
+      - -c
+      - timescaledb.telemetry_level=off
+      # podman VM 메모리가 2GiB 다. 이미지의 timescaledb-tune 이 잡는 값이 VM 이 아니라
+      # 호스트 기준으로 커질 수 있어 여기서 못 박는다.
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=100
+      # 압축·보존·연속 집계 잡이 도는 워커. 하이퍼테이블 1 + 집계 2 = 정책 5개.
+      - -c
+      - timescaledb.max_background_workers=8
+      # 느린 문장 기록. 대시보드 SQL 이 무거워지면 여기서 먼저 보인다.
+      - -c
+      - log_min_duration_statement=1000
+    ports:
+      - "59432:5432"
+    volumes:
+      - tsdb-lidar-pgdata:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lidar"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  tsdb-lidar-pgdata:

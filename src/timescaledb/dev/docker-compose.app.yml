@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# lidar-ingest — Kafka(ot-lidar-status) → TimescaleDB 소비자
+#
+# Kafka 는 이 스택이 띄우지 않는다. Aspire(InterSysLink) 가 세션마다 띄우는 컨테이너
+# (이름 kafka-xxxxxxxx) 에 붙는다. 브로커는 자기 네트워크 안에서 kafka:9093
+# (PLAINTEXT_INTERNAL) 으로 광고되고, 호스트 쪽 127.0.0.1:9092 는 Aspire 프록시라
+# podman VM 안에서는 보이지 않는다.
+#
+# 소비자를 Aspire 세션 네트워크에 넣는 방법은 안 된다 — Aspire 가 자기 네트워크에
+# 붙은 낯선 컨테이너를 5초 안에 떼어 낸다 (podman events 로 확인, 2026-09-09).
+# 반대로 Kafka 컨테이너를 이쪽 네트워크(tsdb-net)에 alias "kafka" 로 붙이면 떼지 않는다.
+# 그 일을 scripts/up 이 한다. 여기서는 소비자가 tsdb-net 하나만 쓴다.
+# ─────────────────────────────────────────────────────────────────────────────
+# 루트 docker-compose.yml 의 include 로만 쓴다.
+networks:
+  tsdb-net:
+    name: tsdb-net
+
+services:
+  lidar-ingest:
+    build:
+      context: ./ingest
+    image: timescaledb/lidar-ingest:local
+    container_name: tsdb-lidar-ingest
+    networks: [tsdb-net]
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      # kafka 라는 이름은 scripts/up 이 Kafka 컨테이너를 tsdb-net 에 붙일 때 준 alias 다.
+      KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP:-kafka:9093}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-ot-lidar-status}
+      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID:-tsdb-lidar-ingest}
+      # 처음 붙을 때 토픽에 이미 쌓인 것부터 읽는다 (earliest). 오프셋이 커밋된 뒤로는 무시된다.
+      KAFKA_AUTO_OFFSET_RESET: ${KAFKA_AUTO_OFFSET_RESET:-earliest}
+      PG_DSN: postgresql://postgres:postgres@timescaledb:5432/lidar
+      # 배치: 레코드 N개 또는 대기 M ms 중 먼저 오는 쪽에서 DB 에 쓴다.
+      BATCH_MAX_MESSAGES: "50"
+      BATCH_MAX_WAIT_MS: "1000"
+      METRICS_PORT: "8000"
+      TZ: Asia/Seoul
+    ports:
+      - "59080:8000"
+    restart: unless-stopped
