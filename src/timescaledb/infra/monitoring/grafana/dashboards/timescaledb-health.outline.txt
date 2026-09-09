@@ -1,0 +1,121 @@
+# TimescaleDB 상태 (lidar)
+uid=tsdb-health  schema=39  refresh=5s  time=now-1h~now
+tags=timescaledb,postgres
+
+  panel #1 stat "DB 크기" @ x0 y0 4x5
+    unit=bytes  decimals=1
+    thresholds base:green
+    calc lastNotNull
+    A  tsdb_db_size_bytes  legend="lidar"
+    desc: pg_database_size(lidar)
+  panel #2 stat "lidar_status 크기" @ x4 y0 4x5
+    unit=bytes  decimals=1
+    thresholds base:green
+    calc lastNotNull
+    A  tsdb_hypertable_total_bytes{hypertable="lidar_status"}  legend="total"
+    desc: 하이퍼테이블 heap + index + toast (모든 청크)
+  panel #3 stat "청크 수 (전체 / 압축)" @ x8 y0 4x5
+    unit=short  decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  tsdb_hypertable_chunks{hypertable="lidar_status"}  legend="전체"
+    B  tsdb_hypertable_compressed_chunks{hypertable="lidar_status"}  legend="압축"
+    desc: 청크 간격 6시간 · 보존 31일이면 정상 상태에서 ~124개. 3일 지난 것부터 압축된다
+  panel #4 stat "압축률" @ x12 y0 4x5
+    unit=percentunit  decimals=0
+    thresholds base:orange 0.5:green
+    calc lastNotNull
+    A  (tsdb_compression_before_bytes - tsdb_compression_after_bytes) / clamp_min(tsdb_compression_before_bytes, 1)  legend="절감"
+    desc: 압축된 청크 기준 1 − after/before. 압축된 청크가 없으면 0
+  panel #5 stat "행 수 (근사)" @ x16 y0 4x5
+    unit=short  decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  tsdb_rows_approx{hypertable="lidar_status"}  legend="rows"
+    desc: approximate_row_count — 카탈로그 통계 기반. count(*) 는 청크 전체 스캔이라 안 쓴다
+  panel #6 stat "연결 수" @ x20 y0 4x5
+    unit=short  decimals=0
+    thresholds base:green 50:orange 80:red
+    calc lastNotNull
+    A  tsdb_db_connections  legend="connections"
+    desc: lidar DB 백엔드 수. ingest 1 + exporter 1 + Grafana 몇 개가 정상이다 (max 100)
+  panel #7 timeseries "트랜잭션/초" @ x0 y5 8x8
+    unit=ops
+    thresholds base:green
+    A  rate(pg_stat_database_xact_commit{datname="lidar"}[1m])  legend="commit"
+    B  rate(pg_stat_database_xact_rollback{datname="lidar"}[1m])  legend="rollback"
+    desc: 적재는 배치(레코드 1~3개)당 트랜잭션 하나라 ~1/s 다. rollback 이 보이면 ingest 의 DB 오류 패널을 보라
+  panel #8 timeseries "튜플 삽입/초 vs 적재 행/초" @ x8 y5 8x8
+    unit=short
+    thresholds base:green
+    A  rate(pg_stat_database_tup_inserted{datname="lidar"}[1m])  legend="tup_inserted (DB)"
+    B  sum(rate(lidar_ingest_rows_inserted_total[1m]))  legend="적재 행 (ingest)"
+    desc: DB 가 센 삽입과 소비자가 센 삽입. DB 쪽이 더 크면 그 차이는 연속 집계 갱신과 상태 표 UPSERT 다
+  panel #9 timeseries "버퍼 캐시 적중률" @ x16 y5 8x8
+    unit=percentunit  decimals=1
+    thresholds base:red 0.9:green
+    A  rate(pg_stat_database_blks_hit{datname="lidar"}[5m]) / (rate(pg_stat_database_blks_hit{datname="lidar"}[5m]) + rate(pg_stat_database_blks_read{datname="lidar"}[5m]))  legend="hit ratio"
+    desc: shared_buffers 256MB. 대시보드 SQL 이 오래된 청크를 훑으면 떨어진다
+  panel #10 timeseries "lidar_status 크기 추이" @ x0 y13 8x8
+    unit=bytes
+    thresholds base:green
+    A  tsdb_hypertable_table_bytes{hypertable="lidar_status"}  legend="heap"
+    B  tsdb_hypertable_index_bytes{hypertable="lidar_status"}  legend="index"
+    C  tsdb_hypertable_toast_bytes{hypertable="lidar_status"}  legend="toast"
+    desc: 압축 잡이 돌면 heap 이 계단처럼 내려간다. 31일 보존이 돌면 청크째 사라진다
+  panel #11 timeseries "청크 수 · 압축 청크" @ x8 y13 8x8
+    unit=short  decimals=0
+    thresholds base:green
+    A  tsdb_hypertable_chunks  legend="{{hypertable}} 전체"
+    B  tsdb_hypertable_compressed_chunks  legend="{{hypertable}} 압축"
+    desc: _materialized_hypertable_* 은 연속 집계의 내부 하이퍼테이블이다
+  panel #12 timeseries "WAL 생성률 · pg_wal 크기" @ x16 y13 8x8
+    unit=bytes
+    thresholds base:green
+    overrides 1건
+    A  rate(tsdb_wal_lsn_bytes_total[1m])  legend="WAL 생성 B/s"
+    B  tsdb_wal_size_bytes  legend="pg_wal 크기"
+    desc: 압축 잡이 도는 순간 WAL 이 튄다. 복제 슬롯이 없어 pg_wal 은 체크포인트마다 정리된다
+  panel #13 timeseries "연결 (상태별)" @ x0 y21 8x8
+    unit=short  decimals=0
+    thresholds base:green
+    A  pg_stat_activity_count{datname="lidar"}  legend="{{state}}"
+    desc: idle in transaction 이 오래 남으면 잡거나 대시보드 쿼리가 끝나지 않은 것이다
+  panel #14 timeseries "락 (모드별)" @ x8 y21 8x8
+    unit=short  decimals=0
+    thresholds base:green
+    A  pg_locks_count{datname="lidar"}  legend="{{mode}}"
+    desc: 압축 잡은 청크에 ShareLock 류를 잡는다. ExclusiveLock 이 길게 남으면 그때다
+  panel #15 timeseries "Dead tuple · autovacuum" @ x16 y21 8x8
+    unit=short  decimals=0
+    thresholds base:green
+    overrides 1건
+    A  sum by (schemaname) (pg_stat_user_tables_n_dead_tup{datname="lidar"})  legend="dead {{schemaname}}"
+    B  sum(rate(pg_stat_user_tables_autovacuum_count{datname="lidar"}[5m])) * 60  legend="autovacuum/분"
+    desc: 적재는 INSERT 만이라 dead tuple 은 lidar_device_state UPSERT(장비 210행 × 초당 약 1회) 에서 나온다. _timescaledb_internal 은 청크들
+  panel #16 timeseries "체크포인트 · 버퍼 쓰기" @ x0 y29 8x8
+    unit=short
+    thresholds base:green
+    overrides 1건
+    A  rate(pg_stat_checkpointer_num_timed_total[5m]) * 60  legend="timed/분"
+    B  rate(pg_stat_checkpointer_num_requested_total[5m]) * 60  legend="requested/분"
+    C  rate(pg_stat_checkpointer_buffers_written_total[5m])  legend="buffers written/s"
+    desc: PG17 은 체크포인트 통계가 pg_stat_checkpointer 로 옮겨졌다. requested 가 timed 보다 잦으면 max_wal_size 가 작다
+  panel #17 timeseries "TimescaleDB 백그라운드 워커" @ x8 y29 8x8
+    unit=short  decimals=0
+    thresholds base:green
+    A  tsdb_db_ts_workers  legend="실행 중"
+    B  tsdb_db_ts_workers_max  legend="max_background_workers"
+    desc: 정책 5개(압축 1 · 보존 3 · 집계 갱신 2) 가 돌 워커. 상한에 붙어 있으면 잡이 밀린다
+  panel #18 timeseries "도커 VM 디스크 · 메모리 여유" @ x16 y29 8x8
+    unit=bytes
+    thresholds base:green
+    A  node_filesystem_avail_bytes{mountpoint="/", fstype!="tmpfs"}  legend="디스크 여유 /"
+    B  node_memory_MemAvailable_bytes  legend="메모리 여유"
+    desc: 31일 보존이면 정상 상태에서도 ~20GB 가 상주한다. 10% 아래로 가면 경보(TimescaleDiskLow)
+[row] 백그라운드 잡 — 압축 · 보존 · 연속 집계 갱신
+  panel #20 table "정책 잡 실행 상태" @ x0 y38 24x9
+    thresholds base:green
+    overrides 1건
+    A  SELECT j.job_id, j.proc_name, COALESCE(j.hypertable_name, '') AS hypertable, j.schedule_interval::text AS schedule, s.last_run_status, s.last_run_started_at, s.last_run_duration::text AS duration, s.total_runs, s.total_failures, s.next_start FROM timescaledb_information.jobs j LEFT JOIN timescaledb_information.job_stats s ON s.job_id = j.job_id WHERE j.job_id >= 1000 ORDER BY j.job_id
+    desc: last_run_status 가 Failed 면 디스크가 안 줄고(압축·보존) 1분 집계가 멈춘다(refresh). config 는 psql 로 본다

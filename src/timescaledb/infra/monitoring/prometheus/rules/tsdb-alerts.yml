@@ -1,0 +1,135 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ot-lidar-status 적재 · TimescaleDB 경보
+#
+# 임계값 근거 (2026-09-09 관측):
+#   - 발신 주기 1~3초 · 레코드당 ~210 항목 · 장비 210대 · 상태 분포 ONLINE 88% / IDLE 6% / WARNING 5% / ERROR 0.6%
+#   - 따라서 "3분간 메시지 0" 은 발신 60회 이상을 건너뛴 것이고, "60초 무응답 장비" 는 20회 이상을 건너뛴 것이다.
+# ─────────────────────────────────────────────────────────────────────────────
+groups:
+  - name: lidar-ingest
+    rules:
+      # 소비자가 살아 있는데 메시지가 안 들어온다 — 발신 측(Aspire Kafka) 이 멈췄거나
+      # Aspire 세션이 새로 떠서 Kafka 컨테이너가 바뀌었는데 tsdb-net 에 안 붙은 것이다.
+      - alert: LidarIngestStalled
+        expr: sum(rate(lidar_ingest_messages_total[3m])) == 0
+        for: 3m
+        labels: {severity: critical}
+        annotations:
+          summary: "3분간 ot-lidar-status 메시지를 하나도 소비하지 못했다"
+          description: "발신이 멈췄거나 lidar-ingest 가 Kafka(kafka:9093) 에 닿지 못한다. scripts/up 을 다시 돌려 새 Kafka 컨테이너를 tsdb-net 에 붙여라."
+
+      # 소비자 지표 자체가 없다 — 컨테이너가 죽었다.
+      - alert: LidarIngestDown
+        expr: up{job="lidar-ingest"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "lidar-ingest 컨테이너가 응답하지 않는다"
+
+      # 소비가 발신을 못 따라간다. 레코드 200개 = 약 10분치.
+      - alert: LidarKafkaLagHigh
+        expr: sum(lidar_ingest_kafka_lag) > 200
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Kafka 소비 지연이 {{ $value }} 레코드"
+          description: "DB 쓰기가 느리거나(배치 시간 패널) 소비자가 재시작을 반복하고 있다."
+
+      # 장비 발생 시각 → DB 커밋. 정상은 1초 미만이다.
+      # 소비자를 새로 올려 밀린 것을 따라잡는 동안(earliest 부터) 은 오래된 이벤트가 들어오므로
+      # 크게 나온다 — 그래서 10분을 기다린다. 따라잡은 뒤에도 크면 진짜 지연이다.
+      - alert: LidarEndToEndLagHigh
+        expr: histogram_quantile(0.95, sum(rate(lidar_ingest_end_to_end_seconds_bucket[5m])) by (le)) > 30
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "end-to-end 지연 p95 가 {{ $value }}초"
+
+      # 파싱 실패는 스키마가 바뀌었다는 신호다. 한 건이라도 나면 봐야 한다.
+      - alert: LidarIngestRejects
+        expr: increase(lidar_ingest_rejects_total[10m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "최근 10분간 격리된 항목 {{ $value }}건"
+          description: "lidar_ingest_reject 표에서 원문과 사유를 확인하라. 발신 스키마가 바뀌었을 가능성이 크다."
+
+      # DB 오류로 배치를 재시도 중이다. 소비는 멈추고 Kafka 지연이 쌓인다.
+      - alert: LidarIngestDbErrors
+        expr: increase(lidar_ingest_db_errors_total[5m]) > 3
+        labels: {severity: critical}
+        annotations:
+          summary: "최근 5분간 DB 쓰기 오류 {{ $value }}회"
+
+  - name: lidar-fleet
+    rules:
+      - alert: LidarDevicesError
+        expr: tsdb_lidar_devices_count{status="ERROR"} > 10
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "ERROR 상태 장비 {{ $value }}대"
+          description: "관측 평균은 210대 중 1~2대다. 10대를 넘으면 개별 장비가 아니라 공통 원인(네트워크 E-NET-*)을 의심하라."
+
+      - alert: LidarDevicesStale
+        expr: tsdb_lidar_fleet_stale > 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "60초 넘게 소식이 없는 장비 {{ $value }}대"
+
+      # 전체가 멈추면 stale 보다 이 값이 먼저 커진다. LidarIngestStalled 와 짝.
+      - alert: LidarDataStale
+        expr: tsdb_lidar_fleet_freshness_seconds > 120
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "DB 의 최신 이벤트가 {{ $value }}초 전이다"
+
+  - name: timescaledb
+    rules:
+      - alert: TimescaleDbDown
+        expr: pg_up{job="timescaledb"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "TimescaleDB 에 exporter 가 붙지 못한다"
+
+      # 압축·보존·집계 정책 중 하나가 마지막 실행에 실패했다.
+      # 실패한 채 두면 디스크가 안 줄고 대시보드의 1분 집계가 멈춘다.
+      - alert: TimescaleJobFailed
+        expr: tsdb_job_last_run_ok == 0 and tsdb_job_total_runs > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "백그라운드 잡 {{ $labels.proc_name }} ({{ $labels.hypertable }}) 마지막 실행 실패"
+
+      - alert: TimescaleJobFailingRepeatedly
+        expr: increase(tsdb_job_total_failures[1h]) >= 3
+        labels: {severity: critical}
+        annotations:
+          summary: "잡 {{ $labels.proc_name }} 이 1시간에 {{ $value }}번 실패"
+
+      # 31일 보존이라 정상 상태에서도 한 달치(~20GB)가 쌓인다. 10% 남으면 경보.
+      - alert: TimescaleDiskLow
+        expr: node_filesystem_avail_bytes{mountpoint="/", fstype!="tmpfs"} / node_filesystem_size_bytes{mountpoint="/", fstype!="tmpfs"} < 0.10
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "도커 VM 디스크 여유 {{ $value | humanizePercentage }}"
+
+      - alert: TimescaleConnectionsHigh
+        expr: tsdb_db_connections > 80
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "DB 연결 {{ $value }}개 (max_connections 100)"
+
+      # 캐시 적중률이 낮으면 shared_buffers 가 작거나 대시보드 SQL 이 오래된 청크를 훑고 있다.
+      - alert: TimescaleCacheHitLow
+        expr: |
+          rate(pg_stat_database_blks_hit{datname="lidar"}[5m])
+            / (rate(pg_stat_database_blks_hit{datname="lidar"}[5m]) + rate(pg_stat_database_blks_read{datname="lidar"}[5m])) < 0.90
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "버퍼 캐시 적중률 {{ $value | humanizePercentage }}"

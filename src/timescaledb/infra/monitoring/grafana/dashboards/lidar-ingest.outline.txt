@@ -1,0 +1,140 @@
+# OT LiDAR 적재 (Kafka → TimescaleDB)
+uid=tsdb-lidar-ingest  schema=39  refresh=5s  time=now-30m~now
+tags=timescaledb,lidar,kafka
+var $tid query SELECT tid FROM lidar_device_state ORDER BY tid::int
+
+  panel #1 stat "적재 행/초" @ x0 y0 4x5
+    unit=short  decimals=1
+    thresholds base:green
+    calc lastNotNull
+    A  sum(rate(lidar_ingest_rows_inserted_total[1m]))  legend="행/s"
+    desc: lidar_status 에 실제로 INSERT 된 행. 관측 기준 70~210 행/초 (레코드당 ~210 항목 · 1~3초 간격)
+  panel #2 stat "Kafka 레코드/초" @ x4 y0 4x5
+    unit=short  decimals=2
+    thresholds base:green
+    calc lastNotNull
+    A  sum(rate(lidar_ingest_messages_total[1m]))  legend="레코드/s"
+    desc: 소비한 Kafka 레코드 수. 0 이 지속되면 발신이 멈췄거나 브로커에 못 닿는 것이다 (LidarIngestStalled)
+  panel #3 stat "Kafka 소비 지연 (레코드)" @ x8 y0 4x5
+    unit=short  decimals=0
+    thresholds base:green 50:orange 200:red
+    calc lastNotNull
+    A  sum(lidar_ingest_kafka_lag)  legend="lag"
+    desc: high watermark − 소비 위치. 200 이면 약 10분치가 밀린 것이다
+  panel #4 stat "DB 최신 이벤트 경과" @ x12 y0 4x5
+    unit=s  decimals=0
+    thresholds base:green 30:orange 120:red
+    calc lastNotNull
+    A  tsdb_lidar_fleet_freshness_seconds  legend="경과"
+    desc: now() − DB 에 있는 가장 최근 occurred_at. 발신 주기 1~3초라 30초를 넘으면 이상이다
+  panel #5 stat "중복 스킵 누계" @ x16 y0 4x5
+    unit=short  decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  sum(lidar_ingest_rows_duplicate_total)  legend="중복"
+    desc: (idempotency_key, time) 유니크 인덱스가 걸러 낸 행. Kafka 재전달·소비자 재시작 뒤에 오른다. 유실이 아니라 정상 방어다
+  panel #6 stat "격리 누계 (reject)" @ x20 y0 4x5
+    unit=short  decimals=0
+    thresholds base:green 1:red
+    calc lastNotNull
+    A  tsdb_rows_approx{hypertable="lidar_ingest_reject"}  legend="격리"
+    desc: 파싱 실패로 lidar_ingest_reject 에 들어간 항목. 한 건이라도 있으면 발신 스키마가 바뀐 것이다
+  panel #7 timeseries "처리량 — 파싱 항목 · 적재 행 · 레코드" @ x0 y5 12x8
+    unit=short
+    thresholds base:green
+    overrides 1건
+    A  sum(rate(lidar_ingest_items_total[1m]))  legend="파싱 항목/s"
+    B  sum(rate(lidar_ingest_rows_inserted_total[1m]))  legend="적재 행/s"
+    C  sum(rate(lidar_ingest_messages_total[1m]))  legend="레코드/s"
+    desc: 파싱 항목과 적재 행이 벌어지면 그 차이가 중복(정상) 또는 격리(이상)다. 레코드/s 는 오른쪽 축
+  panel #8 timeseries "End-to-End 지연 (장비 발생 → DB 커밋)" @ x12 y5 12x8
+    unit=s
+    thresholds base:green 30:red
+    A  histogram_quantile(0.50, sum(rate(lidar_ingest_end_to_end_seconds_bucket[1m])) by (le))  legend="p50"
+    B  histogram_quantile(0.95, sum(rate(lidar_ingest_end_to_end_seconds_bucket[1m])) by (le))  legend="p95"
+    C  histogram_quantile(0.99, sum(rate(lidar_ingest_end_to_end_seconds_bucket[1m])) by (le))  legend="p99"
+    D  rate(lidar_ingest_end_to_end_seconds_sum[1m]) / rate(lidar_ingest_end_to_end_seconds_count[1m])  legend="평균"
+    desc: content.timestamp(장비 시계) 와 DB 커밋 시각의 차이. 밀린 백로그를 따라잡는 동안은 크게 나오고, 따라잡으면 1초 아래로 내려온다
+  panel #9 timeseries "Kafka 소비 지연 추이" @ x0 y13 8x8
+    unit=short  decimals=0
+    thresholds base:green
+    A  lidar_ingest_kafka_lag  legend="partition {{partition}}"
+    desc: 계속 오르면 DB 쓰기(오른쪽 패널)가 발신을 못 따라가는 것이다
+  panel #10 timeseries "DB 배치 쓰기 시간" @ x8 y13 8x8
+    unit=s
+    thresholds base:green
+    A  histogram_quantile(0.95, sum(rate(lidar_ingest_batch_seconds_bucket[1m])) by (le))  legend="p95"
+    B  rate(lidar_ingest_batch_seconds_sum[1m]) / rate(lidar_ingest_batch_seconds_count[1m])  legend="평균"
+    C  sum(rate(lidar_ingest_db_errors_total[1m]))  legend="DB 오류/s"
+    desc: INSERT + UPSERT + COMMIT 한 트랜잭션. 배치 하나가 레코드 최대 50개(~10,000행)다
+  panel #11 timeseries "배치 크기 · 빈도" @ x16 y13 8x8
+    unit=short
+    thresholds base:green
+    overrides 1건
+    A  rate(lidar_ingest_batch_rows_sum[1m]) / rate(lidar_ingest_batch_rows_count[1m])  legend="행/배치"
+    B  sum(rate(lidar_ingest_batches_total[1m]))  legend="배치/s"
+    desc: 정상은 레코드 1~3개 = 배치 1개(~210~630행). 행/배치가 커지면 밀린 것을 몰아서 쓰는 중이다
+[row] 장비 상태 — lidar_device_state (장비별 최신 항목)
+  panel #13 stat "상태별 장비 수" @ x0 y22 8x5
+    unit=short  decimals=0
+    thresholds base:green
+    overrides 4건
+    calc lastNotNull
+    A  tsdb_lidar_devices_count  legend="{{status}}"  instant
+    desc: 장비별 마지막 이벤트의 status. 관측 분포 ONLINE 88% · IDLE 6% · WARNING 5% · ERROR 0.6%
+  panel #14 stat "60초 무응답 장비" @ x8 y22 4x5
+    unit=short  decimals=0
+    thresholds base:green 1:orange 10:red
+    calc lastNotNull
+    A  tsdb_lidar_fleet_stale  legend="stale"
+    desc: 마지막 이벤트가 60초 넘게 안 온 장비. 발신 주기 1~3초라 20회 이상 건너뛴 것이다
+  panel #15 stat "전체 장비" @ x12 y22 4x5
+    unit=short  decimals=0
+    thresholds base:green
+    calc lastNotNull
+    A  tsdb_lidar_fleet_devices  legend="장비"
+    desc: 지금까지 한 번이라도 보인 tid 수 (관측 210)
+  panel #16 stat "오류 코드별 장비 수" @ x16 y22 8x5
+    unit=short  decimals=0
+    thresholds base:orange
+    calc lastNotNull
+    A  tsdb_lidar_error_devices  legend="{{error_code}}"  instant
+    desc: 최신 이벤트에 error_code 가 붙은 장비. E-NET-* 은 네트워크, E-LDR-* 은 라이다 본체 쪽이다
+  panel #17 timeseries "상태별 장비 수 추이" @ x0 y27 12x8
+    unit=short  decimals=0
+    thresholds base:green
+    overrides 4건
+    A  tsdb_lidar_devices_count  legend="{{status}}"
+    desc: ERROR 가 계단처럼 오르면 공통 원인(네트워크)이고, 한 대씩 오르내리면 개별 장비다
+  panel #18 timeseries "상태별 수신 항목/초" @ x12 y27 12x8
+    unit=short
+    thresholds base:green
+    overrides 4건
+    A  sum by (status) (rate(lidar_ingest_items_total[1m]))  legend="{{status}}"
+    desc: 레코드에서 파싱된 항목을 status 로 나눈 것. 위 패널이 '지금 몇 대' 라면 이것은 '얼마나 자주 그렇게 보고하는가'
+  panel #19 table "장비 최신 상태" @ x0 y35 24x12
+    thresholds base:green
+    overrides 5건
+    A  SELECT tid::int AS tid, status, error_code, temperature_c, scan_rate_pts_per_sec AS scan_rate, point_cloud_quality_score AS quality, connectivity_rssi AS rssi, last_event_at, extract(epoch from (now() - last_event_at)) AS age_s FROM lidar_device_state ORDER BY CASE status WHEN 'ERROR' THEN 0 WHEN 'WARNING' THEN 1 WHEN 'IDLE' THEN 2 ELSE 3 END, tid::int
+    desc: ERROR → WARNING → IDLE → ONLINE 순. age_s 가 큰 행이 무응답 장비다
+[row] 장비 추이 — lidar_status_1m 연속 집계 (SQL · $tid)
+  panel #21 timeseries "온도 (1분 평균)" @ x0 y48 12x8
+    unit=celsius  decimals=1
+    thresholds base:green
+    A  SELECT bucket AS "time", tid AS metric, avg_temperature_c AS value FROM lidar_status_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1
+    desc: 장비별 temperature_c 의 1분 평균. 위 tid 변수로 장비를 고른다
+  panel #22 timeseries "스캔 속도 (1분 평균, pts/s)" @ x12 y48 12x8
+    unit=short  decimals=0
+    thresholds base:green
+    A  SELECT bucket AS "time", tid AS metric, avg_scan_rate AS value FROM lidar_status_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1
+    desc: scan_rate_pts_per_sec 의 1분 평균. IDLE 이면 떨어진다
+  panel #23 timeseries "점군 품질 점수 (1분 평균)" @ x0 y56 12x8
+    unit=percentunit  decimals=1
+    thresholds base:red 0.8:green
+    A  SELECT bucket AS "time", tid AS metric, avg_quality AS value FROM lidar_status_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1
+    desc: point_cloud_quality_score(0~1) 의 1분 평균
+  panel #24 timeseries "오류 코드별 발생 건수 (1분)" @ x12 y56 12x8
+    unit=short  decimals=0
+    thresholds base:green
+    A  SELECT bucket AS "time", error_code AS metric, cnt::float AS value FROM lidar_error_1m WHERE $__timeFilter(bucket) ORDER BY 1
+    desc: error_code 가 붙은 항목 수를 코드별로 1분 집계한 것 (lidar_error_1m). 전체 장비 대상

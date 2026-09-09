@@ -1,0 +1,91 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 모니터링 스택 — Prometheus + Grafana + postgres_exporter + node-exporter
+#
+#   tsdb-exporter : TimescaleDB 의 PostgreSQL 기본 지표(트랜잭션·캐시·연결·락·dead tuple)
+#                   + 커스텀 쿼리(하이퍼테이블 크기·청크·압축률·백그라운드 잡·장비 상태 집계)
+#   node-exporter : 도커 VM 의 디스크 여유·메모리 — 청크가 쌓여 디스크가 차기 전에 경보
+#   prometheus    : 위 둘 + lidar-ingest(/metrics) 수집, rules/ 의 경보 평가
+#   grafana       : Prometheus + TimescaleDB 직결 두 데이터소스, 대시보드 자동 프로비저닝
+#
+# 접속: Grafana http://localhost:59300 (admin/admin, 익명 Viewer 허용)
+#       Prometheus http://localhost:59090
+# ─────────────────────────────────────────────────────────────────────────────
+# 루트 docker-compose.yml 의 include 로만 쓴다 — 단독으로 -f 지정해 올리면 프로젝트가
+# 따로 잡혀 같은 container_name/네트워크를 두고 충돌한다.
+networks:
+  tsdb-net:
+    name: tsdb-net
+
+services:
+  tsdb-exporter:
+    # v0.15 는 PG17 에서 pg_stat_bgwriter 의 체크포인트 컬럼(17 에서 pg_stat_checkpointer 로
+    # 이동)을 읽다 실패한다. 17 을 아는 판을 쓴다.
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+    container_name: tsdb-lidar-exporter
+    networks: [tsdb-net]
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@timescaledb:5432/lidar?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/pgexporter/queries-tsdb.yaml
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "false"
+    command:
+      # PG17 체크포인트 통계(pg_stat_checkpointer). 기본으로는 꺼져 있다.
+      - --collector.stat_checkpointer
+      # 오래 열린 트랜잭션 — 압축 잡이나 대시보드 쿼리가 잡고 있는지
+      - --collector.long_running_transactions
+    volumes:
+      - ./exporter:/etc/pgexporter:ro
+    ports:
+      - "59187:9187"
+
+  # 도커 VM 의 파일시스템 여유. 하이퍼테이블은 31일 보존이라 정상 상태에서도
+  # 한 달치가 쌓인다. 행 수보다 이 그래프가 먼저 경보를 준다.
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: tsdb-lidar-node-exporter
+    networks: [tsdb-net]
+    command:
+      - --path.rootfs=/host
+      - --collector.disable-defaults
+      - --collector.filesystem
+      - --collector.meminfo
+      - --collector.cpu
+    volumes:
+      - /:/host:ro
+    ports:
+      - "59192:9100"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: tsdb-lidar-prometheus
+    networks: [tsdb-net]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - tsdb-prometheus-data:/prometheus
+    ports:
+      - "59090:9090"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: tsdb-lidar-grafana
+    networks: [tsdb-net]
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_DEFAULT_THEME: light
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      TZ: Asia/Seoul
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - tsdb-grafana-data:/var/lib/grafana
+    ports:
+      - "59300:3000"
+
+volumes:
+  tsdb-prometheus-data:
+  tsdb-grafana-data:
