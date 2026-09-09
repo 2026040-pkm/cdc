@@ -43,11 +43,28 @@ services:
       # 느린 문장 기록. 대시보드 SQL 이 무거워지면 여기서 먼저 보인다.
       - -c
       - log_min_duration_statement=1000
+      # ── embedded-cdc 의 원천 역할 ────────────────────────────────────────
+      # 로그 기반 CDC(logical decoding, pgoutput) 를 받기 위한 설정. 값의 근거는
+      # ../../../embedded-cdc/infra/db/docker-compose.source.yml 주석 참고.
+      - -c
+      - wal_level=logical
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - wal_sender_timeout=5min
     ports:
       - "59432:5432"
     volumes:
       - tsdb-lidar-pgdata:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d:ro
+      # embedded-cdc 의 원천 스키마(car · computer · grade · member · cdc_heartbeat · cdc_user ·
+      # publication)를 그대로 가져온다. 복사본을 두지 않는 이유는 두 파일이 어긋나는 순간
+      # "기존 스키마를 그대로 둔다" 는 전제가 깨지기 때문이다.
+      # init 디렉터리 안에 파일로 겹쳐 마운트하지 않는다 — 그러면 podman 이 호스트의 ./init 에
+      # 빈 마운트 지점 파일을 만들어 놓는다. 따로 마운트하고 04-cdc-lidar.sql 이 \i 로 읽는다.
+      - ../../../embedded-cdc/infra/db/source/init:/embedded-cdc-source:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d lidar"]
       interval: 5s
