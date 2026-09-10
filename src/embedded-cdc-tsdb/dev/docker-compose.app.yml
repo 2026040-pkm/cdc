@@ -1,0 +1,82 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# cdc-service — Debezium Embedded Engine 을 내장한 Spring Boot 서비스 (TSDB target 판)
+#
+#   lidar TimescaleDB (WAL) ──logical replication──▶ cdc-service ──JDBC──▶ target TimescaleDB
+#
+# embedded-cdc 와 **같은 원천 DB 를 동시에 읽는다.** 그래서 커넥터의 정체성 다섯 개
+# (name · topic-prefix · slot-name · publication-name · offset 파일)가 전부 달라야 한다.
+# 겹치면 두 엔진이 같은 슬롯을 다투거나 오프셋을 서로 덮어쓴다 (application.yml 주석).
+# 여기서는 publication 만 공유한다 — publication 은 "무엇을 캡처하는가" 의 정의일 뿐이고
+# 하나를 여러 슬롯이 읽는 것은 정상이다. 슬롯과 오프셋은 따로 판다.
+#
+# 원천은 lidar 스택(src/timescaledb)의 TimescaleDB 다. 그 DB 에 embedded-cdc 의 원천 스키마
+# (car · computer · grade · member)가 그대로 들어 있고, lidar 표 세 개가 publication 에 더해져 있다.
+# 그래서 lidar 스택이 먼저 떠 있어야 한다 — tsdb-net 은 그쪽이 만든 external 네트워크다.
+# 예전 원천(source-postgres, infra/db/docker-compose.source.yml)은 루트 compose 에서 뺐다.
+#
+# offset(어디까지 읽었는지)은 named volume 의 파일에 저장되므로
+# 컨테이너를 재시작해도 멈춘 지점부터 이어서 읽는다.
+# ─────────────────────────────────────────────────────────────────────────────
+# 루트 docker-compose.yml 의 include 로만 쓴다 — 단독으로 -f 지정해 올리면 프로젝트가
+# 따로 잡혀 같은 container_name/네트워크를 두고 충돌한다.
+networks:
+  emb-cdc-tsdb-net:
+    name: emb-cdc-tsdb-net
+  tsdb-net:
+    external: true
+    name: tsdb-net
+
+services:
+  cdc-service:
+    # target 이 healthy 가 된 뒤에 올라온다. 원천(lidar TimescaleDB)은 다른 compose 프로젝트라
+    # depends_on 으로 걸 수 없다 — 안 떠 있으면 복제 슬롯 생성이 실패한 채 재시도 루프에 빠진다.
+    # (루트 compose 는 include 한 서비스를 덮어쓸 수 없으므로 여기에 둔다)
+    depends_on:
+      target-postgres:
+        condition: service_healthy
+    build:
+      context: ./cdc-service
+    image: embedded-cdc-tsdb/cdc-service:local
+    container_name: emb-cdc-tsdb-service
+    networks: [emb-cdc-tsdb-net, tsdb-net]
+    environment:
+      SOURCE_DB_HOST: ${SOURCE_DB_HOST:-timescaledb}
+      SOURCE_DB_PORT: ${SOURCE_DB_PORT:-5432}
+      SOURCE_DB_NAME: ${SOURCE_DB_NAME:-lidar}
+      TARGET_DB_HOST: target-postgres
+      TARGET_DB_PORT: "5432"
+      # ── 커넥터 정체성 ────────────────────────────────────────────────────
+      # embedded-cdc 와 같은 원천에 붙으므로 전부 다른 값이어야 한다.
+      # publication 만 공유한다(embedded_cdc_pub — 원천 init SQL 이 만든다).
+      CDC_NAME: ${CDC_NAME:-embedded-cdc-tsdb}
+      CDC_TOPIC_PREFIX: ${CDC_TOPIC_PREFIX:-embedded-tsdb}
+      CDC_SLOT_NAME: ${CDC_SLOT_NAME:-embedded_cdc_tsdb_slot}
+      CDC_PUBLICATION_NAME: ${CDC_PUBLICATION_NAME:-embedded_cdc_pub}
+      # heartbeat 는 원천의 cdc_heartbeat 에 쓴다. 파이프라인 이름이 그 표의 PK 라
+      # embedded-cdc 와 다른 값을 써야 두 슬롯이 각자 전진한다 — 같은 행을 쓰면
+      # 한쪽 heartbeat 가 다른 쪽 것으로 보여 슬롯 전진 판정이 흐려진다.
+      CDC_HEARTBEAT_QUERY: ${CDC_HEARTBEAT_QUERY:-INSERT INTO rdb.cdc_heartbeat (pipeline, beat_at) VALUES ('embedded-cdc-tsdb', now()) ON CONFLICT (pipeline) DO UPDATE SET beat_at = now()}
+      # V1 — UPDATE 의 변경 필드를 cdc_change_audit 에 남길 테이블. 세 가지 형태:
+      #   CDC_AUDIT_CHANGED_FIELDS=              끔
+      #   CDC_AUDIT_CHANGED_FIELDS=car,computer  일부 (쉼표 구분)
+      #   CDC_AUDIT_CHANGED_FIELDS=*             전체 (all 도 같다)
+      # 이벤트당 INSERT 한 건이 더 붙어 1만 건 UPDATE 버스트에서 처리량이 3분의 1 줄고
+      # 최대 지연이 목표 5초를 넘겼다(10.1초). PoC 에서는 감사 동작을 보여주기 위해
+      # car 한 테이블에만 켠다. 성능 비교 측정처럼 조건을 맞춰야 할 때는 빈 값으로:
+      #   CDC_AUDIT_CHANGED_FIELDS= docker compose up -d cdc-service
+      # (`:-` 가 아니라 `-` 라 명시적으로 빈 값을 주면 그대로 빈 값이 된다)
+      # lidar_device_state 는 초당 ~200 UPDATE 라 여기에 넣으면 감사 표가 그 속도로 자란다.
+      CDC_AUDIT_CHANGED_FIELDS: ${CDC_AUDIT_CHANGED_FIELDS-car}
+    ports:
+      - "60080:8080"
+    volumes:
+      - emb-cdc-tsdb-offsets:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  emb-cdc-tsdb-offsets:

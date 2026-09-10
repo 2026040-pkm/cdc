@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 루트 compose — Debezium Embedded (Java) · TimescaleDB target 스택의 유일한 진입점
+#
+#   docker compose up -d --build     # DB 2개 + 모니터링 + 앱까지 한 번에
+#   docker compose down              # 정지 (데이터 유지)
+#   docker compose down -v           # 볼륨까지 삭제
+#
+# 네트워크(emb-cdc-tsdb-net)와 볼륨은 compose 가 만들고 지운다. 미리 만들 필요 없다.
+#
+# embedded-cdc 와 같은 원천(src/timescaledb 의 lidar TimescaleDB)을 읽고 표 구성도 같다.
+# 다른 것은 수신 측 엔진이 TimescaleDB 라는 점과, 커넥터 정체성(슬롯·이름·오프셋)이
+# 갈려 있다는 점뿐이다. 둘을 동시에 띄워도 서로 간섭하지 않는다.
+#
+# include 는 -f 여러 개(병합)와 다르다. 가져온 서비스를 이 파일에서 다시 선언해
+# 덮어쓰려 하면 병합되지 않고 "services.<이름> conflicts with imported resource" 로
+# 기동 자체가 막힌다. 그래서 cdc-service 의 depends_on 은 이 파일이 아니라
+# dev/docker-compose.app.yml 안에 둔다 — 다른 include 파일의 서비스를 depends_on
+# 으로 가리키는 것은 최종 모델에서 합쳐지므로 문제없다.
+#
+# include 안의 상대 경로(build context, 설정 파일 마운트)는 이 파일이 아니라
+# 그 compose 파일 자신의 위치를 기준으로 풀린다.
+# ─────────────────────────────────────────────────────────────────────────────
+name: embedded-cdc-tsdb
+
+include:
+  # 원천은 lidar 스택(src/timescaledb)의 TimescaleDB 다. 그쪽을 먼저 올려야 한다
+  # (scripts/up 이 확인한다). 예전 원천 컨테이너는 파일만 남기고 include 에서 뺐다 —
+  # 되돌리려면 아래 줄을 살리고 dev/docker-compose.app.yml 의 SOURCE_DB_* 를 바꾼다.
+  # - path: infra/db/docker-compose.source.yml
+  - path: infra/db/docker-compose.target.yml
+  - path: infra/monitoring/docker-compose.monitoring.yml
+  - path: dev/docker-compose.app.yml
