@@ -41,5 +41,5 @@ Write-Host "── 기동 완료 ───────────────�
 Write-Host "  TimescaleDB  : localhost:59432 (lidar / postgres:postgres)"
 Write-Host "  lidar-ingest : http://localhost:59080/metrics"
 Write-Host "  Prometheus   : http://localhost:59090"
-Write-Host "  Grafana      : http://localhost:59300  (admin/admin)"
+Write-Host "  Grafana      : http://localhost:59380  (admin/admin)"
 Write-Host "  Kafka        : $kafkaCtr (kafka:9093 on tsdb-net)"

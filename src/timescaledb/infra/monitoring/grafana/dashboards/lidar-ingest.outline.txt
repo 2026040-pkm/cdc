@@ -1,7 +1,7 @@
 # OT LiDAR 적재 (Kafka → TimescaleDB)
 uid=tsdb-lidar-ingest  schema=39  refresh=5s  time=now-30m~now
 tags=timescaledb,lidar,kafka
-var $tid query SELECT tid FROM lidar_device_state ORDER BY tid::int
+var $tid query SELECT tid FROM lidar_device_state ORDER BY tid
 
   panel #1 stat "적재 행/초" @ x0 y0 4x5
     unit=short  decimals=1
@@ -81,7 +81,7 @@ var $tid query SELECT tid FROM lidar_device_state ORDER BY tid::int
     overrides 4건
     calc lastNotNull
     A  tsdb_lidar_devices_count  legend="{{status}}"  instant
-    desc: 장비별 마지막 이벤트의 status. 관측 분포 ONLINE 88% · IDLE 6% · WARNING 5% · ERROR 0.6%
+    desc: 장비별 마지막 이벤트의 status. 대부분 ONLINE 이고 CALIBRATING·ERROR 가 드물게 섞인다
   panel #14 stat "60초 무응답 장비" @ x8 y22 4x5
     unit=short  decimals=0
     thresholds base:green 1:orange 10:red
@@ -93,7 +93,7 @@ var $tid query SELECT tid FROM lidar_device_state ORDER BY tid::int
     thresholds base:green
     calc lastNotNull
     A  tsdb_lidar_fleet_devices  legend="장비"
-    desc: 지금까지 한 번이라도 보인 tid 수 (관측 210)
+    desc: 지금까지 한 번이라도 보인 장비 수 (조립 210 + 선행의장 140 = 350)
   panel #16 stat "오류 코드별 장비 수" @ x16 y22 8x5
     unit=short  decimals=0
     thresholds base:orange
@@ -105,19 +105,19 @@ var $tid query SELECT tid FROM lidar_device_state ORDER BY tid::int
     thresholds base:green
     overrides 4건
     A  tsdb_lidar_devices_count  legend="{{status}}"
-    desc: ERROR 가 계단처럼 오르면 공통 원인(네트워크)이고, 한 대씩 오르내리면 개별 장비다
-  panel #18 timeseries "상태별 수신 항목/초" @ x12 y27 12x8
+    desc: ERROR 가 계단처럼 오르면 공통 원인(네트워크)이고, 한 대씩 오르내리면 개별 장비다. OFFLINE 은 ERROR 를 지나야 들어가는 종착 상태다
+  panel #18 timeseries "채널별 수신 항목/초" @ x12 y27 12x8
     unit=short
     thresholds base:green
-    overrides 4건
-    A  sum by (status) (rate(lidar_ingest_items_total[1m]))  legend="{{status}}"
-    desc: 레코드에서 파싱된 항목을 status 로 나눈 것. 위 패널이 '지금 몇 대' 라면 이것은 '얼마나 자주 그렇게 보고하는가'
+    overrides 3건
+    A  sum by (channel) (rate(lidar_ingest_items_total[1m]))  legend="{{channel}}"
+    desc: 레코드에서 파싱된 항목을 채널로 나눈 것. status=장비 상태(1초/대) · actual=실적(1분/대) · artifact=산출물 메타(12건/1분/대)
   panel #19 table "장비 최신 상태" @ x0 y35 24x12
     thresholds base:green
-    overrides 5건
-    A  SELECT tid::int AS tid, status, error_code, temperature_c, scan_rate_pts_per_sec AS scan_rate, point_cloud_quality_score AS quality, connectivity_rssi AS rssi, last_event_at, extract(epoch from (now() - last_event_at)) AS age_s FROM lidar_device_state ORDER BY CASE status WHEN 'ERROR' THEN 0 WHEN 'WARNING' THEN 1 WHEN 'IDLE' THEN 2 ELSE 3 END, tid::int
-    desc: ERROR → WARNING → IDLE → ONLINE 순. age_s 가 큰 행이 무응답 장비다
-[row] 장비 추이 — lidar_status_1m 연속 집계 (SQL · $tid)
+    overrides 4건
+    A  SELECT tid, zone, bay, status, error_code, temperature_c, scan_rate_pts_per_sec AS scan_rate, connectivity_rssi AS rssi, fov_mode, last_event_at, extract(epoch from (now() - last_event_at)) AS age_s FROM lidar_device_state ORDER BY CASE status WHEN 'ERROR' THEN 0 WHEN 'OFFLINE' THEN 1 WHEN 'CALIBRATING' THEN 2 ELSE 3 END, tid
+    desc: ERROR → OFFLINE → CALIBRATING → ONLINE 순. age_s 가 큰 행이 무응답 장비다
+[row] 장비 추이 — lidar_status_1m · lidar_scan_1m 연속 집계 (SQL · $tid)
   panel #21 timeseries "온도 (1분 평균)" @ x0 y48 12x8
     unit=celsius  decimals=1
     thresholds base:green
@@ -127,12 +127,12 @@ var $tid query SELECT tid FROM lidar_device_state ORDER BY tid::int
     unit=short  decimals=0
     thresholds base:green
     A  SELECT bucket AS "time", tid AS metric, avg_scan_rate AS value FROM lidar_status_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1
-    desc: scan_rate_pts_per_sec 의 1분 평균. IDLE 이면 떨어진다
-  panel #23 timeseries "점군 품질 점수 (1분 평균)" @ x0 y56 12x8
+    desc: scan_rate_pts_per_sec 의 1분 평균. OFFLINE 이면 0, ERROR·CALIBRATING 이면 떨어진다
+  panel #23 timeseries "정합 신뢰도 (1분 평균)" @ x0 y56 12x8
     unit=percentunit  decimals=1
     thresholds base:red 0.8:green
-    A  SELECT bucket AS "time", tid AS metric, avg_quality AS value FROM lidar_status_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1
-    desc: point_cloud_quality_score(0~1) 의 1분 평균
+    A  SELECT bucket AS "time", tid || ' · ' || stage AS metric, avg_match_confidence AS value FROM lidar_scan_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1
+    desc: 실적(ot/sensor/{stage}/actual)의 match_confidence(0~1) 1분 평균. 상태 메시지에는 품질 점수가 없다
   panel #24 timeseries "오류 코드별 발생 건수 (1분)" @ x12 y56 12x8
     unit=short  decimals=0
     thresholds base:green

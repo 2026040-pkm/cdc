@@ -35,27 +35,19 @@
           "type": "postgres",
           "uid": "tsdb-db"
         },
-        "query": "SELECT tid FROM lidar_device_state ORDER BY tid::int",
-        "definition": "SELECT tid FROM lidar_device_state ORDER BY tid::int",
+        "query": "SELECT tid FROM lidar_device_state ORDER BY tid",
+        "definition": "SELECT tid FROM lidar_device_state ORDER BY tid",
         "refresh": 2,
         "multi": true,
         "includeAll": true,
         "sort": 0,
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
-            "1",
-            "2",
-            "3",
-            "4",
-            "5"
+            "$__all"
           ],
           "value": [
-            "1",
-            "2",
-            "3",
-            "4",
-            "5"
+            "$__all"
           ]
         },
         "options": [],
@@ -988,7 +980,7 @@
       "id": 13,
       "type": "stat",
       "title": "상태별 장비 수",
-      "description": "장비별 마지막 이벤트의 status. 관측 분포 ONLINE 88% · IDLE 6% · WARNING 5% · ERROR 0.6%",
+      "description": "장비별 마지막 이벤트의 status. 대부분 ONLINE 이고 CALIBRATING·ERROR 가 드물게 섞인다",
       "gridPos": {
         "x": 0,
         "y": 22,
@@ -1049,7 +1041,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "IDLE"
+              "options": "CALIBRATING"
             },
             "properties": [
               {
@@ -1057,21 +1049,6 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "blue"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "WARNING"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "orange"
                 }
               }
             ]
@@ -1087,6 +1064,21 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OFFLINE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
                 }
               }
             ]
@@ -1185,7 +1177,7 @@
       "id": 15,
       "type": "stat",
       "title": "전체 장비",
-      "description": "지금까지 한 번이라도 보인 tid 수 (관측 210)",
+      "description": "지금까지 한 번이라도 보인 장비 수 (조립 210 + 선행의장 140 = 350)",
       "gridPos": {
         "x": 12,
         "y": 22,
@@ -1313,7 +1305,7 @@
       "id": 17,
       "type": "timeseries",
       "title": "상태별 장비 수 추이",
-      "description": "ERROR 가 계단처럼 오르면 공통 원인(네트워크)이고, 한 대씩 오르내리면 개별 장비다",
+      "description": "ERROR 가 계단처럼 오르면 공통 원인(네트워크)이고, 한 대씩 오르내리면 개별 장비다. OFFLINE 은 ERROR 를 지나야 들어가는 종착 상태다",
       "gridPos": {
         "x": 0,
         "y": 27,
@@ -1385,7 +1377,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "IDLE"
+              "options": "CALIBRATING"
             },
             "properties": [
               {
@@ -1393,21 +1385,6 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "blue"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "WARNING"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "orange"
                 }
               }
             ]
@@ -1423,6 +1400,21 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OFFLINE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
                 }
               }
             ]
@@ -1445,8 +1437,8 @@
     {
       "id": 18,
       "type": "timeseries",
-      "title": "상태별 수신 항목/초",
-      "description": "레코드에서 파싱된 항목을 status 로 나눈 것. 위 패널이 '지금 몇 대' 라면 이것은 '얼마나 자주 그렇게 보고하는가'",
+      "title": "채널별 수신 항목/초",
+      "description": "레코드에서 파싱된 항목을 채널로 나눈 것. status=장비 상태(1초/대) · actual=실적(1분/대) · artifact=산출물 메타(12건/1분/대)",
       "gridPos": {
         "x": 12,
         "y": 27,
@@ -1463,8 +1455,8 @@
             "type": "prometheus",
             "uid": "tsdb-prom"
           },
-          "expr": "sum by (status) (rate(lidar_ingest_items_total[1m]))",
-          "legendFormat": "{{status}}",
+          "expr": "sum by (channel) (rate(lidar_ingest_items_total[1m]))",
+          "legendFormat": "{{channel}}",
           "refId": "A",
           "editorMode": "code",
           "range": true,
@@ -1502,7 +1494,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "ONLINE"
+              "options": "status"
             },
             "properties": [
               {
@@ -1517,7 +1509,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "IDLE"
+              "options": "actual"
             },
             "properties": [
               {
@@ -1532,7 +1524,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "WARNING"
+              "options": "artifact"
             },
             "properties": [
               {
@@ -1540,21 +1532,6 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "orange"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "ERROR"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "red"
                 }
               }
             ]
@@ -1578,7 +1555,7 @@
       "id": 19,
       "type": "table",
       "title": "장비 최신 상태",
-      "description": "ERROR → WARNING → IDLE → ONLINE 순. age_s 가 큰 행이 무응답 장비다",
+      "description": "ERROR → OFFLINE → CALIBRATING → ONLINE 순. age_s 가 큰 행이 무응답 장비다",
       "gridPos": {
         "x": 0,
         "y": 35,
@@ -1596,7 +1573,7 @@
             "uid": "tsdb-db"
           },
           "rawQuery": true,
-          "rawSql": "SELECT tid::int AS tid, status, error_code, temperature_c, scan_rate_pts_per_sec AS scan_rate,\n       point_cloud_quality_score AS quality, connectivity_rssi AS rssi,\n       last_event_at, extract(epoch from (now() - last_event_at)) AS age_s\nFROM lidar_device_state\nORDER BY CASE status WHEN 'ERROR' THEN 0 WHEN 'WARNING' THEN 1 WHEN 'IDLE' THEN 2 ELSE 3 END, tid::int",
+          "rawSql": "SELECT tid, zone, bay, status, error_code, temperature_c,\n       scan_rate_pts_per_sec AS scan_rate, connectivity_rssi AS rssi, fov_mode,\n       last_event_at, extract(epoch from (now() - last_event_at)) AS age_s\nFROM lidar_device_state\nORDER BY CASE status WHEN 'ERROR' THEN 0 WHEN 'OFFLINE' THEN 1 WHEN 'CALIBRATING' THEN 2 ELSE 3 END, tid",
           "format": "table",
           "refId": "A",
           "editorMode": "code"
@@ -1641,16 +1618,16 @@
                         "color": "green",
                         "index": 0
                       },
-                      "IDLE": {
+                      "CALIBRATING": {
                         "color": "blue",
                         "index": 1
                       },
-                      "WARNING": {
-                        "color": "orange",
-                        "index": 2
-                      },
                       "ERROR": {
                         "color": "red",
+                        "index": 2
+                      },
+                      "OFFLINE": {
+                        "color": "purple",
                         "index": 3
                       }
                     }
@@ -1674,22 +1651,6 @@
               {
                 "id": "unit",
                 "value": "celsius"
-              },
-              {
-                "id": "decimals",
-                "value": 1
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "quality"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "percentunit"
               },
               {
                 "id": "decimals",
@@ -1765,7 +1726,7 @@
     {
       "id": 20,
       "type": "row",
-      "title": "장비 추이 — lidar_status_1m 연속 집계 (SQL · $tid)",
+      "title": "장비 추이 — lidar_status_1m · lidar_scan_1m 연속 집계 (SQL · $tid)",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1850,7 +1811,7 @@
       "id": 22,
       "type": "timeseries",
       "title": "스캔 속도 (1분 평균, pts/s)",
-      "description": "scan_rate_pts_per_sec 의 1분 평균. IDLE 이면 떨어진다",
+      "description": "scan_rate_pts_per_sec 의 1분 평균. OFFLINE 이면 0, ERROR·CALIBRATING 이면 떨어진다",
       "gridPos": {
         "x": 12,
         "y": 48,
@@ -1920,8 +1881,8 @@
     {
       "id": 23,
       "type": "timeseries",
-      "title": "점군 품질 점수 (1분 평균)",
-      "description": "point_cloud_quality_score(0~1) 의 1분 평균",
+      "title": "정합 신뢰도 (1분 평균)",
+      "description": "실적(ot/sensor/{stage}/actual)의 match_confidence(0~1) 1분 평균. 상태 메시지에는 품질 점수가 없다",
       "gridPos": {
         "x": 0,
         "y": 56,
@@ -1939,7 +1900,7 @@
             "uid": "tsdb-db"
           },
           "rawQuery": true,
-          "rawSql": "SELECT bucket AS \"time\", tid AS metric, avg_quality AS value\nFROM lidar_status_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1",
+          "rawSql": "SELECT bucket AS \"time\", tid || ' · ' || stage AS metric, avg_match_confidence AS value\nFROM lidar_scan_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1",
           "format": "time_series",
           "refId": "A",
           "editorMode": "code"

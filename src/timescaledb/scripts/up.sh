@@ -39,6 +39,6 @@ cat <<EOS
   TimescaleDB  : localhost:59432 (lidar / postgres:postgres)
   lidar-ingest : http://localhost:59080/metrics
   Prometheus   : http://localhost:59090
-  Grafana      : http://localhost:59300  (admin/admin)
+  Grafana      : http://localhost:59380  (admin/admin)
   Kafka        : ${kafka_ctr:-<not found>} (kafka:9093 on tsdb-net)
 EOS

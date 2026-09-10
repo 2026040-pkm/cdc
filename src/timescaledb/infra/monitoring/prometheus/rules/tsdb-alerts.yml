@@ -1,9 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# ot-lidar-status 적재 · TimescaleDB 경보
+# OT LiDAR 필드 데이터 적재 · TimescaleDB 경보
 #
-# 임계값 근거 (2026-09-09 관측):
-#   - 발신 주기 1~3초 · 레코드당 ~210 항목 · 장비 210대 · 상태 분포 ONLINE 88% / IDLE 6% / WARNING 5% / ERROR 0.6%
-#   - 따라서 "3분간 메시지 0" 은 발신 60회 이상을 건너뛴 것이고, "60초 무응답 장비" 는 20회 이상을 건너뛴 것이다.
+# 임계값 근거 (발행기 tools/mqtt-lidar-sim 의 기본값 · 필드 정의서 4.2/5.2):
+#   - 장비 350대 (조립 210 · 선행의장 140) · 상태 1초/대 · 스캔(실적·산출물) 1분/대
+#   - 상태 전이 ONLINE ↔ CALIBRATING · ONLINE → ERROR → OFFLINE. 대부분은 ONLINE 이다.
+#   - 따라서 "3분간 메시지 0" 은 발신 수백 회를 건너뛴 것이고, "60초 무응답 장비" 는 60회를 건너뛴 것이다.
 # ─────────────────────────────────────────────────────────────────────────────
 groups:
   - name: lidar-ingest
@@ -15,7 +16,7 @@ groups:
         for: 3m
         labels: {severity: critical}
         annotations:
-          summary: "3분간 ot-lidar-status 메시지를 하나도 소비하지 못했다"
+          summary: "3분간 ot.lidar.* 메시지를 하나도 소비하지 못했다"
           description: "발신이 멈췄거나 lidar-ingest 가 Kafka(kafka:9093) 에 닿지 못한다. scripts/up 을 다시 돌려 새 Kafka 컨테이너를 tsdb-net 에 붙여라."
 
       # 소비자 지표 자체가 없다 — 컨테이너가 죽었다.
@@ -53,6 +54,32 @@ groups:
           summary: "최근 10분간 격리된 항목 {{ $value }}건"
           description: "lidar_ingest_reject 표에서 원문과 사유를 확인하라. 발신 스키마가 바뀌었을 가능성이 크다."
 
+      # 카탈로그에 없는 숫자 tid 가 들어왔다 — InterSysLink 에서 태그를 새로 등록했는데
+      # lidar_tag_catalog 를 다시 내보내지 않은 것이다. 그 항목은 장비 축이 '#숫자' 로 남는다.
+      # 적재는 계속되므로 critical 은 아니지만 대시보드의 장비 축이 조용히 망가진다.
+      - alert: LidarTagUnresolved
+        expr: increase(lidar_ingest_tag_unresolved_total[10m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "최근 10분간 카탈로그가 못 푼 태그 {{ $value }}건 ({{ $labels.channel }})"
+          description: "python scripts/export-tag-catalog.py 로 03-tag-catalog.sql 을 다시 만들고 lidar_tag_catalog 를 갱신하라."
+
+      # 태그 카탈로그가 비었다. 소비자가 기동할 때 표를 못 읽었거나 시드가 안 들어갔다.
+      - alert: LidarTagCatalogEmpty
+        expr: lidar_ingest_tag_catalog_rows == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "태그 카탈로그가 비어 있다 — 모든 장비 축이 '#숫자' 로 남는다"
+
+      # 등록부의 채널과 실제 발행 토픽이 어긋난다 — EES 메시지 설정이 잘못됐다.
+      - alert: LidarTagChannelMismatch
+        expr: increase(lidar_ingest_tag_channel_mismatch_total[10m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "최근 10분간 카탈로그 채널과 토픽이 어긋난 항목 {{ $value }}건"
+          description: "InterSysLink 의 EES 메시지(send_topic)와 태그 등록이 어긋났다. 실려 온 토픽을 믿고 적재했다."
+
       # DB 오류로 배치를 재시도 중이다. 소비는 멈추고 Kafka 지연이 쌓인다.
       - alert: LidarIngestDbErrors
         expr: increase(lidar_ingest_db_errors_total[5m]) > 3
@@ -68,7 +95,16 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "ERROR 상태 장비 {{ $value }}대"
-          description: "관측 평균은 210대 중 1~2대다. 10대를 넘으면 개별 장비가 아니라 공통 원인(네트워크 E-NET-*)을 의심하라."
+          description: "정상은 350대 중 한두 대다. 10대를 넘으면 개별 장비가 아니라 공통 원인(네트워크 E-NET-*)을 의심하라."
+
+      # OFFLINE 은 ERROR 를 지나야 들어가는 종착 상태다. 하트비트가 멈추고 스캔 속도가 0 이 된다.
+      # 여기 오래 머무는 장비는 사람이 가서 봐야 한다 — 스스로 복구될 확률이 낮다.
+      - alert: LidarDevicesOffline
+        expr: tsdb_lidar_devices_count{status="OFFLINE"} > 5
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "OFFLINE 장비 {{ $value }}대가 10분 넘게 이어진다"
 
       - alert: LidarDevicesStale
         expr: tsdb_lidar_fleet_stale > 0

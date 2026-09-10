@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# lidar-ingest — Kafka(ot-lidar-status) → TimescaleDB 소비자
+# lidar-ingest — Kafka(OT LiDAR 필드 데이터) → TimescaleDB 소비자
 #
 # Kafka 는 이 스택이 띄우지 않는다. Aspire(InterSysLink) 가 세션마다 띄우는 컨테이너
 # (이름 kafka-xxxxxxxx) 에 붙는다. 브로커는 자기 네트워크 안에서 kafka:9093
@@ -29,7 +29,9 @@ services:
     environment:
       # kafka 라는 이름은 scripts/up 이 Kafka 컨테이너를 tsdb-net 에 붙일 때 준 alias 다.
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP:-kafka:9093}
-      KAFKA_TOPIC: ${KAFKA_TOPIC:-ot-lidar-status}
+      # 쉼표로 여러 개를 받는다. 채널 하나에 토픽 하나이고, 분류는 토픽 이름의
+      # 마지막 마디(status·actual·artifact)로 한다. kafka.env 참고.
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-ot.lidar.status,ot.lidar.actual,ot.lidar.artifact}
       KAFKA_GROUP_ID: ${KAFKA_GROUP_ID:-tsdb-lidar-ingest}
       # 처음 붙을 때 토픽에 이미 쌓인 것부터 읽는다 (earliest). 오프셋이 커밋된 뒤로는 무시된다.
       KAFKA_AUTO_OFFSET_RESET: ${KAFKA_AUTO_OFFSET_RESET:-earliest}

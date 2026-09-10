@@ -55,11 +55,12 @@ tsdb_hypertable:
 # 압축률 = 1 - after/before 를 대시보드에서 계산한다.
 tsdb_compression:
   query: |
-    SELECT 'lidar_status'                                        AS hypertable,
-           COALESCE(before_compression_total_bytes, 0)::float    AS before_bytes,
-           COALESCE(after_compression_total_bytes, 0)::float     AS after_bytes,
-           COALESCE(number_compressed_chunks, 0)::float          AS compressed_chunks
-    FROM hypertable_compression_stats('lidar_status')
+    SELECT h.hypertable_name                                       AS hypertable,
+           COALESCE(s.before_compression_total_bytes, 0)::float    AS before_bytes,
+           COALESCE(s.after_compression_total_bytes, 0)::float     AS after_bytes,
+           COALESCE(s.number_compressed_chunks, 0)::float          AS compressed_chunks
+    FROM (VALUES ('lidar_status'), ('lidar_scan_actual'), ('lidar_scan_artifact')) h(hypertable_name)
+    CROSS JOIN LATERAL hypertable_compression_stats(h.hypertable_name::regclass) s
   metrics:
     - hypertable:
         usage: "LABEL"
@@ -79,6 +80,10 @@ tsdb_compression:
 tsdb_rows:
   query: |
     SELECT 'lidar_status' AS hypertable, approximate_row_count('lidar_status')::float AS approx
+    UNION ALL
+    SELECT 'lidar_scan_actual', approximate_row_count('lidar_scan_actual')::float
+    UNION ALL
+    SELECT 'lidar_scan_artifact', approximate_row_count('lidar_scan_artifact')::float
     UNION ALL
     SELECT 'lidar_status_message', (SELECT count(*) FROM lidar_status_message)::float
     UNION ALL
@@ -133,24 +138,25 @@ tsdb_job:
         description: "seconds until the next scheduled run (음수면 밀린 것)"
 
 # ── 장비 상태 집계 ──────────────────────────────────────────────────────────
-# lidar_device_state 는 장비당 한 행(약 210행)이라 매 스크랩 읽어도 가볍다.
+# lidar_device_state 는 장비당 한 행(약 350행)이라 매 스크랩 읽어도 가볍다.
 # 상태가 하나도 없는 값은 시계열이 사라져 "No data" 가 되므로 네 상태를 0 으로 채운다.
+# 네 가지는 발행 측의 상태 전이 그대로다 — ONLINE ↔ CALIBRATING · ONLINE → ERROR → OFFLINE.
 tsdb_lidar_devices:
   query: |
     SELECT s.status, COALESCE(d.cnt, 0)::float AS count
-    FROM (VALUES ('ONLINE'), ('IDLE'), ('WARNING'), ('ERROR')) s(status)
+    FROM (VALUES ('ONLINE'), ('CALIBRATING'), ('ERROR'), ('OFFLINE')) s(status)
     LEFT JOIN (SELECT status, count(*) AS cnt FROM lidar_device_state GROUP BY status) d
            ON d.status = s.status
   metrics:
     - status:
         usage: "LABEL"
-        description: "ONLINE / IDLE / WARNING / ERROR"
+        description: "ONLINE / CALIBRATING / ERROR / OFFLINE"
     - count:
         usage: "GAUGE"
         description: "number of devices whose latest event carries this status"
 
 # 마지막 이벤트가 60초 넘게 안 온 장비 수 + 전체 장비 수 + 신선도.
-# 발신 주기가 ~3초라 60초는 스무 번을 건너뛴 것이다.
+# 상태 발신 주기가 1초라 60초는 예순 번을 건너뛴 것이다.
 tsdb_lidar_fleet:
   query: |
     SELECT count(*)::float                                                          AS devices,
@@ -168,7 +174,7 @@ tsdb_lidar_fleet:
         usage: "GAUGE"
         description: "age of the newest event in the DB (계속 커지면 적재가 멈춘 것)"
 
-# 오류 코드별 현재 장비 수. ERROR 뿐 아니라 WARNING 도 코드가 붙는다.
+# 오류 코드별 현재 장비 수. 코드는 ERROR 상태에서만 붙고, 빠져나오면 NULL 로 돌아간다.
 tsdb_lidar_error:
   query: |
     SELECT error_code, count(*)::float AS devices

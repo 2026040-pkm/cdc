@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# 루트 compose — ot-lidar-status → TimescaleDB 스택의 유일한 진입점
+# 루트 compose — OT LiDAR 필드 데이터 → TimescaleDB 스택의 유일한 진입점
 #
 #   scripts/up.sh (또는 up.ps1)    # 스택을 올리고 Kafka 컨테이너를 tsdb-net 에 alias kafka 로 붙인다
 #   scripts/down.sh [-v]           # Kafka 를 떼고 정지 (-v 면 볼륨까지 삭제 → init SQL 재실행)

@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# TimescaleDB — ot-lidar-status 적재 대상 DB (PostgreSQL 17 + TimescaleDB 2.29)
+# TimescaleDB — OT LiDAR 필드 데이터 적재 대상 DB (PostgreSQL 17 + TimescaleDB 2.29)
 #
 # init/ 의 SQL 은 볼륨이 처음 만들어질 때 한 번만 실행된다. 스키마를 고쳤으면
 # `down -v` 로 볼륨까지 지우고 다시 올려야 반영된다.
@@ -37,9 +37,16 @@ services:
       - maintenance_work_mem=128MB
       - -c
       - max_connections=100
-      # 압축·보존·연속 집계 잡이 도는 워커. 하이퍼테이블 1 + 집계 2 = 정책 5개.
+      # 압축·보존·연속 집계 잡이 도는 워커.
+      # 정책은 10개다 — 하이퍼테이블 3 × (압축 + 보존) + 연속 집계 4개의 새로고침.
+      # 8 로 두면 기동 직후 잡이 한꺼번에 뜰 때 "failed to start job" 이 나고
+      # (timescaledb_information.job_errors 에 남는다) 다음 주기에 재시도로 넘어간다.
+      # 결과는 맞지만 실패 수가 계속 올라가 경보를 흐린다.
       - -c
-      - timescaledb.max_background_workers=8
+      - timescaledb.max_background_workers=16
+      # 위 값은 postgres 전체 워커 한도 안에서만 늘어난다. 기본 8 이라 같이 올린다.
+      - -c
+      - max_worker_processes=32
       # 느린 문장 기록. 대시보드 SQL 이 무거워지면 여기서 먼저 보인다.
       - -c
       - log_min_duration_statement=1000
