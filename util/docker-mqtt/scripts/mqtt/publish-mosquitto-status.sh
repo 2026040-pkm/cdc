@@ -1,0 +1,64 @@
+#!/usr/bin/env sh
+set -eu
+
+CLI_CONTAINER="${CLI_CONTAINER:-mqtt-cli}"
+BROKER_HOST="${BROKER_HOST:-host.containers.internal}"
+BROKER_PORT="${BROKER_PORT:-1883}"
+TOPIC="${TOPIC:-ot.device.fabrication.mosquitto.status}"
+QOS="${QOS:-1}"
+INTERVAL_SECONDS="${INTERVAL_SECONDS:-2}"
+DEVICE_IDS="${DEVICE_IDS:-mosquitto-device-1 mosquitto-device-2 mosquitto-device-3}"
+
+random_int() {
+    min="$1"
+    max="$2"
+    random_value="$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')"
+    awk -v min="$min" -v max="$max" -v random_value="$random_value" \
+        'BEGIN { print min + (random_value % (max - min + 1)) }'
+}
+
+pick_status() {
+    case "$(random_int 0 3)" in
+        0) printf 'ONLINE' ;;
+        1) printf 'OFFLINE' ;;
+        2) printf 'ERROR' ;;
+        *) printf 'CALIBRATING' ;;
+    esac
+}
+
+pick_error_code() {
+    case "$(random_int 0 2)" in
+        0) printf 'null' ;;
+        *) printf '"ERR_%s"' "$(random_int 100 999)" ;;
+    esac
+}
+
+make_key() {
+    timestamp="$(date -u +%Y%m%dT%H%M%S)"
+    printf '%s-%s-%s' "$1" "$timestamp" "$(random_int 100000 999999)"
+}
+
+publish_one() {
+    id="$1"
+    now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    key="$(make_key mosquitto)"
+    status="$(pick_status)"
+    error_code="$(pick_error_code)"
+
+    payload=$(printf '{"id":"%s","raw_payload":{"last_heartbeat_at":"%s","error_code":%s,"occurred_at":"%s","ingested_at":"%s","idempotency_key":"%s","status":"%s","kmp":"KMP-%s"}}' \
+        "$id" "$now" "$error_code" "$now" "$now" "$key" "$status" "$(random_int 1000 9999)")
+
+    podman exec "$CLI_CONTAINER" mosquitto_pub \
+        -h "$BROKER_HOST" -p "$BROKER_PORT" -t "$TOPIC" -q "$QOS" -m "$payload"
+    printf '[MOSQUITTO] %s %s\n' "$now" "$payload"
+}
+
+printf 'Publishing fixed device IDs every %ss to mqtt://%s:%s/%s: %s (Ctrl+C to stop)\n' \
+    "$INTERVAL_SECONDS" "$BROKER_HOST" "$BROKER_PORT" "$TOPIC" "$DEVICE_IDS"
+
+while :; do
+    for id in $DEVICE_IDS; do
+        publish_one "$id"
+    done
+    sleep "$INTERVAL_SECONDS"
+done

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MQTT Broker 테스트 스크립트</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body { max-width: 960px; margin: 0 auto; padding: 32px 20px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 28px; }
+    th, td { padding: 10px 12px; border: 1px solid #8886; text-align: left; }
+    th { background: #8882; }
+    code { padding: 2px 5px; border-radius: 4px; background: #8882; }
+    pre { overflow-x: auto; padding: 16px; border-radius: 8px; background: #8882; }
+    .ok { color: #17803d; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>MQTT Broker 테스트 스크립트</h1>
+    <p>세 MQTT 브로커의 테스트 메시지 발행 및 retained topic 초기화 정보를 정리한 문서입니다.</p>
+
+    <h2>브로커 연결 정보</h2>
+    <table>
+      <thead>
+        <tr><th>브로커</th><th>호스트 포트</th><th>기본 topic</th><th>상태</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Mosquitto</td><td><code>1883</code></td><td><code>ot/device/fabrication/mosquitto/status</code></td><td class="ok">확인 완료</td></tr>
+        <tr><td>EMQX</td><td><code>1884</code></td><td><code>ot/device/fabrication/emqx/status</code></td><td class="ok">확인 완료</td></tr>
+        <tr><td>NATS MQTT</td><td><code>1885</code></td><td><code>ot/device/fabrication/nats/status</code></td><td class="ok">확인 완료</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Publish 실행</h2>
+    <p>각 스크립트는 고정 장비 ID 3개를 순회하며 시간, 상태 및 측정값을 변경해 발행합니다.</p>
+    <pre><code>sh scripts/mqtt/publish-mosquitto-status.sh
+sh scripts/mqtt/publish-emqx-status.sh
+sh scripts/mqtt/publish-nats-status.sh</code></pre>
+
+    <h2>Retained topic 초기화</h2>
+    <p>기본적으로 세 브로커에서 <code>ot/device/fabrication/#</code>에 해당하는 retained topic을 찾아 초기화합니다.</p>
+    <pre><code>sh scripts/mqtt/reset-broker-topics.sh</code></pre>
+
+    <h2>환경변수 설정 예시</h2>
+    <pre><code>DEVICE_IDS="device-a device-b device-c" \
+BROKER_PORT=1884 \
+TOPIC="ot/device/fabrication/custom/status" \
+sh scripts/mqtt/publish-emqx-status.sh
+
+TOPIC_FILTER="ot/device/fabrication/#" \
+BROKER_PORTS="1883 1884 1885" \
+sh scripts/mqtt/reset-broker-topics.sh</code></pre>
+
+    <h2>파일 위치</h2>
+    <ul>
+      <li><code>scripts/mqtt/publish-mosquitto-status.sh</code></li>
+      <li><code>scripts/mqtt/publish-emqx-status.sh</code></li>
+      <li><code>scripts/mqtt/publish-nats-status.sh</code></li>
+      <li><code>scripts/mqtt/reset-broker-topics.sh</code></li>
+    </ul>
+  </main>
+</body>
+</html>
