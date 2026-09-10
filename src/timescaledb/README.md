@@ -71,9 +71,9 @@ podman VM 안 컨테이너에서는 보이지 않는다. 소비자를 Aspire 세
 
 | Kafka 토픽 | MQTT 토픽 | 주기 · 건수 | 표 |
 |---|---|---|---|
-| `ot.lidar.status` | `ot/device/{zone}/lidar/status` | 1초 · 1건/대 | `lidar_status` |
-| `ot.lidar.actual` | `ot/sensor/{stage}/actual` | 1분 · 1건/대 | `lidar_scan_actual` |
-| `ot.lidar.artifact` | `ot/pipeline/{zone}/{shop}/{bay}/artifact` | 1분 · 12건/대 | `lidar_scan_artifact` |
+| `ot.lidar.status` | `ot/device/{zone}/lidar/status` | 1초 · 1건/대 | `tsdb.lidar_status` |
+| `ot.lidar.actual` | `ot/sensor/{stage}/actual` | 1분 · 1건/대 | `tsdb.lidar_scan_actual` |
+| `ot.lidar.artifact` | `ot/pipeline/{zone}/{shop}/{bay}/artifact` | 1분 · 12건/대 | `tsdb.lidar_scan_artifact` |
 
 세 채널 모두 `tagMode=raw` 다 — `content.value` 는 `raw_payload` 객체 통째의 JSON 문자열이고
 채널마다 키가 다르다. 마지막 마디가 셋 중 하나가 아닌 토픽에서 온 레코드는 통째로
@@ -105,19 +105,23 @@ scripts/down.sh -v && scripts/up.sh      # init SQL 은 볼륨이 새로 만들�
 앞부분에서 장비 id 를 되찾고, 실적·산출물은 `#2257` 처럼 숫자를 그대로 장비 축에 둔다.
 그 수는 `lidar_ingest_tag_unresolved_total` 과 `verify` 의 `unresolved devices` 로 보인다.
 
+스키마는 둘이다. 나누는 선은 "행 단위 CDC 가 성립하는가" 다 — `tsdb` 는 하이퍼테이블과 연속 집계라
+CDC 대상이 아니고, `rdb` 는 publication 에 실려 CDC 가 옮긴다. 조회하는 쪽이 스키마를 몰라도 되도록
+`ALTER DATABASE lidar SET search_path = tsdb, rdb, public` 을 걸어 둔다(01-schema.sql).
+
 | 표 | 성격 | 내용 |
 |---|---|---|
-| `lidar_status` | 하이퍼테이블 · 청크 6h · 압축 3일 후 · 보존 31일 | 상태 항목 하나 = 행 하나. `time` = `occurred_at` |
-| `lidar_scan_actual` | 하이퍼테이블 · 청크 1일 · 압축 3일 후 · 보존 31일 | 실적 항목 하나 = 행 하나. 호선·블록·공정·진척률·정합 신뢰도 |
-| `lidar_scan_artifact` | 하이퍼테이블 · 청크 6h · 압축 3일 후 · 보존 31일 | 산출물 메타 하나 = 행 하나. 파일 본체는 오지 않고 `storage_uri` 만 온다 |
-| `lidar_status_message` | 일반 테이블 | Kafka 레코드 하나 = 행 하나. 파티션·오프셋·헤더·채널별 항목 수·격리 수 |
-| `lidar_tag_catalog` | 일반 테이블 · 태그당 1행 | 숫자 `tid` → 장비 id·TagId·MQTT 토픽·채널. InterSysLink 등록부의 사본 |
-| `lidar_device_state` | 일반 테이블 · 장비당 1행 | 장비별 최신 상태. exporter 와 대시보드가 하이퍼테이블 대신 이것을 읽는다 |
-| `lidar_ingest_reject` | 일반 테이블 | 파싱 실패 항목의 원문과 사유 |
-| `lidar_status_1m` | 연속 집계 | 장비별 1분: 온도·스캔 속도·RSSI, 상태별 건수 |
-| `lidar_error_1m` | 연속 집계 | 오류 코드별 1분 건수·장비 수 |
-| `lidar_scan_1m` | 연속 집계 | 장비·공정별 1분: 정합 신뢰도, 진척률, COMPLETE 건수 |
-| `lidar_artifact_1m` | 연속 집계 | 산출물 종류별 1분 건수·바이트 |
+| `tsdb.lidar_status` | 하이퍼테이블 · 청크 6h · 압축 3일 후 · 보존 31일 | 상태 항목 하나 = 행 하나. `time` = `occurred_at` |
+| `tsdb.lidar_scan_actual` | 하이퍼테이블 · 청크 1일 · 압축 3일 후 · 보존 31일 | 실적 항목 하나 = 행 하나. 호선·블록·공정·진척률·정합 신뢰도 |
+| `tsdb.lidar_scan_artifact` | 하이퍼테이블 · 청크 6h · 압축 3일 후 · 보존 31일 | 산출물 메타 하나 = 행 하나. 파일 본체는 오지 않고 `storage_uri` 만 온다 |
+| `rdb.lidar_status_message` | 일반 테이블 | Kafka 레코드 하나 = 행 하나. 파티션·오프셋·헤더·채널별 항목 수·격리 수 |
+| `rdb.lidar_tag_catalog` | 일반 테이블 · 태그당 1행 | 숫자 `tid` → 장비 id·TagId·MQTT 토픽·채널. InterSysLink 등록부의 사본 |
+| `rdb.lidar_device_state` | 일반 테이블 · 장비당 1행 | 장비별 최신 상태. exporter 와 대시보드가 하이퍼테이블 대신 이것을 읽는다 |
+| `rdb.lidar_ingest_reject` | 일반 테이블 | 파싱 실패 항목의 원문과 사유 |
+| `tsdb.lidar_status_1m` | 연속 집계 | 장비별 1분: 온도·스캔 속도·RSSI, 상태별 건수 |
+| `tsdb.lidar_error_1m` | 연속 집계 | 오류 코드별 1분 건수·장비 수 |
+| `tsdb.lidar_scan_1m` | 연속 집계 | 장비·공정별 1분: 정합 신뢰도, 진척률, COMPLETE 건수 |
+| `tsdb.lidar_artifact_1m` | 연속 집계 | 산출물 종류별 1분 건수·바이트 |
 
 멱등성: `(idempotency_key, time)` 유니크 인덱스 + `ON CONFLICT DO NOTHING`. Kafka 오프셋은 DB 커밋 뒤에만
 커밋한다(at-least-once). MQTT 가 QoS 1 이라 중복은 예외가 아니라 정상 동작이다 —
@@ -128,7 +132,7 @@ DDL 은 `infra/db/init/01-schema.sql`, 정책은 `02-policies.sql`, 태그 카�
 (자동 생성). 스키마를 고쳤으면 `down.sh -v` 로 볼륨을 지워야 반영된다.
 CDC 원천으로 여는 설정은 `04-cdc-lidar.sql` 이고, 하이퍼테이블 셋은 publication 에 넣지 않는다
 (청크·압축·보존이 행 단위 변경으로 보이지 않는다 — `docs/timescaledb-cdc-impact.html` B안).
-그 네 표(`lidar_device_state` · `lidar_status_message` · `lidar_ingest_reject` · `lidar_tag_catalog`)를
+그 네 표(`rdb.lidar_device_state` · `rdb.lidar_status_message` · `rdb.lidar_ingest_reject` · `rdb.lidar_tag_catalog`)를
 받는 쪽은 `src/embedded-cdc` 와 `src/embedded-cdc-tsdb` 의 `infra/db/target/init/02-lidar.sql` 과
 `LidarPassthroughHandlers` 의 컬럼 목록이다 — **원천 컬럼을 고치면 네 곳을 같이 고쳐야 한다.**
 

@@ -12,9 +12,9 @@ InterSysLink(OT) LiDAR 필드 데이터 Kafka → TimescaleDB 소비자.
 채널은 **Kafka 토픽**이 정한다. EES 메시지 하나가 토픽 하나이고, 채널마다 메시지를 따로
 만들어 두었다 (msgHeaderFormat.topic.send_topic). 토픽 이름의 마지막 마디로 고른다.
 
-    ot.lidar.status    ← ot/device/{zone}/lidar/status              → lidar_status        (1건/1초·대)
-    ot.lidar.actual    ← ot/sensor/{stage}/actual                   → lidar_scan_actual   (1건/1분·대)
-    ot.lidar.artifact  ← ot/pipeline/{zone}/{shop}/{bay}/artifact   → lidar_scan_artifact (12건/1분·대)
+    ot.lidar.status    ← ot/device/{zone}/lidar/status              → tsdb.lidar_status        (1건/1초·대)
+    ot.lidar.actual    ← ot/sensor/{stage}/actual                   → tsdb.lidar_scan_actual   (1건/1분·대)
+    ot.lidar.artifact  ← ot/pipeline/{zone}/{shop}/{bay}/artifact   → tsdb.lidar_scan_artifact (12건/1분·대)
 
 **content.tid 는 TagId 가 아니라 EES ParameterId(숫자)다.** Provider 가 태그를 실을 때
 문자열 TagId 를 버리고 이 번호만 쓴다 (ValueMessageFormatterV1_0). raw_payload 안에도 장비 id
@@ -30,8 +30,8 @@ tagMode=raw 라 content.value 는 raw_payload 통째의 JSON 문자열이다 —
 
 하는 일은 다섯이다.
   1. 배열을 풀어 항목마다(채널은 토픽이 정한다) 해당 표에 한 행 (멱등 키 충돌은 DO NOTHING)
-  2. 배치 안의 장비별 최신 상태로 lidar_device_state UPSERT (오래된 이벤트는 못 덮는다)
-  3. 레코드 자체를 lidar_status_message 한 행 (헤더·오프셋·채널별 항목 수)
+  2. 배치 안의 장비별 최신 상태로 rdb.lidar_device_state UPSERT (오래된 이벤트는 못 덮는다)
+  3. 레코드 자체를 rdb.lidar_status_message 한 행 (헤더·오프셋·채널별 항목 수)
   4. 파싱이 안 되거나 모르는 토픽인 항목은 lidar_ingest_reject 로 격리 — 나머지는 그대로 적재
   5. 지표 노출 (/metrics)
 
@@ -150,9 +150,9 @@ def insert_sql(table, cols):
 
 
 INSERTS = {
-    CH_STATUS: ("lidar_status", insert_sql("lidar_status", STATUS_COLS)),
-    CH_ACTUAL: ("lidar_scan_actual", insert_sql("lidar_scan_actual", ACTUAL_COLS)),
-    CH_ARTIFACT: ("lidar_scan_artifact", insert_sql("lidar_scan_artifact", ARTIFACT_COLS)),
+    CH_STATUS: ("lidar_status", insert_sql("tsdb.lidar_status", STATUS_COLS)),
+    CH_ACTUAL: ("lidar_scan_actual", insert_sql("tsdb.lidar_scan_actual", ACTUAL_COLS)),
+    CH_ARTIFACT: ("lidar_scan_artifact", insert_sql("tsdb.lidar_scan_artifact", ARTIFACT_COLS)),
 }
 
 STATE_COLS = (
@@ -160,8 +160,8 @@ STATE_COLS = (
     "temperature_c, connectivity_rssi, fov_mode, last_event_at, last_heartbeat_at"
 )
 UPSERT_STATE = f"""
-    INSERT INTO lidar_device_state ({STATE_COLS}, updated_at)
-    SELECT {STATE_COLS}, now() FROM json_populate_recordset(NULL::lidar_device_state, %s::json)
+    INSERT INTO rdb.lidar_device_state ({STATE_COLS}, updated_at)
+    SELECT {STATE_COLS}, now() FROM json_populate_recordset(NULL::rdb.lidar_device_state, %s::json)
     ON CONFLICT (tid) DO UPDATE SET
         device_role = EXCLUDED.device_role,
         site = EXCLUDED.site,
@@ -180,7 +180,7 @@ UPSERT_STATE = f"""
     WHERE EXCLUDED.last_event_at > lidar_device_state.last_event_at
 """
 INSERT_MESSAGE = """
-    INSERT INTO lidar_status_message
+    INSERT INTO rdb.lidar_status_message
         (kafka_partition, kafka_offset, kafka_ts, kafka_topic, uniqueid, msg_ts, message_version,
          method_id, data_type, project_id, infra_proc_name, task_area_code, send_topic,
          item_count, status_count, actual_count, artifact_count, reject_count)
@@ -188,7 +188,7 @@ INSERT_MESSAGE = """
     ON CONFLICT (kafka_partition, kafka_offset) DO NOTHING
 """
 INSERT_REJECT = """
-    INSERT INTO lidar_ingest_reject (kafka_offset, payload, reason) VALUES (%s, %s::jsonb, %s)
+    INSERT INTO rdb.lidar_ingest_reject (kafka_offset, payload, reason) VALUES (%s, %s::jsonb, %s)
 """
 
 # ── 변환 ────────────────────────────────────────────────────────────────────
@@ -271,7 +271,7 @@ class TagCatalog:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT send_topic, param_id, tag_id, tid, mqtt_topic_key, channel "
-                    "FROM lidar_tag_catalog"
+                    "FROM rdb.lidar_tag_catalog"
                 )
                 for send_topic, param_id, tag_id, tid, topic_key, channel in cur:
                     row = (tag_id, tid, topic_key, channel)

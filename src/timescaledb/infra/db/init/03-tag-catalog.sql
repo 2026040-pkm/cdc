@@ -9,7 +9,7 @@
 -- 이 표가 Kafka 의 숫자 tid(content.tid = EES ParameterId)를 장비 id 로 되돌린다.
 -- 없으면 장비 축이 사라진다 — 배경은 스크립트 상단 주석 참고.
 -- ─────────────────────────────────────────────────────────────────────────────
-INSERT INTO lidar_tag_catalog (send_topic, param_id, tag_id, device_id, tid, channel, artifact_type, mqtt_topic, mqtt_topic_key, field, data_type) VALUES
+INSERT INTO rdb.lidar_tag_catalog (send_topic, param_id, tag_id, device_id, tid, channel, artifact_type, mqtt_topic, mqtt_topic_key, field, data_type) VALUES
     ('ot.lidar.actual', 1401, 'LDR-GJ-A1B1-01.ot_sensor_arrangement_actual.raw_payload', 'LDR-GJ-A1B1-01', 'LDR-GJ-A1B1-01', 'actual', NULL, 'ot/sensor/arrangement/actual', 'ot_sensor_arrangement_actual', 'raw_payload', 'STRING'),
     ('ot.lidar.actual', 1402, 'LDR-GJ-A1B1-01.ot_sensor_inspection_actual.raw_payload', 'LDR-GJ-A1B1-01', 'LDR-GJ-A1B1-01', 'actual', NULL, 'ot/sensor/inspection/actual', 'ot_sensor_inspection_actual', 'raw_payload', 'STRING'),
     ('ot.lidar.actual', 1403, 'LDR-GJ-A1B1-01.ot_sensor_welding_actual.raw_payload', 'LDR-GJ-A1B1-01', 'LDR-GJ-A1B1-01', 'actual', NULL, 'ot/sensor/welding/actual', 'ot_sensor_welding_actual', 'raw_payload', 'STRING'),

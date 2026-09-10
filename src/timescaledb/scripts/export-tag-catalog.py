@@ -192,7 +192,7 @@ def main():
 -- 이 표가 Kafka 의 숫자 tid(content.tid = EES ParameterId)를 장비 id 로 되돌린다.
 -- 없으면 장비 축이 사라진다 — 배경은 스크립트 상단 주석 참고.
 -- ─────────────────────────────────────────────────────────────────────────────
-INSERT INTO lidar_tag_catalog ({cols}) VALUES
+INSERT INTO rdb.lidar_tag_catalog ({cols}) VALUES
 {values}
 ON CONFLICT (send_topic, param_id) DO UPDATE SET
     tag_id = EXCLUDED.tag_id,

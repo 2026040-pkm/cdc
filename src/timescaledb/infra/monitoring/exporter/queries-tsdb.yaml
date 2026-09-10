@@ -59,8 +59,10 @@ tsdb_compression:
            COALESCE(s.before_compression_total_bytes, 0)::float    AS before_bytes,
            COALESCE(s.after_compression_total_bytes, 0)::float     AS after_bytes,
            COALESCE(s.number_compressed_chunks, 0)::float          AS compressed_chunks
-    FROM (VALUES ('lidar_status'), ('lidar_scan_actual'), ('lidar_scan_artifact')) h(hypertable_name)
-    CROSS JOIN LATERAL hypertable_compression_stats(h.hypertable_name::regclass) s
+    FROM (VALUES ('lidar_status',        'tsdb.lidar_status'),
+                 ('lidar_scan_actual',   'tsdb.lidar_scan_actual'),
+                 ('lidar_scan_artifact', 'tsdb.lidar_scan_artifact')) h(hypertable_name, ref)
+    CROSS JOIN LATERAL hypertable_compression_stats(h.ref::regclass) s
   metrics:
     - hypertable:
         usage: "LABEL"
@@ -79,15 +81,15 @@ tsdb_compression:
 # count(*) 는 청크마다 전체 스캔이라 5초 스크랩에 못 넣는다. 카탈로그 통계 기반 근사값.
 tsdb_rows:
   query: |
-    SELECT 'lidar_status' AS hypertable, approximate_row_count('lidar_status')::float AS approx
+    SELECT 'lidar_status' AS hypertable, approximate_row_count('tsdb.lidar_status')::float AS approx
     UNION ALL
-    SELECT 'lidar_scan_actual', approximate_row_count('lidar_scan_actual')::float
+    SELECT 'lidar_scan_actual', approximate_row_count('tsdb.lidar_scan_actual')::float
     UNION ALL
-    SELECT 'lidar_scan_artifact', approximate_row_count('lidar_scan_artifact')::float
+    SELECT 'lidar_scan_artifact', approximate_row_count('tsdb.lidar_scan_artifact')::float
     UNION ALL
-    SELECT 'lidar_status_message', (SELECT count(*) FROM lidar_status_message)::float
+    SELECT 'lidar_status_message', (SELECT count(*) FROM rdb.lidar_status_message)::float
     UNION ALL
-    SELECT 'lidar_ingest_reject', (SELECT count(*) FROM lidar_ingest_reject)::float
+    SELECT 'lidar_ingest_reject', (SELECT count(*) FROM rdb.lidar_ingest_reject)::float
   metrics:
     - hypertable:
         usage: "LABEL"
@@ -145,7 +147,7 @@ tsdb_lidar_devices:
   query: |
     SELECT s.status, COALESCE(d.cnt, 0)::float AS count
     FROM (VALUES ('ONLINE'), ('CALIBRATING'), ('ERROR'), ('OFFLINE')) s(status)
-    LEFT JOIN (SELECT status, count(*) AS cnt FROM lidar_device_state GROUP BY status) d
+    LEFT JOIN (SELECT status, count(*) AS cnt FROM rdb.lidar_device_state GROUP BY status) d
            ON d.status = s.status
   metrics:
     - status:
@@ -162,7 +164,7 @@ tsdb_lidar_fleet:
     SELECT count(*)::float                                                          AS devices,
            count(*) FILTER (WHERE last_event_at < now() - interval '60 seconds')::float AS stale,
            COALESCE(extract(epoch from (now() - max(last_event_at))), 0)::float     AS freshness_seconds
-    FROM lidar_device_state
+    FROM rdb.lidar_device_state
   metrics:
     - devices:
         usage: "GAUGE"
@@ -178,7 +180,7 @@ tsdb_lidar_fleet:
 tsdb_lidar_error:
   query: |
     SELECT error_code, count(*)::float AS devices
-    FROM lidar_device_state
+    FROM rdb.lidar_device_state
     WHERE error_code IS NOT NULL
     GROUP BY error_code
   metrics:

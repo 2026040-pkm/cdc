@@ -7,9 +7,9 @@
 -- 채널은 **Kafka 토픽**이 정한다. EES 메시지 하나가 토픽 하나이고, 채널마다 메시지를 따로
 -- 만들어 두었기 때문이다 (EES_MESSAGE.msgHeaderFormat.topic.send_topic).
 --
---   ot.lidar.status    ← ot/device/{zone}/lidar/status              1건/1초·대   → lidar_status
---   ot.lidar.actual    ← ot/sensor/{stage}/actual                   1건/1분·대   → lidar_scan_actual
---   ot.lidar.artifact  ← ot/pipeline/{zone}/{shop}/{bay}/artifact  12건/1분·대   → lidar_scan_artifact
+--   ot.lidar.status    ← ot/device/{zone}/lidar/status              1건/1초·대   → tsdb.lidar_status
+--   ot.lidar.actual    ← ot/sensor/{stage}/actual                   1건/1분·대   → tsdb.lidar_scan_actual
+--   ot.lidar.artifact  ← ot/pipeline/{zone}/{shop}/{bay}/artifact  12건/1분·대   → tsdb.lidar_scan_artifact
 --
 -- content.tid 는 TagId 가 아니라 **EES ParameterId(숫자)** 다. Provider 가 태그를 실을 때
 -- 문자열 TagId 를 버리고 이 번호만 쓴다(ValueMessageFormatterV1_0). 그리고 raw_payload
@@ -18,20 +18,44 @@
 --
 -- tagMode=raw 라 content.value 는 raw_payload 객체 통째의 JSON 문자열이다. 채널마다 키가 다르다.
 --
--- 표는 일곱이다.
---   lidar_status         상태 항목 하나 = 행 하나. 하이퍼테이블.
---   lidar_scan_actual    실적 항목 하나 = 행 하나. 하이퍼테이블. scan_id 로 산출물과 이어진다.
---   lidar_scan_artifact  산출물 메타 하나 = 행 하나. 하이퍼테이블. 파일 본체는 오지 않는다(경로만).
---   lidar_status_message Kafka 레코드 하나 = 행 하나. 헤더·오프셋·항목 수. 추적용.
---   lidar_device_state   장비별 최신 상태 한 행. 대시보드와 exporter 가 읽는다.
---   lidar_ingest_reject  파싱 실패 항목 격리. 원문과 사유를 남긴다.
---   lidar_tag_catalog    숫자 tid → 장비 id·TagId·MQTT 토픽. InterSysLink 등록부의 사본.
+-- 표는 일곱이고 스키마 둘로 나뉜다. 나누는 선은 "행 단위 CDC 가 성립하는가" 다.
+--
+-- tsdb — 하이퍼테이블. CDC 대상이 아니다.
+--   tsdb.lidar_status         상태 항목 하나 = 행 하나.
+--   tsdb.lidar_scan_actual    실적 항목 하나 = 행 하나. scan_id 로 산출물과 이어진다.
+--   tsdb.lidar_scan_artifact  산출물 메타 하나 = 행 하나. 파일 본체는 오지 않는다(경로만).
+--
+-- rdb — 일반 표. publication(embedded_cdc_pub)에 실려 CDC 가 옮긴다.
+--   rdb.lidar_status_message  Kafka 레코드 하나 = 행 하나. 헤더·오프셋·항목 수. 추적용.
+--   rdb.lidar_device_state    장비별 최신 상태 한 행. 대시보드와 exporter 가 읽는다.
+--   rdb.lidar_ingest_reject   파싱 실패 항목 격리. 원문과 사유를 남긴다.
+--   rdb.lidar_tag_catalog     숫자 tid → 장비 id·TagId·MQTT 토픽. InterSysLink 등록부의 사본.
 --
 -- 컬럼 이름은 raw_payload 의 키를 그대로 쓴다. 이름을 바꾸면 필드 정의서와 대조가 안 된다.
 -- 예외는 넷뿐이다 — time(=occurred_at) · tid(=장비 id) · tag_id(=문자열 TagId) ·
 -- param_id(=content.tid 숫자 그대로).
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+-- ── 스키마 둘 ───────────────────────────────────────────────────────────────
+-- 이 DB 의 진짜 경계는 "CDC 로 복제되는 표 / 안 되는 표" 다. 그것을 주석이 아니라
+-- 스키마로 둔다 — publication 에 하이퍼테이블이 실수로 끼어드는 것을 구조가 막는다.
+--
+--   rdb   일반 표. 행 단위 INSERT/UPDATE/DELETE 만 있어 논리 복제가 성립한다.
+--         embedded-cdc 의 원천 표(car·computer·grade·member·cdc_heartbeat)도 여기 산다
+--         — 04-cdc-lidar.sql 이 search_path 로 밀어 넣는다.
+--   tsdb  하이퍼테이블과 연속 집계. 청크가 주기마다 새 표로 생기고 압축·보존이 내부
+--         경로로 행을 옮기고 지워 행 단위 CDC 가 성립하지 않는다.
+--
+-- 스키마 이름 tsdb 와 아래 CREATE TABLE 의 WITH (tsdb.hypertable, ...) 는 서로 무관하다.
+-- 뒤엣것은 TimescaleDB 가 등록한 스토리지 옵션 네임스페이스라 스키마와 충돌하지 않는다.
+CREATE SCHEMA rdb;
+CREATE SCHEMA tsdb;
+
+-- 조회하는 쪽(ingest·exporter·Grafana·psql)이 스키마를 몰라도 되게 한다.
+-- 우리 SQL 은 전부 수식해 두지만 임시 조회와 남의 도구까지 강제할 수는 없다.
+-- 이 설정은 다음 세션부터 걸린다 — init 파일 자신은 못 받으므로 여기서는 전부 수식한다.
+ALTER DATABASE lidar SET search_path = tsdb, rdb, public;
 
 -- ── 0) 태그 등록부 ──────────────────────────────────────────────────────────
 -- InterSysLink 의 EES_TAG × TAG_CATALOG 를 그대로 옮겨 둔 사본이다.
@@ -43,7 +67,7 @@ CREATE EXTENSION IF NOT EXISTS timescaledb;
 --
 -- 키가 (send_topic, param_id) 인 이유: ParameterId 는 워크플로우·PType 안에서만 1부터
 -- 매기는 일련번호라 메시지가 다르면 같은 숫자가 다른 태그를 가리킬 수 있다.
-CREATE TABLE lidar_tag_catalog (
+CREATE TABLE rdb.lidar_tag_catalog (
     send_topic     TEXT        NOT NULL,   -- Kafka 토픽 (= EES send_topic · 헤더 request)
     param_id       BIGINT      NOT NULL,   -- content.tid
     tag_id         TEXT        NOT NULL,   -- 문자열 TagId ({장비}.{토픽}.{필드})
@@ -59,12 +83,12 @@ CREATE TABLE lidar_tag_catalog (
     PRIMARY KEY (send_topic, param_id)
 );
 
-CREATE INDEX lidar_tag_catalog_tid_idx ON lidar_tag_catalog (tid);
+CREATE INDEX lidar_tag_catalog_tid_idx ON rdb.lidar_tag_catalog (tid);
 
 -- ── 1) 장비 상태 ────────────────────────────────────────────────────────────
 -- time 은 raw_payload.occurred_at(장비 발생 시각) 이다. Kafka 도착 시각이 아니다.
 -- 버퍼 방출로 늦게 온 항목도 제 시각 자리에 들어가야 집계가 맞는다.
-CREATE TABLE lidar_status (
+CREATE TABLE tsdb.lidar_status (
     time                      TIMESTAMPTZ      NOT NULL,   -- raw_payload.occurred_at
     tid                       TEXT             NOT NULL,   -- 장비 id (예 LDR-GJ-A1B3-07). 카탈로그가 없으면 '#<param_id>'
     tag_id                    TEXT,                        -- 문자열 TagId (카탈로그에서 푼 값)
@@ -100,13 +124,13 @@ CREATE TABLE lidar_status (
 
 -- 멱등 적재의 근거. MQTT QoS 1 · Kafka at-least-once 라 재전달이 온다.
 -- 하이퍼테이블의 유니크 인덱스는 파티션 컬럼(time)을 반드시 포함해야 한다.
-CREATE UNIQUE INDEX lidar_status_uq ON lidar_status (idempotency_key, time);
+CREATE UNIQUE INDEX lidar_status_uq ON tsdb.lidar_status (idempotency_key, time);
 -- 장비별 최근 조회. 압축 segmentby 와 같은 축이다.
-CREATE INDEX lidar_status_tid_time_idx ON lidar_status (tid, time DESC);
+CREATE INDEX lidar_status_tid_time_idx ON tsdb.lidar_status (tid, time DESC);
 
 -- ── 2) 실적 결과 ────────────────────────────────────────────────────────────
 -- 스캔 한 번이 실적 1건 + 산출물 12건을 만든다. scan_id 가 둘을 잇는 유일한 조인 키다.
-CREATE TABLE lidar_scan_actual (
+CREATE TABLE tsdb.lidar_scan_actual (
     time                 TIMESTAMPTZ      NOT NULL,   -- raw_payload.occurred_at
     tid                  TEXT             NOT NULL,   -- 장비 id. 카탈로그가 없으면 '#<param_id>'
     tag_id               TEXT,
@@ -148,15 +172,15 @@ CREATE TABLE lidar_scan_actual (
     tsdb.orderby   = 'time DESC'
 );
 
-CREATE UNIQUE INDEX lidar_scan_actual_uq ON lidar_scan_actual (idempotency_key, time);
-CREATE INDEX lidar_scan_actual_tid_time_idx ON lidar_scan_actual (tid, time DESC);
+CREATE UNIQUE INDEX lidar_scan_actual_uq ON tsdb.lidar_scan_actual (idempotency_key, time);
+CREATE INDEX lidar_scan_actual_tid_time_idx ON tsdb.lidar_scan_actual (tid, time DESC);
 -- 실적에서 산출물로 건너갈 때 쓰는 축.
-CREATE INDEX lidar_scan_actual_scan_idx ON lidar_scan_actual (scan_id, time DESC);
+CREATE INDEX lidar_scan_actual_scan_idx ON tsdb.lidar_scan_actual (scan_id, time DESC);
 
 -- ── 3) 산출물 메타 ──────────────────────────────────────────────────────────
 -- 점군 파일 자체는 오지 않는다. storage_uri · file_size_bytes · checksum 만 온다.
 -- 변환행렬만 숫자 16개뿐이라 예외적으로 메시지에 직접 실려 온다.
-CREATE TABLE lidar_scan_artifact (
+CREATE TABLE tsdb.lidar_scan_artifact (
     time                  TIMESTAMPTZ      NOT NULL,   -- raw_payload.occurred_at
     tid                   TEXT             NOT NULL,   -- 장비 id (-REGISTERED_PCD 등 접미사는 뗀다). 없으면 '#<param_id>'
     tag_id                TEXT,
@@ -190,15 +214,15 @@ CREATE TABLE lidar_scan_artifact (
     tsdb.orderby   = 'time DESC'
 );
 
-CREATE UNIQUE INDEX lidar_scan_artifact_uq ON lidar_scan_artifact (idempotency_key, time);
-CREATE INDEX lidar_scan_artifact_scan_idx ON lidar_scan_artifact (scan_id, time DESC);
-CREATE INDEX lidar_scan_artifact_type_time_idx ON lidar_scan_artifact (artifact_type, time DESC);
+CREATE UNIQUE INDEX lidar_scan_artifact_uq ON tsdb.lidar_scan_artifact (idempotency_key, time);
+CREATE INDEX lidar_scan_artifact_scan_idx ON tsdb.lidar_scan_artifact (scan_id, time DESC);
+CREATE INDEX lidar_scan_artifact_type_time_idx ON tsdb.lidar_scan_artifact (artifact_type, time DESC);
 
 -- ── Kafka 레코드 단위 추적 ──────────────────────────────────────────────────
 -- 행이 어느 레코드에서 왔는지, 레코드 하나에 항목이 몇 개였는지 남긴다.
 -- 헤더는 EES V1.0 의 11개 계약(EesHeaderBuilderV1_0)에서 뜻이 있는 것만 받는다.
 -- request 헤더가 곧 발신 측이 설정한 send_topic 이다.
-CREATE TABLE lidar_status_message (
+CREATE TABLE rdb.lidar_status_message (
     kafka_partition  INTEGER     NOT NULL,
     kafka_offset     BIGINT      NOT NULL,
     kafka_ts         TIMESTAMPTZ NOT NULL,   -- 레코드 CreateTime
@@ -225,7 +249,7 @@ CREATE TABLE lidar_status_message (
 -- "지금 ERROR 인 장비가 몇 대인가" 를 하이퍼테이블 전체를 훑지 않고 답한다.
 -- ingest 가 배치마다 UPSERT 하되, 더 오래된 이벤트가 최신 값을 덮지 못하게
 -- last_event_at 비교를 건다 (늦게 도착한 재전달 방어).
-CREATE TABLE lidar_device_state (
+CREATE TABLE rdb.lidar_device_state (
     tid                   TEXT PRIMARY KEY,
     device_role           TEXT,
     site                  TEXT,
@@ -246,7 +270,7 @@ CREATE TABLE lidar_device_state (
 -- ── 격리 ────────────────────────────────────────────────────────────────────
 -- 항목 하나가 깨졌다고 레코드 전체를 버리지 않는다. 깨진 것만 여기로 보내고
 -- 나머지는 적재한다. 운영자가 들여다보는 표라 일반 테이블이다.
-CREATE TABLE lidar_ingest_reject (
+CREATE TABLE rdb.lidar_ingest_reject (
     id            BIGSERIAL   PRIMARY KEY,
     received_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     kafka_offset  BIGINT,

@@ -35,8 +35,8 @@
           "type": "postgres",
           "uid": "tsdb-db"
         },
-        "query": "SELECT tid FROM lidar_device_state ORDER BY tid",
-        "definition": "SELECT tid FROM lidar_device_state ORDER BY tid",
+        "query": "SELECT tid FROM rdb.lidar_device_state ORDER BY tid",
+        "definition": "SELECT tid FROM rdb.lidar_device_state ORDER BY tid",
         "refresh": 2,
         "multi": true,
         "includeAll": true,
@@ -1573,7 +1573,7 @@
             "uid": "tsdb-db"
           },
           "rawQuery": true,
-          "rawSql": "SELECT tid, zone, bay, status, error_code, temperature_c,\n       scan_rate_pts_per_sec AS scan_rate, connectivity_rssi AS rssi, fov_mode,\n       last_event_at, extract(epoch from (now() - last_event_at)) AS age_s\nFROM lidar_device_state\nORDER BY CASE status WHEN 'ERROR' THEN 0 WHEN 'OFFLINE' THEN 1 WHEN 'CALIBRATING' THEN 2 ELSE 3 END, tid",
+          "rawSql": "SELECT tid, zone, bay, status, error_code, temperature_c,\n       scan_rate_pts_per_sec AS scan_rate, connectivity_rssi AS rssi, fov_mode,\n       last_event_at, extract(epoch from (now() - last_event_at)) AS age_s\nFROM rdb.lidar_device_state\nORDER BY CASE status WHEN 'ERROR' THEN 0 WHEN 'OFFLINE' THEN 1 WHEN 'CALIBRATING' THEN 2 ELSE 3 END, tid",
           "format": "table",
           "refId": "A",
           "editorMode": "code"
@@ -1758,7 +1758,7 @@
             "uid": "tsdb-db"
           },
           "rawQuery": true,
-          "rawSql": "SELECT bucket AS \"time\", tid AS metric, avg_temperature_c AS value\nFROM lidar_status_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1",
+          "rawSql": "SELECT bucket AS \"time\", tid AS metric, avg_temperature_c AS value\nFROM tsdb.lidar_status_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1",
           "format": "time_series",
           "refId": "A",
           "editorMode": "code"
@@ -1829,7 +1829,7 @@
             "uid": "tsdb-db"
           },
           "rawQuery": true,
-          "rawSql": "SELECT bucket AS \"time\", tid AS metric, avg_scan_rate AS value\nFROM lidar_status_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1",
+          "rawSql": "SELECT bucket AS \"time\", tid AS metric, avg_scan_rate AS value\nFROM tsdb.lidar_status_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1",
           "format": "time_series",
           "refId": "A",
           "editorMode": "code"
@@ -1900,7 +1900,7 @@
             "uid": "tsdb-db"
           },
           "rawQuery": true,
-          "rawSql": "SELECT bucket AS \"time\", tid || ' · ' || stage AS metric, avg_match_confidence AS value\nFROM lidar_scan_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1",
+          "rawSql": "SELECT bucket AS \"time\", tid || ' · ' || stage AS metric, avg_match_confidence AS value\nFROM tsdb.lidar_scan_1m WHERE $__timeFilter(bucket) AND tid IN ($tid) ORDER BY 1",
           "format": "time_series",
           "refId": "A",
           "editorMode": "code"
@@ -1975,7 +1975,7 @@
             "uid": "tsdb-db"
           },
           "rawQuery": true,
-          "rawSql": "SELECT bucket AS \"time\", error_code AS metric, cnt::float AS value\nFROM lidar_error_1m WHERE $__timeFilter(bucket) ORDER BY 1",
+          "rawSql": "SELECT bucket AS \"time\", error_code AS metric, cnt::float AS value\nFROM tsdb.lidar_error_1m WHERE $__timeFilter(bucket) ORDER BY 1",
           "format": "time_series",
           "refId": "A",
           "editorMode": "code"
