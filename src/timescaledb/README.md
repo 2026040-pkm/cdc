@@ -167,7 +167,7 @@ Python · confluent-kafka · psycopg3. 레코드 최대 50개 또는 1초마다 
 
 환경변수는 `kafka.env` 와 `dev/docker-compose.app.yml` 참고.
 
-## 규모 (발행기 기본값 · `intersyslink-v4/tools/mqtt-lidar-sim`)
+## 규모 (발행기 기본값 · `util/mqtt-lidar-sim`)
 
 - 장비 350대 = 조립 210(`assembly1` × `bay1~7`) + 선행의장 140(`outfitting1` × `bay1~7`).
 - 상태 1초/대 = 350 msg/s, 스캔 1분/대 × 13건 = 75.8 msg/s → 합계 약 426 msg/s.
@@ -176,6 +176,18 @@ Python · confluent-kafka · psycopg3. 레코드 최대 50개 또는 1초마다 
 - 오류 코드: E-NET-0007, E-LDR-0101 / 0203 / 0311 / 0402.
 - 공정(stage): 조립 ARRANGEMENT · FITTING · WELDING · INSPECTION, 의장 WIRING · PIPING.
 - 산출물 12건 = 정합 PCD 1 + 변환행렬 1 + 세그먼트 PCD 10.
+
+**MQTT 메시지 426건/초가 Kafka 레코드 426개/초가 아니다.** EES 레코드 하나는 항목 배열이고,
+항목 몇 개로 묶느냐는 발신 측이 정한다. 소비자가 세는 `lidar_ingest_messages_total` 과
+`lidar_ingest_kafka_lag` 는 이 **레코드** 단위다.
+
+| 발신 | 배치 창 | 레코드/초 | 레코드당 항목 |
+|---|---|---|---|
+| ISL EES Kafka Provider | (Provider 설정) | 0.3 ~ 1 | ~210 |
+| `util/mqtt-ees-bridge` | `BATCH_MAX_WAIT_MS=1000` | 3 (토픽마다 1) | status 350 · artifact 70 · actual 6 |
+
+어느 쪽이든 항목(=적재 행)은 초당 426건으로 같다. 브리지의 창을 200ms 로 줄이면 행은 그대로인데
+레코드가 5배로 잘아져 `LidarKafkaLagHigh`(레코드 200개) 가 뜻하는 밀린 시간이 같이 줄어든다.
 
 발행기 옵션(`--status-interval` · `--interval` · `--segments`)을 바꾸면 이 값이 전부 바뀐다.
 페이로드 규격 자체가 ISL 벤더 합의 전 제안 규격이므로, 확정되면 `01-schema.sql` 의 컬럼과

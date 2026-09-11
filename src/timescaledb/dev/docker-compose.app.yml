@@ -37,6 +37,9 @@ services:
       KAFKA_AUTO_OFFSET_RESET: ${KAFKA_AUTO_OFFSET_RESET:-earliest}
       PG_DSN: postgresql://postgres:postgres@timescaledb:5432/lidar
       # 배치: 레코드 N개 또는 대기 M ms 중 먼저 오는 쪽에서 DB 에 쓴다.
+      # 발신이 초당 3레코드(브리지) ~ 1레코드(ISL)라 정상 운전에서는 늘 1000ms 쪽이 먼저 끊는다
+      # — 배치 1개/초 · ~426행. 50개 상한은 밀린 것을 따라잡을 때만 걸린다(~1.8만 행).
+      # 레코드 하나에 항목이 수백 개라 상한을 레코드 수로 잡아 둔 것이지 행 수가 아니다.
       BATCH_MAX_MESSAGES: "50"
       BATCH_MAX_WAIT_MS: "1000"
       METRICS_PORT: "8000"
