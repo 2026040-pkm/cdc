@@ -119,3 +119,26 @@ tags=timescaledb,postgres
     overrides 1건
     A  SELECT j.job_id, j.proc_name, COALESCE(j.hypertable_name, '') AS hypertable, j.schedule_interval::text AS schedule, s.last_run_status, s.last_run_started_at, s.last_run_duration::text AS duration, s.total_runs, s.total_failures, s.next_start FROM timescaledb_information.jobs j LEFT JOIN timescaledb_information.job_stats s ON s.job_id = j.job_id WHERE j.job_id >= 1000 ORDER BY j.job_id
     desc: last_run_status 가 Failed 면 디스크가 안 줄고(압축·보존) 1분 집계가 멈춘다(refresh). config 는 psql 로 본다
+[row] 원천 DB 구성 — rdb · tsdb 스키마 표 전부
+  panel #31 table "원천 lidar DB — rdb · tsdb 스키마 표 전부" @ x0 y48 14x11
+    overrides 3건
+    A  tsdb_object_rows  instant
+    B  tsdb_object_bytes  instant
+    C  tsdb_object_chunks  instant
+    desc: 이 DB 에 실제로 들어 있는 표 전부. captured 가 389beac 가 스키마로 못 박은 경계다 — rdb 는 publication(embedded_cdc_pub)에 들어가 CDC 가 행 단위로 옮기고, tsdb 는 안 옮긴다. 하이퍼테이블은 청크가 주기마다 새 표로 생겨 INS
+  panel #32 stat "스키마별 표 수 — CDC 캡처 / 비캡처" @ x14 y48 5x5
+    decimals=0
+    calc lastNotNull
+    A  count(tsdb_object_rows{captured="yes"})  legend="rdb 캡처"  instant
+    B  count(tsdb_object_rows{captured="no"})  legend="tsdb 비캡처"  instant
+    desc: rdb 는 전부 캡처, tsdb 는 전부 비캡처가 정상이다. 숫자가 어긋나면 publication 을 확인할 것
+  panel #33 stat "스키마별 용량" @ x19 y48 5x5
+    unit=bytes  decimals=1
+    calc lastNotNull
+    A  sum(tsdb_object_bytes{schema="rdb"})  legend="rdb"  instant
+    B  sum(tsdb_object_bytes{schema="tsdb"})  legend="tsdb"  instant
+    desc: tsdb(적재 표)가 rdb 를 압도하는 것이 정상이다 — 원천 DB 디스크는 사실상 lidar_status 가 쓴다
+  panel #34 timeseries "적재 표 행 수 추이 — 세 채널" @ x14 y53 10x6
+    decimals=0
+    A  tsdb_object_rows{kind="hypertable"}  legend="{{table_name}}"
+    desc: status · actual · artifact 세 채널의 하이퍼테이블이 각각 자라는지. 한 선만 평평하면 그 토픽이 안 들어오는 것이다

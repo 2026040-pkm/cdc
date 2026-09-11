@@ -98,6 +98,89 @@ tsdb_rows:
         usage: "GAUGE"
         description: "row count — 하이퍼테이블은 approximate_row_count, 나머지는 정확한 count"
 
+# ── 원천 DB 표 전체 (rdb · tsdb) ────────────────────────────────────────────
+# tsdb_rows 는 적재 경로에 걸린 표 다섯 개만 손으로 세운 목록이라, 스키마를 가른
+# 뒤로는 "이 DB 에 무엇이 들어 있는가" 를 못 보여준다. 이 블록이 rdb·tsdb 두 스키마의
+# 표를 전부 훑어 한 줄씩 낸다 — 대시보드의 "원천 lidar DB" 표가 이것만 본다.
+#
+# kind 가 경계를 그대로 드러낸다.
+#   plain       rdb 의 일반 표. publication 에 들어가 CDC 가 행 단위로 옮긴다
+#   hypertable  tsdb 의 적재 표. 청크가 주기마다 새로 생겨 행 단위 DML 로 안 보인다
+#   caggr       연속 집계. 내부 하이퍼테이블의 크기·청크를 대신 센다
+#
+# captured 는 publication(embedded_cdc_pub) 소속 여부다. 이 라벨이 곧 389beac 가
+# 스키마로 못 박은 "CDC 로 복제되는 표 / 안 되는 표" 경계이고, rdb=yes · tsdb=no 가
+# 아닌 줄이 나오면 publication 에 실수로 뭔가 끼어든 것이다.
+#
+# 5초 스크랩이라 행 수는 하이퍼테이블만 approximate_row_count 로 근사한다.
+# rdb 쪽은 전부 수천 행 이하라 count(*) 정확값을 그대로 쓴다.
+#
+# ⚠️ embedded-cdc-tsdb 의 cdc_source_object 와 같은 표를 본다. 한쪽을 고치면
+#    다른 쪽도 같이 고쳐야 두 스택의 화면이 어긋나지 않는다.
+tsdb_object:
+  query: |
+    SELECT n.nspname AS schema,
+           c.relname AS table_name,
+           (CASE WHEN h.hypertable_name IS NOT NULL THEN 'hypertable' ELSE 'plain' END) AS kind,
+           (CASE WHEN p.tablename IS NOT NULL THEN 'yes' ELSE 'no' END) AS captured,
+           (CASE WHEN h.hypertable_name IS NOT NULL
+                 THEN approximate_row_count(c.oid::regclass)
+                 ELSE (xpath('/row/c/text()',
+                             query_to_xml(format('SELECT count(*) AS c FROM %I.%I', n.nspname, c.relname),
+                                          false, true, '')))[1]::text::bigint
+            END)::float AS rows,
+           (CASE WHEN h.hypertable_name IS NOT NULL
+                 THEN COALESCE(hypertable_size(c.oid::regclass), 0)
+                 ELSE pg_total_relation_size(c.oid)
+            END)::float AS bytes,
+           COALESCE(ch.n, 0)::float AS chunks
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname IN ('rdb', 'tsdb')
+    LEFT JOIN timescaledb_information.hypertables h
+           ON h.hypertable_schema = n.nspname AND h.hypertable_name = c.relname
+    LEFT JOIN pg_publication_tables p
+           ON p.schemaname = n.nspname AND p.tablename = c.relname
+          AND p.pubname = 'embedded_cdc_pub'
+    LEFT JOIN (SELECT hypertable_schema AS s, hypertable_name AS t, count(*) AS n
+                 FROM timescaledb_information.chunks GROUP BY 1, 2) ch
+           ON ch.s = n.nspname AND ch.t = c.relname
+    WHERE c.relkind = 'r'
+    UNION ALL
+    SELECT ca.view_schema,
+           ca.view_name,
+           'caggr',
+           'no',
+           approximate_row_count(format('%I.%I', ca.materialization_hypertable_schema,
+                                        ca.materialization_hypertable_name)::regclass)::float,
+           COALESCE(hypertable_size(format('%I.%I', ca.materialization_hypertable_schema,
+                                           ca.materialization_hypertable_name)::regclass), 0)::float,
+           (SELECT count(*) FROM timescaledb_information.chunks ck
+             WHERE ck.hypertable_schema = ca.materialization_hypertable_schema
+               AND ck.hypertable_name = ca.materialization_hypertable_name)::float
+    FROM timescaledb_information.continuous_aggregates ca
+  metrics:
+    - schema:
+        usage: "LABEL"
+        description: "rdb (CDC 대상) / tsdb (적재 표·연속 집계)"
+    - table_name:
+        usage: "LABEL"
+        description: "table or continuous aggregate name"
+    - kind:
+        usage: "LABEL"
+        description: "plain / hypertable / caggr"
+    - captured:
+        usage: "LABEL"
+        description: "yes = publication(embedded_cdc_pub) 에 들어 있어 CDC 가 옮긴다"
+    - rows:
+        usage: "GAUGE"
+        description: "행 수. plain 은 count(*) 정확값, hypertable·caggr 은 청크 통계 근사값"
+    - bytes:
+        usage: "GAUGE"
+        description: "디스크 크기. hypertable·caggr 은 청크까지 합친 hypertable_size()"
+    - chunks:
+        usage: "GAUGE"
+        description: "청크 수. plain 은 0. 이 수가 늘어나는 것이 곧 행 단위 CDC 가 성립하지 않는 이유다"
+
 # ── 백그라운드 잡 (압축 · 보존 · 연속 집계 갱신) ────────────────────────────
 # 정책이 실패하고 있으면 디스크가 안 줄고 집계가 멈춘다. 대시보드에서 표로 보인다.
 tsdb_job:

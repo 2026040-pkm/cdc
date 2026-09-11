@@ -8,7 +8,7 @@ var $tid query SELECT tid FROM rdb.lidar_device_state ORDER BY tid
     thresholds base:green
     calc lastNotNull
     A  sum(rate(lidar_ingest_rows_inserted_total[1m]))  legend="행/s"
-    desc: lidar_status 에 실제로 INSERT 된 행. 관측 기준 70~210 행/초 (레코드당 ~210 항목 · 1~3초 간격)
+    desc: lidar_status·scan_actual·scan_artifact 에 실제로 INSERT 된 행. 정상은 약 426 행/초 (상태 350 + 산출물 70 + 실적 6)
   panel #2 stat "Kafka 레코드/초" @ x4 y0 4x5
     unit=short  decimals=2
     thresholds base:green
@@ -20,13 +20,13 @@ var $tid query SELECT tid FROM rdb.lidar_device_state ORDER BY tid
     thresholds base:green 50:orange 200:red
     calc lastNotNull
     A  sum(lidar_ingest_kafka_lag)  legend="lag"
-    desc: high watermark − 소비 위치. 200 이면 약 10분치가 밀린 것이다
+    desc: high watermark − 소비 위치. 토픽마다 레코드 1개/초라 200 이면 약 1분치가 밀린 것이다
   panel #4 stat "DB 최신 이벤트 경과" @ x12 y0 4x5
     unit=s  decimals=0
     thresholds base:green 30:orange 120:red
     calc lastNotNull
     A  tsdb_lidar_fleet_freshness_seconds  legend="경과"
-    desc: now() − DB 에 있는 가장 최근 occurred_at. 발신 주기 1~3초라 30초를 넘으면 이상이다
+    desc: now() − DB 에 있는 가장 최근 occurred_at. 상태 발신 주기가 1초/대라 30초를 넘으면 이상이다
   panel #5 stat "중복 스킵 누계" @ x16 y0 4x5
     unit=short  decimals=0
     thresholds base:green
@@ -66,14 +66,14 @@ var $tid query SELECT tid FROM rdb.lidar_device_state ORDER BY tid
     A  histogram_quantile(0.95, sum(rate(lidar_ingest_batch_seconds_bucket[1m])) by (le))  legend="p95"
     B  rate(lidar_ingest_batch_seconds_sum[1m]) / rate(lidar_ingest_batch_seconds_count[1m])  legend="평균"
     C  sum(rate(lidar_ingest_db_errors_total[1m]))  legend="DB 오류/s"
-    desc: INSERT + UPSERT + COMMIT 한 트랜잭션. 배치 하나가 레코드 최대 50개(~10,000행)다
+    desc: INSERT + UPSERT + COMMIT 한 트랜잭션. 정상은 1초 창에 레코드 3개(~426행)이고, 밀렸을 때만 레코드 50개 상한(~1.8만 행)에 닿는다
   panel #11 timeseries "배치 크기 · 빈도" @ x16 y13 8x8
     unit=short
     thresholds base:green
     overrides 1건
     A  rate(lidar_ingest_batch_rows_sum[1m]) / rate(lidar_ingest_batch_rows_count[1m])  legend="행/배치"
     B  sum(rate(lidar_ingest_batches_total[1m]))  legend="배치/s"
-    desc: 정상은 레코드 1~3개 = 배치 1개(~210~630행). 행/배치가 커지면 밀린 것을 몰아서 쓰는 중이다
+    desc: 정상은 레코드 3개(토픽마다 1개) = 배치 1개(~426행) · 배치 1개/초. 행/배치가 커지면 밀린 것을 몰아서 쓰는 중이다
 [row] 장비 상태 — lidar_device_state (장비별 최신 항목)
   panel #13 stat "상태별 장비 수" @ x0 y22 8x5
     unit=short  decimals=0
@@ -87,7 +87,7 @@ var $tid query SELECT tid FROM rdb.lidar_device_state ORDER BY tid
     thresholds base:green 1:orange 10:red
     calc lastNotNull
     A  tsdb_lidar_fleet_stale  legend="stale"
-    desc: 마지막 이벤트가 60초 넘게 안 온 장비. 발신 주기 1~3초라 20회 이상 건너뛴 것이다
+    desc: 마지막 이벤트가 60초 넘게 안 온 장비. 상태 발신 주기가 1초/대라 60회 이상 건너뛴 것이다
   panel #15 stat "전체 장비" @ x12 y22 4x5
     unit=short  decimals=0
     thresholds base:green
@@ -138,3 +138,25 @@ var $tid query SELECT tid FROM rdb.lidar_device_state ORDER BY tid
     thresholds base:green
     A  SELECT bucket AS "time", error_code AS metric, cnt::float AS value FROM tsdb.lidar_error_1m WHERE $__timeFilter(bucket) ORDER BY 1
     desc: error_code 가 붙은 항목 수를 코드별로 1분 집계한 것 (lidar_error_1m). 전체 장비 대상
+[row] 적재 대상 표 — tsdb 세 채널 · rdb 살림살이
+  panel #41 stat "채널별 적재 행 수" @ x0 y65 9x5
+    decimals=0
+    thresholds base:red 1:green
+    calc lastNotNull
+    A  tsdb_object_rows{kind="hypertable"}  legend="{{table_name}}"  instant
+    desc: 토픽 하나가 표 하나다. 한 칸이 0 에 머물면 그 토픽이 안 들어오는 것 — Kafka 컨테이너가 tsdb-net 에 붙어 있는지부터 본다
+  panel #42 timeseries "채널별 표 증가율 (행/초)" @ x9 y65 15x5
+    unit=rowsps  decimals=2
+    A  rate(tsdb_object_rows{kind="hypertable"}[1m])  legend="{{table_name}}"
+    desc: 지표가 아니라 표를 직접 센 값의 기울기다. 파싱은 됐는데 DB 에 안 쌓이는 경우를 여기서 잡는다
+  panel #43 table "적재 대상 표 — 행 수 · 크기 · 청크" @ x0 y70 24x10
+    overrides 3건
+    A  tsdb_object_rows  instant
+    B  tsdb_object_bytes  instant
+    C  tsdb_object_chunks  instant
+    desc: 이 스택이 쓰는 표 전부. tsdb 는 Kafka 에서 들어온 원문이 쌓이는 하이퍼테이블과 그 연속 집계이고, rdb 는 장비 최신 상태(lidar_device_state) · 레코드 대장(lidar_status_message) · 격리(lidar_ingest_reject) · 태그 등
+  panel #44 table "태그 해석 상태 — 채널별 장비 축" @ x0 y80 24x7
+    decimals=0
+    overrides 1건
+    A  SELECT '1 status' AS "채널", count(*) AS "행", count(*) FILTER (WHERE tag_id IS NULL) AS "태그 미해석", count(*) FILTER (WHERE tid LIKE '#%') AS "장비 미해석", count(DISTINCT tid) AS "장비 수" FROM tsdb.lidar_status UNION ALL SELECT '2 actual', count(*), count(*) FILTER (WHERE tag_id IS NULL), count(*) FILTER (WHERE tid LIKE '#%'), count(DISTINCT tid) FROM tsdb.lidar_scan_actual UNION ALL SELECT '3 artifact', count(*), count(*) FILTER (WHERE tag_id IS NULL), count(*) FILTER (WHERE tid LIKE '#%'), count(DISTINCT tid) FROM tsdb.lidar_scan_artifact ORDER BY 1
+    desc: Kafka 는 숫자(content.tid = EES ParameterId)만 싣는다. 그 숫자를 장비로 되돌리는 것이 rdb.lidar_tag_catalog 다. 미해석이 0 이 아니면 카탈로그가 발행 측 ParameterId 와 어긋난 것 — scripts/export-tag-cata

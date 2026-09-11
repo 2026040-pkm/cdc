@@ -77,7 +77,7 @@
       "id": 1,
       "type": "stat",
       "title": "적재 행/초",
-      "description": "lidar_status 에 실제로 INSERT 된 행. 관측 기준 70~210 행/초 (레코드당 ~210 항목 · 1~3초 간격)",
+      "description": "lidar_status·scan_actual·scan_artifact 에 실제로 INSERT 된 행. 정상은 약 426 행/초 (상태 350 + 산출물 70 + 실적 6)",
       "gridPos": {
         "x": 0,
         "y": 0,
@@ -205,7 +205,7 @@
       "id": 3,
       "type": "stat",
       "title": "Kafka 소비 지연 (레코드)",
-      "description": "high watermark − 소비 위치. 200 이면 약 10분치가 밀린 것이다",
+      "description": "high watermark − 소비 위치. 토픽마다 레코드 1개/초라 200 이면 약 1분치가 밀린 것이다",
       "gridPos": {
         "x": 8,
         "y": 0,
@@ -277,7 +277,7 @@
       "id": 4,
       "type": "stat",
       "title": "DB 최신 이벤트 경과",
-      "description": "now() − DB 에 있는 가장 최근 occurred_at. 발신 주기 1~3초라 30초를 넘으면 이상이다",
+      "description": "now() − DB 에 있는 가장 최근 occurred_at. 상태 발신 주기가 1초/대라 30초를 넘으면 이상이다",
       "gridPos": {
         "x": 12,
         "y": 0,
@@ -776,7 +776,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "DB 배치 쓰기 시간",
-      "description": "INSERT + UPSERT + COMMIT 한 트랜잭션. 배치 하나가 레코드 최대 50개(~10,000행)다",
+      "description": "INSERT + UPSERT + COMMIT 한 트랜잭션. 정상은 1초 창에 레코드 3개(~426행)이고, 밀렸을 때만 레코드 50개 상한(~1.8만 행)에 닿는다",
       "gridPos": {
         "x": 8,
         "y": 13,
@@ -871,7 +871,7 @@
       "id": 11,
       "type": "timeseries",
       "title": "배치 크기 · 빈도",
-      "description": "정상은 레코드 1~3개 = 배치 1개(~210~630행). 행/배치가 커지면 밀린 것을 몰아서 쓰는 중이다",
+      "description": "정상은 레코드 3개(토픽마다 1개) = 배치 1개(~426행) · 배치 1개/초. 행/배치가 커지면 밀린 것을 몰아서 쓰는 중이다",
       "gridPos": {
         "x": 16,
         "y": 13,
@@ -1105,7 +1105,7 @@
       "id": 14,
       "type": "stat",
       "title": "60초 무응답 장비",
-      "description": "마지막 이벤트가 60초 넘게 안 온 장비. 발신 주기 1~3초라 20회 이상 건너뛴 것이다",
+      "description": "마지막 이벤트가 60초 넘게 안 온 장비. 상태 발신 주기가 1초/대라 60회 이상 건너뛴 것이다",
       "gridPos": {
         "x": 8,
         "y": 22,
@@ -2022,6 +2022,361 @@
           "mode": "multi",
           "sort": "desc"
         }
+      }
+    },
+    {
+      "id": 40,
+      "type": "row",
+      "collapsed": false,
+      "title": "적재 대상 표 — tsdb 세 채널 · rdb 살림살이",
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 41,
+      "type": "stat",
+      "title": "채널별 적재 행 수",
+      "description": "토픽 하나가 표 하나다. 한 칸이 0 에 머물면 그 토픽이 안 들어오는 것 — Kafka 컨테이너가 tsdb-net 에 붙어 있는지부터 본다",
+      "gridPos": {
+        "x": 0,
+        "y": 65,
+        "w": 9,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tsdb-prom"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tsdb_object_rows{kind=\"hypertable\"}",
+          "legendFormat": "{{table_name}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 1,
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 42,
+      "type": "timeseries",
+      "title": "채널별 표 증가율 (행/초)",
+      "description": "지표가 아니라 표를 직접 센 값의 기울기다. 파싱은 됐는데 DB 에 안 쌓이는 경우를 여기서 잡는다",
+      "gridPos": {
+        "x": 9,
+        "y": 65,
+        "w": 15,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tsdb-prom"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(tsdb_object_rows{kind=\"hypertable\"}[1m])",
+          "legendFormat": "{{table_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rowsps",
+          "decimals": 2,
+          "custom": {
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 43,
+      "type": "table",
+      "title": "적재 대상 표 — 행 수 · 크기 · 청크",
+      "description": "이 스택이 쓰는 표 전부. tsdb 는 Kafka 에서 들어온 원문이 쌓이는 하이퍼테이블과 그 연속 집계이고, rdb 는 장비 최신 상태(lidar_device_state) · 레코드 대장(lidar_status_message) · 격리(lidar_ingest_reject) · 태그 등록부(lidar_tag_catalog) 같은 살림살이다. CDC 캡처 열이 곧 embedded-cdc 가 가져가는 범위다.",
+      "gridPos": {
+        "x": 0,
+        "y": 70,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tsdb-prom"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tsdb_object_rows",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "expr": "tsdb_object_bytes",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "expr": "tsdb_object_chunks",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "server": true
+            },
+            "renameByName": {}
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "renameByName": {
+              "schema": "스키마",
+              "table_name": "표",
+              "kind": "종류",
+              "captured": "CDC 캡처",
+              "Value #A": "행 수",
+              "Value #B": "크기",
+              "Value #C": "청크"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "크기"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "행 수"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CDC 캡처"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "yes": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "yes (rdb)"
+                      },
+                      "no": {
+                        "color": "blue",
+                        "index": 1,
+                        "text": "no (tsdb)"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "크기",
+            "desc": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 44,
+      "type": "table",
+      "title": "태그 해석 상태 — 채널별 장비 축",
+      "description": "Kafka 는 숫자(content.tid = EES ParameterId)만 싣는다. 그 숫자를 장비로 되돌리는 것이 rdb.lidar_tag_catalog 다. 미해석이 0 이 아니면 카탈로그가 발행 측 ParameterId 와 어긋난 것 — scripts/export-tag-catalog.py 로 다시 내보낸 뒤 down -v 로 볼륨을 지워야 반영된다. 채널 불일치는 숫자가 다른 채널 태그로 풀렸다는 뜻이라 장비 축을 믿을 수 없다.",
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "tsdb-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "format": "table",
+          "editorMode": "code",
+          "rawSql": "SELECT '1 status' AS \"채널\", count(*) AS \"행\", count(*) FILTER (WHERE tag_id IS NULL) AS \"태그 미해석\", count(*) FILTER (WHERE tid LIKE '#%') AS \"장비 미해석\", count(DISTINCT tid) AS \"장비 수\"\nFROM tsdb.lidar_status\nUNION ALL\nSELECT '2 actual', count(*), count(*) FILTER (WHERE tag_id IS NULL), count(*) FILTER (WHERE tid LIKE '#%'), count(DISTINCT tid)\nFROM tsdb.lidar_scan_actual\nUNION ALL\nSELECT '3 artifact', count(*), count(*) FILTER (WHERE tag_id IS NULL), count(*) FILTER (WHERE tid LIKE '#%'), count(DISTINCT tid)\nFROM tsdb.lidar_scan_artifact\nORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*미해석"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "value": null,
+                      "color": "green"
+                    },
+                    {
+                      "value": 1,
+                      "color": "red"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": []
       }
     }
   ]
