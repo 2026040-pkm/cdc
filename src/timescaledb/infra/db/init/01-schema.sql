@@ -267,6 +267,119 @@ CREATE TABLE rdb.lidar_device_state (
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ── 블록별 공정 진행 (actual 채널) ──────────────────────────────────────────
+-- 축은 (hull_no, block_id) 다. stage 를 키에 넣지 않는다 — 그러면 블록 하나가 공정 수만큼
+-- 행으로 쪼개져 표가 계속 자라고, 결국 하이퍼테이블의 사본이 된다. 공정은 키가 아니라
+-- **마일스톤 컬럼**으로 눕힌다. 블록 하나 = 한 행이고, 공정을 지날 때마다 그 행이 갱신된다.
+--
+-- 이 축이 유계인 근거: 발행기에서 hull_no·block_id 는 장비 Index 로 고정된다
+-- (lidar-sim.cs — H{1200+Index%40} · B{100+Index%90}{P|S}). 장비 350대가 곧 블록 349개이고
+-- 새 블록은 생기지 않는다. 그래서 이 표는 349행에서 멈추고 그 뒤로는 UPDATE 만 일어난다.
+-- 반대로 tsdb.lidar_scan_actual 은 시간에 비례해 무한히 자란다 — 그 차이가 두 스키마의 역할이다.
+--
+-- 마일스톤은 GREATEST 로 갱신한다. PostgreSQL 의 GREATEST 는 NULL 을 무시하므로
+-- "아직 안 끝난 공정(NULL)" 과 "이미 끝난 공정" 이 한 식으로 처리되고, 늦게 도착한
+-- 재전달이 먼저 온 완료 시각을 되돌리지 못한다. 순서에 기대지 않는다.
+CREATE TABLE rdb.lidar_block_progress (
+    hull_no                  TEXT NOT NULL,
+    block_id                 TEXT NOT NULL,
+
+    -- 블록이 놓인 자리. 마지막으로 관측된 값이다.
+    site                     TEXT,
+    zone                     TEXT,                  -- ASSEMBLY · OUTFITTING
+    shop                     TEXT,
+    bay                      TEXT,
+
+    -- 진행 중인 공정 — 가장 최근 이벤트의 값
+    current_stage            TEXT,
+    current_event_type       TEXT,                  -- START · PROGRESS · COMPLETE
+    current_progress_rate    DOUBLE PRECISION,
+    current_match_confidence DOUBLE PRECISION,
+    current_scan_id          TEXT,
+    current_tid              TEXT,                  -- 그 스캔을 올린 장비
+    reference_cad_id         TEXT,
+    model_version            TEXT,
+
+    -- 공정 마일스톤 — COMPLETE 를 받은 시각. NULL 이면 아직 안 끝났다.
+    -- 조립 4종 · 의장 2종이고 구역마다 지나는 공정이 다르다(Zones.StagesOf).
+    -- 그래서 한 블록은 여섯 중 넷 또는 둘만 채워진다.
+    arrangement_completed_at TIMESTAMPTZ,
+    fitting_completed_at     TIMESTAMPTZ,
+    welding_completed_at     TIMESTAMPTZ,
+    inspection_completed_at  TIMESTAMPTZ,
+    wiring_completed_at      TIMESTAMPTZ,
+    piping_completed_at      TIMESTAMPTZ,
+
+    -- 끝난 공정 수. 여섯 컬럼에서 바로 나오므로 생성 컬럼으로 둔다 — ingest 가 따로 세지
+    -- 않고, 수신 측에도 같은 정의가 있어 둘이 어긋날 수 없다. 그래서 CDC 로 옮기지 않는다.
+    completed_stage_count    SMALLINT GENERATED ALWAYS AS (
+        num_nonnulls(arrangement_completed_at, fitting_completed_at, welding_completed_at,
+                     inspection_completed_at, wiring_completed_at, piping_completed_at)
+    ) STORED,
+
+    -- 누계
+    event_count              BIGINT      NOT NULL DEFAULT 0,
+    complete_count           BIGINT      NOT NULL DEFAULT 0,
+    max_progress_rate        DOUBLE PRECISION,
+
+    first_event_at           TIMESTAMPTZ NOT NULL,
+    last_event_at            TIMESTAMPTZ NOT NULL,
+    updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (hull_no, block_id)
+);
+
+CREATE INDEX lidar_block_progress_last_event_idx ON rdb.lidar_block_progress (last_event_at DESC);
+CREATE INDEX lidar_block_progress_stage_idx      ON rdb.lidar_block_progress (current_stage);
+
+-- ── 블록별 산출물 대장 (artifact 채널) ──────────────────────────────────────
+-- 같은 블록 축이지만 모양이 다르다. 실적은 "어디까지 갔나(상태 머신)" 이고
+-- 산출물은 "무엇이 몇 개 · 얼마나 나왔나(대장)" 라, 종류 셋을 건수·용량 컬럼으로 눕힌다.
+-- artifact_type 을 키에 넣지 않는 이유는 위 stage 와 같다.
+--
+-- 종류 셋은 계약이 고정한 값이다(ARTIFACT_TYPES — REGISTERED_PCD · TRANSFORMATION_MATRIX ·
+-- SEGMENTED_PCD). SEGMENTED_PCD 만 한 스캔이 여러 건(SEG-001…)을 내므로 건수가 가장 크다.
+-- TRANSFORMATION_MATRIX 는 행렬 값이라 파일 크기가 없어 bytes 컬럼을 두지 않는다.
+CREATE TABLE rdb.lidar_block_artifact (
+    hull_no                     TEXT NOT NULL,
+    block_id                    TEXT NOT NULL,
+
+    -- 종류별 대장
+    registered_pcd_count        BIGINT NOT NULL DEFAULT 0,
+    registered_pcd_bytes        BIGINT NOT NULL DEFAULT 0,
+    transformation_matrix_count BIGINT NOT NULL DEFAULT 0,
+    segmented_pcd_count         BIGINT NOT NULL DEFAULT 0,
+    segmented_pcd_bytes         BIGINT NOT NULL DEFAULT 0,
+
+    -- 세 종류가 다 왔는가. 한 스캔이 내는 산출물 한 벌이 갖춰졌다는 뜻이다.
+    -- completed_stage_count 와 같은 이유로 생성 컬럼이고 CDC 로 옮기지 않는다.
+    is_complete_set             BOOLEAN GENERATED ALWAYS AS (
+        registered_pcd_count > 0 AND transformation_matrix_count > 0 AND segmented_pcd_count > 0
+    ) STORED,
+
+    -- 가장 최근 산출물
+    latest_artifact_type        TEXT,
+    latest_scan_id              TEXT,
+    latest_segment_id           TEXT,               -- SEGMENTED_PCD 일 때만 값이 있다
+    latest_storage_uri          TEXT,
+    latest_checksum             TEXT,
+    latest_file_size_bytes      BIGINT,
+    produced_by_device_id       TEXT,               -- 산출물을 만든 추론 서버
+    latest_tid                  TEXT,
+    model_version               TEXT,
+
+    -- 합계
+    artifact_count              BIGINT      NOT NULL DEFAULT 0,
+    total_bytes                 BIGINT      NOT NULL DEFAULT 0,
+
+    first_event_at              TIMESTAMPTZ NOT NULL,
+    last_event_at               TIMESTAMPTZ NOT NULL,
+    updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (hull_no, block_id)
+);
+
+CREATE INDEX lidar_block_artifact_last_event_idx ON rdb.lidar_block_artifact (last_event_at DESC);
+CREATE INDEX lidar_block_artifact_scan_idx       ON rdb.lidar_block_artifact (latest_scan_id);
+
 -- ── 격리 ────────────────────────────────────────────────────────────────────
 -- 항목 하나가 깨졌다고 레코드 전체를 버리지 않는다. 깨진 것만 여기로 보내고
 -- 나머지는 적재한다. 운영자가 들여다보는 표라 일반 테이블이다.

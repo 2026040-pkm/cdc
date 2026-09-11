@@ -36,16 +36,27 @@ ALTER TABLE rdb.lidar_device_state   REPLICA IDENTITY FULL;
 ALTER TABLE rdb.lidar_status_message REPLICA IDENTITY FULL;
 ALTER TABLE rdb.lidar_ingest_reject  REPLICA IDENTITY FULL;
 ALTER TABLE rdb.lidar_tag_catalog    REPLICA IDENTITY FULL;
+ALTER TABLE rdb.lidar_block_progress     REPLICA IDENTITY FULL;
+ALTER TABLE rdb.lidar_block_artifact REPLICA IDENTITY FULL;
 
 -- 최초 snapshot 읽기 권한
 GRANT SELECT ON rdb.lidar_device_state, rdb.lidar_status_message,
-                rdb.lidar_ingest_reject, rdb.lidar_tag_catalog TO cdc_user;
+                rdb.lidar_ingest_reject, rdb.lidar_tag_catalog,
+                rdb.lidar_block_progress, rdb.lidar_block_artifact TO cdc_user;
 
 -- 표를 열거하는 대신 ALTER PUBLICATION embedded_cdc_pub ADD TABLES IN SCHEMA rdb 로
 -- 스키마째 실을 수도 있다(PG15+). 그러면 rdb 에 표가 늘어도 저절로 따라오고 하이퍼테이블은
 -- 구조적으로 못 들어온다. 안 쓰는 이유는 소유권이다 — 이 publication 은 위 공유 파일에서
 -- 이미 cdc_user(비 superuser) 소유로 넘어갔고, 스키마 단위 항목을 가진 publication 은
 -- superuser 소유여야 한다. 열거로 두고, 표가 늘면 여기를 같이 고친다.
+-- 채널마다 상태 표가 하나씩이고, 셀 다 축과 모양이 다르다.
+--   status    lidar_device_state    장비 축(tid)         최신 측정치
+--   actual    lidar_block_progress  블록 축(hull, block)  공정 마일스톤
+--   artifact  lidar_block_artifact  블록 축(hull, block)  종류별 대장
+-- 셀 다 행 수가 유계다(350 · 349 · 349). 원문이 쌓이는 하이퍼테이블은 못 싣지만
+-- 그것을 유계 축으로 접은 상태 표는 일반 표라 실릴 수 있다. 수신 측이 세 채널을
+-- 모두 보게 되는 것이 이 셋 덕분이다.
 ALTER PUBLICATION embedded_cdc_pub
     ADD TABLE rdb.lidar_device_state, rdb.lidar_status_message,
-              rdb.lidar_ingest_reject, rdb.lidar_tag_catalog;
+              rdb.lidar_ingest_reject, rdb.lidar_tag_catalog,
+              rdb.lidar_block_progress, rdb.lidar_block_artifact;

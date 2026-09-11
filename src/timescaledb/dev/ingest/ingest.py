@@ -179,6 +179,92 @@ UPSERT_STATE = f"""
         updated_at = now()
     WHERE EXCLUDED.last_event_at > lidar_device_state.last_event_at
 """
+# actual·artifact 의 상태 표. 축은 (hull_no, block_id) 하나이고 stage·artifact_type 은
+# 키가 아니라 컬럼으로 눕는다 — 근거는 01-schema.sql 주석(그러지 않으면 상태 표가
+# 하이퍼테이블의 사본이 된다). 두 표는 축만 같고 모양이 다르므로 UPSERT 도 따로 쓴다.
+#
+# 갱신 규칙이 컬럼 성격마다 셋으로 갈린다.
+#   최신 값  늦게 온 재전달이 덮지 못하도록 last_event_at 비교를 CASE 로 건다
+#   누계    도착 순서와 무관하므로 조건 없이 더한다 (배치 안에서 먼저 합쳐 온다)
+#   마일스톤 GREATEST 로 민다. PostgreSQL 의 GREATEST 는 NULL 을 무시하므로 아직 안 끝난
+#           공정(NULL)과 이미 끝난 공정이 한 식으로 처리되고 되돌려지지도 않는다
+# device_state 는 최신 값만 있어 ON CONFLICT ... WHERE 한 줄로 끝나지만 여기서는 못 쓴다 —
+# WHERE 로 행 전체를 막으면 늦게 온 이벤트의 누계와 마일스톤까지 같이 버려진다.
+#
+# CASE 를 컬럼마다 늘어놓는 대신 여기서 만든다. ON CONFLICT DO UPDATE 는 FROM 절을
+# 못 받아 비교식에 별칭을 달 수 없어, 같은 비교를 컬럼 수만큼 손으로 베껴야 하기 때문이다.
+# 한 줄만 틀려도 그 컬럼만 조용히 안 바뀐다.
+def upsert_state_sql(table, keys, latest_cols, sum_cols, max_cols=(), milestone_cols=()):
+    """
+    (키, 최신 값, 누계, 최댓값, 마일스톤) → 상태 표 UPSERT SQL.
+
+    max_cols 는 GREATEST 로 밀되 의미가 '관측된 최댓값'인 컬럼이고(max_progress_rate),
+    milestone_cols 는 같은 GREATEST 지만 의미가 '그 일이 일어난 시각'인 컬럼이다.
+    식이 같아 한데 묶어도 되지만, 읽는 쪽이 둘을 구별해야 해서 이름을 나눠 둔다.
+    """
+    greatest = list(max_cols) + list(milestone_cols)
+    cols = ", ".join(list(keys) + list(latest_cols) + list(sum_cols) + greatest
+                     + ["first_event_at", "last_event_at"])
+    newer = f"EXCLUDED.last_event_at > {table}.last_event_at"
+    sets = [f"{c} = CASE WHEN {newer} THEN EXCLUDED.{c} ELSE {table}.{c} END" for c in latest_cols]
+    sets += [f"{c} = {table}.{c} + EXCLUDED.{c}" for c in sum_cols]
+    sets += [f"{c} = GREATEST({table}.{c}, EXCLUDED.{c})" for c in greatest]
+    sets += [
+        f"first_event_at = LEAST({table}.first_event_at, EXCLUDED.first_event_at)",
+        f"last_event_at = GREATEST({table}.last_event_at, EXCLUDED.last_event_at)",
+        "updated_at = now()",
+    ]
+    key_list = ", ".join(keys)
+    set_clause = (",\n            ").join(sets)
+    return f"""
+        INSERT INTO {table} ({cols}, updated_at)
+        SELECT {cols}, now() FROM json_populate_recordset(NULL::{table}, %s::json)
+        ON CONFLICT ({key_list}) DO UPDATE SET
+            {set_clause}
+    """
+
+
+# 공정 이름 → 마일스톤 컬럼. 조립 4종·의장 2종이고 구역마다 지나는 공정이 다르다
+# (lidar-sim.cs Zones.StagesOf). 계약에 공정이 늘면 여기와 01-schema.sql 을 같이 고친다.
+STAGE_MILESTONE = {
+    "ARRANGEMENT": "arrangement_completed_at",
+    "FITTING": "fitting_completed_at",
+    "WELDING": "welding_completed_at",
+    "INSPECTION": "inspection_completed_at",
+    "WIRING": "wiring_completed_at",
+    "PIPING": "piping_completed_at",
+}
+
+BLOCK_KEYS = ["hull_no", "block_id"]
+
+PROGRESS_LATEST = [
+    "site", "zone", "shop", "bay", "current_stage", "current_event_type",
+    "current_progress_rate", "current_match_confidence", "current_scan_id", "current_tid",
+    "reference_cad_id", "model_version",
+]
+UPSERT_BLOCK_PROGRESS = upsert_state_sql(
+    "rdb.lidar_block_progress", BLOCK_KEYS, PROGRESS_LATEST,
+    sum_cols=["event_count", "complete_count"],
+    max_cols=["max_progress_rate"],
+    milestone_cols=sorted(STAGE_MILESTONE.values()),
+)
+
+# 산출물은 종류 셋이 건수·용량 컬럼으로 눕는다. 전부 누계라 조건 없이 더한다.
+ARTIFACT_SUMS = [
+    "registered_pcd_count", "registered_pcd_bytes",
+    "transformation_matrix_count",
+    "segmented_pcd_count", "segmented_pcd_bytes",
+    "artifact_count", "total_bytes",
+]
+ARTIFACT_LATEST = [
+    "latest_artifact_type", "latest_scan_id", "latest_segment_id", "latest_storage_uri",
+    "latest_checksum", "latest_file_size_bytes", "produced_by_device_id", "latest_tid",
+    "model_version",
+]
+UPSERT_BLOCK_ARTIFACT = upsert_state_sql(
+    "rdb.lidar_block_artifact", BLOCK_KEYS, ARTIFACT_LATEST, sum_cols=ARTIFACT_SUMS)
+
+
 INSERT_MESSAGE = """
     INSERT INTO rdb.lidar_status_message
         (kafka_partition, kafka_offset, kafka_ts, kafka_topic, uniqueid, msg_ts, message_version,
@@ -595,6 +681,118 @@ def state_rows_of(status_rows):
     ]
 
 
+def block_rows(channel_rows, latest_map, sums, maxes=None, milestone=None):
+    """
+    배치 안 항목을 블록 축으로 합쳐 상태 표에 넣을 행으로 만든다.
+
+    같은 블록이 한 배치에 여러 번 나오는 것은 흔하다 — 산출물은 한 스캔이 12건을 낸다.
+    그대로 넘기면 ON CONFLICT 가 "cannot affect row a second time" 으로 배치를 통째로
+    죽인다. 그래서 여기서 먼저 합친다. 합치는 규칙은 SQL 쪽과 같아야 한다 —
+    최신 값은 time 이 가장 큰 항목의 것, 누계는 덧셈, 최댓값·마일스톤은 GREATEST.
+
+    latest_map  {상태 표 컬럼: 항목 키}  이름이 다른 컬럼이 있어 매핑으로 받는다
+    sums        {컬럼: 항목 하나가 더할 값을 내는 함수}
+    maxes       {컬럼: 항목에서 값을 꺼내는 함수}
+    milestone   항목 → {마일스톤 컬럼: 시각} 또는 None
+    """
+    maxes = maxes or {}
+    merged = {}
+    for row, _ in channel_rows:
+        key = (row["hull_no"], row["block_id"])
+        at = row["time"]
+        cur = merged.get(key)
+        if cur is None:
+            cur = {"hull_no": key[0], "block_id": key[1]}
+            cur.update({c: None for c in latest_map})
+            cur.update({c: 0 for c in sums})
+            cur.update({c: None for c in maxes})
+            cur["first_event_at"] = at
+            cur["last_event_at"] = None
+            cur["_latest_at"] = None
+            merged[key] = cur
+        for col, fn in sums.items():
+            cur[col] += fn(row)
+        for col, fn in maxes.items():
+            v = fn(row)
+            if v is not None and (cur[col] is None or v > cur[col]):
+                cur[col] = v
+        if milestone is not None:
+            for col, ts in milestone(row).items():
+                if ts is not None and (cur.get(col) is None or ts > cur[col]):
+                    cur[col] = ts
+        if cur["first_event_at"] is None or (at is not None and at < cur["first_event_at"]):
+            cur["first_event_at"] = at
+        if cur["_latest_at"] is None or (at is not None and at >= cur["_latest_at"]):
+            cur["_latest_at"] = at
+            cur["last_event_at"] = at
+            for col, src in latest_map.items():
+                cur[col] = row.get(src)
+    for cur in merged.values():
+        del cur["_latest_at"]
+        # 이 배치가 건드리지 않은 마일스톤은 키 자체를 빼서 NULL 로 보낸다.
+        # json_populate_recordset 이 없는 키를 NULL 로 채우고, SQL 의 GREATEST 가 그 NULL 을
+        # 무시하므로 이미 기록된 완료 시각이 덮이지 않는다.
+    return list(merged.values())
+
+
+def progress_rows(actual_rows):
+    """actual 항목 → rdb.lidar_block_progress 행. 공정은 마일스톤 컬럼으로 눕는다."""
+    def milestones(r):
+        # COMPLETE 를 받은 공정만 그 시각을 남긴다. 계약에 없는 공정 이름이 오면
+        # 조용히 버리지 않고 그냥 무시한다 — 마일스톤이 안 찍힐 뿐 적재는 계속된다.
+        if r.get("event_type") != "COMPLETE":
+            return {}
+        col = STAGE_MILESTONE.get((r.get("stage") or "").upper())
+        return {col: r["time"]} if col else {}
+
+    return block_rows(
+        actual_rows,
+        latest_map={
+            "site": "site", "zone": "zone", "shop": "shop", "bay": "bay",
+            "current_stage": "stage", "current_event_type": "event_type",
+            "current_progress_rate": "block_progress_rate",
+            "current_match_confidence": "match_confidence",
+            "current_scan_id": "scan_id", "current_tid": "tid",
+            "reference_cad_id": "reference_cad_id", "model_version": "model_version",
+        },
+        sums={
+            "event_count": lambda r: 1,
+            "complete_count": lambda r: 1 if r.get("event_type") == "COMPLETE" else 0,
+        },
+        maxes={"max_progress_rate": lambda r: r.get("block_progress_rate")},
+        milestone=milestones,
+    )
+
+
+def artifact_rows(artifact_rows_in):
+    """artifact 항목 → rdb.lidar_block_artifact 행. 종류 셋이 건수·용량 컬럼으로 눕는다."""
+    def is_type(name):
+        return lambda r: 1 if r.get("artifact_type") == name else 0
+
+    def bytes_of(name):
+        return lambda r: (r.get("file_size_bytes") or 0) if r.get("artifact_type") == name else 0
+
+    return block_rows(
+        artifact_rows_in,
+        latest_map={
+            "latest_artifact_type": "artifact_type", "latest_scan_id": "scan_id",
+            "latest_segment_id": "segment_id", "latest_storage_uri": "storage_uri",
+            "latest_checksum": "checksum", "latest_file_size_bytes": "file_size_bytes",
+            "produced_by_device_id": "produced_by_device_id", "latest_tid": "tid",
+            "model_version": "model_version",
+        },
+        sums={
+            "registered_pcd_count": is_type("REGISTERED_PCD"),
+            "registered_pcd_bytes": bytes_of("REGISTERED_PCD"),
+            "transformation_matrix_count": is_type("TRANSFORMATION_MATRIX"),
+            "segmented_pcd_count": is_type("SEGMENTED_PCD"),
+            "segmented_pcd_bytes": bytes_of("SEGMENTED_PCD"),
+            "artifact_count": lambda r: 1,
+            "total_bytes": lambda r: r.get("file_size_bytes") or 0,
+        },
+    )
+
+
 def write_batch(conn, rows, rejects, message_rows):
     """한 트랜잭션. 성공하면 (표별 insert 수, 전체 insert 수)."""
     inserted = {}
@@ -609,6 +807,13 @@ def write_batch(conn, rows, rejects, message_rows):
                 inserted[table] = cur.rowcount
             if rows[CH_STATUS]:
                 cur.execute(UPSERT_STATE, (json.dumps(state_rows_of(rows[CH_STATUS])),))
+            # 채널마다 상태 표가 하나씩 있다. status 는 장비 축, 나머지 둘은 블록 축이다.
+            if rows[CH_ACTUAL]:
+                cur.execute(UPSERT_BLOCK_PROGRESS,
+                            (json.dumps(progress_rows(rows[CH_ACTUAL]), default=str),))
+            if rows[CH_ARTIFACT]:
+                cur.execute(UPSERT_BLOCK_ARTIFACT,
+                            (json.dumps(artifact_rows(rows[CH_ARTIFACT]), default=str),))
             if rejects:
                 cur.executemany(INSERT_REJECT, rejects)
             if message_rows:
