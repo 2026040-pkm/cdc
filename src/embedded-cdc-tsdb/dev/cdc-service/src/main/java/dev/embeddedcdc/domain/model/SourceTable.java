@@ -32,6 +32,13 @@ public enum SourceTable {
     LIDAR_STATUS_MESSAGE("lidar_status_message"),
     LIDAR_INGEST_REJECT("lidar_ingest_reject"),
 
+    // 하이퍼테이블을 블록 축(hull_no, block_id)으로 접은 상태 표. 둘은 축만 같고
+    // 모양이 다르다 — 실적은 공정 마일스톤, 산출물은 종류별 대장이다.
+    // 원문은 못 옮겨도 현재 상태는 옮길 수 있다 — 수신 측이 actual·artifact 두 채널을
+    // 보게 되는 유일한 경로다. 축이 장비(tid)가 아닌 이유는 원천 01-schema.sql 주석 참고.
+    LIDAR_BLOCK_PROGRESS("lidar_block_progress"),
+    LIDAR_BLOCK_ARTIFACT("lidar_block_artifact"),
+
     // Kafka 는 장비 id 를 싣지 않고 EES ParameterId(숫자)만 싣는다. 그 숫자를 장비로
     // 되돌리는 등록부 사본이다 — 수신 측에서도 tid 를 읽으려면 같이 와야 한다.
     // 태그를 다시 등록할 때만 바뀌므로 변경량은 사실상 0 이다.
