@@ -153,7 +153,7 @@ return 0;
 
 async Task StatusLoop(Device device)
 {
-    var offset = opt.StatusIntervalMs * (double)device.Index / fleet.Length;
+    var offset = opt.Burst ? 0 : opt.StatusIntervalMs * (double)device.Index / fleet.Length;
     try
     {
         await Task.Delay(TimeSpan.FromMilliseconds(offset), shutdown.Token);
@@ -174,7 +174,7 @@ async Task StatusLoop(Device device)
 
 async Task ScanLoop(Device device)
 {
-    var offset = opt.IntervalMs * (double)device.Index / fleet.Length;
+    var offset = opt.Burst ? 0 : opt.IntervalMs * (double)device.Index / fleet.Length;
     try
     {
         await Task.Delay(TimeSpan.FromMilliseconds(offset), shutdown.Token);
@@ -191,7 +191,7 @@ async Task ScanLoop(Device device)
                 await Publish(m);
 
                 // 한 스캔의 13건은 파이프라인을 타고 순서대로 나오는 것이라 동시에 터지지 않는다.
-                if (opt.StaggerMs > 0)
+                if (!opt.Burst && opt.StaggerMs > 0)
                 {
                     await Task.Delay(opt.StaggerMs, shutdown.Token);
                 }
@@ -881,6 +881,7 @@ sealed record Options(
     int IntervalMs,
     int StatusIntervalMs,
     int StaggerMs,
+    bool Burst,
     int SegmentCount,
     string EdgeGroupId,
     int Qos,
@@ -904,6 +905,7 @@ sealed record Options(
         var interval = 60_000;         // 스캔(실적·산출물) 1분/대
         var statusInterval = 1_000;    // 상태 1초/대 - cdc 검토문서의 D1 수집 주기
         var stagger = 150;
+        var burst = false;         // 켜면 350대가 같은 순간에 한꺼번에 발행한다.
         var segments = 10;             // 스캔당 세그먼트 5~20 가정의 중앙값
         var edgeGroupId = "edge.mqtt.p3.ot";   // Aspire Program.cs 의 MQTT Agent 그룹
         var qos = 1;
@@ -935,6 +937,7 @@ sealed record Options(
                 case "--interval": interval = NextInt("--interval"); break;
                 case "--status-interval": statusInterval = NextInt("--status-interval"); break;
                 case "--stagger": stagger = NextInt("--stagger"); break;
+                case "--burst": burst = true; break;
                 case "--segments": segments = NextInt("--segments"); break;
                 case "--edge-group-id": edgeGroupId = Next("--edge-group-id"); break;
                 case "--qos": qos = NextInt("--qos"); break;
@@ -971,7 +974,7 @@ sealed record Options(
         }
 
         return new Options(host, port, assembly, outfitting, bays, site, siteCode,
-            interval, statusInterval, stagger, segments, edgeGroupId, qos, retain, protocol, clientId, user, pass, dryRun, exportTags);
+            interval, statusInterval, stagger, burst, segments, edgeGroupId, qos, retain, protocol, clientId, user, pass, dryRun, exportTags);
     }
 
     private static void PrintHelp() => Console.WriteLine("""
@@ -987,6 +990,7 @@ sealed record Options(
           --interval <ms>         장비당 스캔 주기(ms)     (기본 60000 = 1분)
           --status-interval <ms>  장비당 상태 주기(ms)     (기본 1000 = 1초)
           --stagger <ms>          한 스캔 안 메시지 간격   (기본 150)
+          --burst                 장비별 시차 없이 전 장비 동시 발행
           --segments <n>          스캔당 세그먼트 PCD 수   (기본 10)
           --qos <0|1|2>           QoS                      (기본 1)
           --retain                retain 플래그
