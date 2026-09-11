@@ -1,0 +1,158 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# mqtt-ees-bridge — EMQX(LiDAR 350대) → Kafka(EES Provider 형식) + Kafka UI
+#
+# InterSysLink 의 Agent + EES Kafka Provider 자리를 대신한다. Aspire 를 띄우지 않고도
+# ot.lidar.* 세 토픽이 같은 모양으로 채워진다.
+#
+#   scripts/up.ps1 (또는 up.sh)   # 스택 기동 + 토픽 생성 (--tsdb 면 tsdb-net 에도 붙인다)
+#   scripts/down.ps1 [-v]         # 정지 (-v 면 볼륨까지)
+#   scripts/verify.ps1            # 지표·오프셋으로 흐르는지 확인
+#
+# 포트는 61xxx 대를 쓴다 — 다른 스택이 56xxx~60xxx 를 이미 쓰고 있다.
+#   61092 Kafka(호스트에서 접속)   61080 Kafka UI   61090 브리지 지표
+#
+# 브로커 이름이 왜 kafka 인가: 수신 측 스택(src/timescaledb)이 kafka:9093 을 찾는다.
+# 그 이름 그대로 광고하므로, 이 브로커를 tsdb-net 에 alias kafka 로 붙이기만 하면
+# 소비자 설정을 한 줄도 안 고치고 Aspire Kafka 대신 이쪽을 읽게 된다.
+# ─────────────────────────────────────────────────────────────────────────────
+name: mqtt-ees-bridge
+
+networks:
+  ees-net:
+    name: ees-net
+
+volumes:
+  ees-kafka-data:
+  ees-bridge-state:
+
+services:
+  # ── Kafka (KRaft 단일 노드) ─────────────────────────────────────────
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: ees-kafka
+    networks: [ees-net]
+    ports:
+      - "61092:61092"   # 호스트에서 붙을 때. 컨테이너끼리는 kafka:9093
+    environment:
+      CLUSTER_ID: "4L6g3nShT-eMCtK--X86sw"
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9091"
+      KAFKA_LISTENERS: "CONTROLLER://:9091,INTERNAL://:9093,EXTERNAL://:61092"
+      # INTERNAL 이 kafka:9093 인 것이 핵심이다 — 수신 측이 그 이름으로 붙는다.
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka:9093,EXTERNAL://localhost:61092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      # 토픽은 kafka-init 이 만든다. 오타 난 토픽이 조용히 생기는 것을 막는다.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+      # 상태 채널이 초당 350건이다. 보존을 짧게 잡아 podman VM 디스크를 지킨다.
+      KAFKA_LOG_RETENTION_HOURS: "24"
+      KAFKA_LOG_RETENTION_BYTES: "2147483648"
+      # podman machine 메모리가 2GiB 다. 기본 힙(1G)을 그대로 두면 다른 스택과 부딪힌다.
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+      TZ: Asia/Seoul
+    volumes:
+      - ees-kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9093 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  # ── 토픽 생성 (한 번 돌고 끝난다) ───────────────────────────────────
+  # 파티션이 1인 이유: Provider 는 Key 를 project_id(=토픽 이름)로 고정해서 쓴다.
+  # 채널마다 Key 가 상수라 파티션을 늘려도 레코드는 전부 한 파티션에 간다.
+  kafka-init:
+    image: apache/kafka:3.9.0
+    container_name: ees-kafka-init
+    networks: [ees-net]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        for t in ot.lidar.status ot.lidar.actual ot.lidar.artifact; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 \
+            --create --if-not-exists --topic "$$t" \
+            --partitions 1 --replication-factor 1 \
+            --config retention.ms=86400000 --config compression.type=producer
+        done
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --list
+    restart: "no"
+
+  # ── Kafka UI ────────────────────────────────────────────────────────
+  # 레코드 내용을 눈으로 본다. Topics → ot.lidar.status → Messages 에서 헤더 11개와
+  # content 배열이 보이면 형식이 맞은 것이다.
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: ees-kafka-ui
+    networks: [ees-net]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "61080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: ot-lidar
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9093
+      DYNAMIC_CONFIG_ENABLED: "true"
+      # 기본 힙이 VM 메모리를 크게 잡아 다른 스택을 밀어낸다.
+      JAVA_OPTS: "-Xms128m -Xmx384m"
+      TZ: Asia/Seoul
+    restart: unless-stopped
+
+  # ── 브리지 ──────────────────────────────────────────────────────────
+  ees-bridge:
+    build:
+      context: ./bridge
+    image: mqtt-ees-bridge/bridge:local
+    container_name: ees-bridge
+    networks: [ees-net]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    # EMQX 는 이 스택 밖(util/docker-mqtt 의 mqtt-broker-lab)에 있다. 그 네트워크에
+    # 들어가는 대신 호스트 포트로 붙는다 — 발행기도 호스트에서 1884 로 붙으므로
+    # 경로가 하나로 맞고, 브로커 스택을 안 띄웠을 때도 설정이 깨지지 않는다.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      MQTT_HOST: ${MQTT_HOST:-host.docker.internal}
+      MQTT_PORT: ${MQTT_PORT:-1884}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-ees-bridge}
+      MQTT_QOS: ${MQTT_QOS:-1}
+      MQTT_TOPICS: ${MQTT_TOPICS:-ot/device/+/lidar/status,ot/sensor/+/actual,ot/pipeline/+/+/+/artifact}
+      KAFKA_BOOTSTRAP: kafka:9093
+      KAFKA_CLIENT_ID: isl-engine
+      # 항목 N개 또는 M ms 중 먼저 오는 쪽에서 레코드 하나로 묶는다. 묶음은 채널마다 따로다 —
+      # 레코드 하나가 EES 메시지 하나이고 EES 메시지 하나가 토픽 하나이기 때문이다.
+      # 창을 상태 주기(1초)에 맞춰 두어 토픽마다 초당 레코드 하나가 나간다:
+      #   ot.lidar.status   350항목/레코드   ot.lidar.artifact 70항목   ot.lidar.actual 6항목
+      # 500건 상한은 장비가 늘어 한 창에 350건을 넘을 때만 걸리는 안전판이다.
+      BATCH_MAX_ITEMS: ${BATCH_MAX_ITEMS:-500}
+      BATCH_MAX_WAIT_MS: ${BATCH_MAX_WAIT_MS:-1000}
+      TAG_CATALOG: /app/tags/tag-catalog.json
+      # 등록부에 없는 태그에 번호를 새로 매겨 내보낸다. false 면 지금 ISL 처럼 버린다.
+      AUTO_REGISTER_TAGS: ${AUTO_REGISTER_TAGS:-true}
+      AUTO_PARAM_ID_BASE: ${AUTO_PARAM_ID_BASE:-900000}
+      STATE_DIR: /state
+      METRICS_PORT: "8000"
+      TZ: Asia/Seoul
+    volumes:
+      # 조회표는 읽기 전용으로 건다 — scripts/export-tag-map.py 로 다시 만들고
+      # 컨테이너만 재기동하면 반영된다 (이미지를 다시 굽지 않는다).
+      - ./tags:/app/tags:ro
+      - ees-bridge-state:/state
+    ports:
+      - "61090:8000"
+    restart: unless-stopped
