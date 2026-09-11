@@ -1,0 +1,1831 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</title>
+<style>
+/* ============================================================
+   HW Doc Kit - design tokens & base primitives
+   금지: 이모지, 보라/바이올렛/인디고 계열, 무지개 그라데이션
+   기준색: 한화 오렌지 계열
+   ============================================================ */
+:root{
+  /* brand */
+  --hw:#F37321;          /* 기본 오렌지 */
+  --hw-dk:#D2590F;       /* 진한 오렌지 (호버/강조선) */
+  --hw-dp:#A8420A;       /* 가장 진한 오렌지 (제목 강조) */
+  --hw-lt:#FFB27A;       /* 밝은 오렌지 (보조 채움) */
+  --hw-pale:#FFF1E7;     /* 아주 옅은 오렌지 (배경 톤) */
+  --hw-tint:#FDE3D1;     /* 옅은 오렌지 (테두리/칩) */
+
+  /* ink & surface */
+  --ink:#141414; --ink2:#3F3F3F; --ink3:#6E6E6E; --ink4:#9A9A9A;
+  --bg:#FFFFFF; --bg2:#FAF8F6; --bg3:#F2EEEA;
+  --line:#E4E1DE; --line2:#CFCAC5;
+
+  /* semantic (보라 금지 - 보색은 청록/황토/벽돌색으로) */
+  --ok:#2E7D5B; --ok-bg:#E8F3EE;
+  --warn:#B8791A; --warn-bg:#FBF1DF;
+  --risk:#C0392B; --risk-bg:#FBEAE7;
+  --info:#2A6F97; --info-bg:#E7F0F6;
+
+  --radius:10px; --radius-sm:6px;
+  --shadow:0 1px 2px rgba(20,20,20,.06), 0 8px 24px rgba(20,20,20,.06);
+  --font:"Pretendard","Malgun Gothic","Apple SD Gothic Neo","Segoe UI",system-ui,sans-serif;
+  --mono:"D2Coding","Cascadia Mono","Consolas","JetBrains Mono",ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --hw:#FF8A3D; --hw-dk:#F37321; --hw-dp:#FFB27A; --hw-lt:#7A3E14; --hw-pale:#241812; --hw-tint:#4A2A15;
+  --ink:#F2EFEC; --ink2:#CFC9C3; --ink3:#9E9691; --ink4:#77706B;
+  --bg:#141312; --bg2:#1C1A18; --bg3:#252220;
+  --line:#332F2C; --line2:#464038;
+  --ok:#5CB58C; --ok-bg:#17251F; --warn:#D9A445; --warn-bg:#2A2317;
+  --risk:#E2705F; --risk-bg:#2A1917; --info:#6BA6CC; --info-bg:#161F26;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font); color:var(--ink); background:var(--bg2);
+  -webkit-font-smoothing:antialiased; line-height:1.55;
+  font-variant-numeric:tabular-nums;
+}
+h1,h2,h3,h4{margin:0; line-height:1.25; font-weight:700; letter-spacing:-.01em}
+p{margin:0 0 .6em}
+a{color:var(--hw-dk); text-underline-offset:2px}
+:root[data-theme="dark"] a{color:var(--hw)}
+code,kbd,pre,samp{font-family:var(--mono)}
+hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+
+/* ---------- 공통 프리미티브 ---------- */
+.kicker{
+  font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--hw-dk);
+}
+.rule{height:3px;background:var(--hw);border-radius:2px;width:56px}
+.muted{color:var(--ink3)}
+.small{font-size:13px}
+.mono{font-family:var(--mono);font-size:.92em}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;
+  background:var(--hw-pale);color:var(--hw-dp);border:1px solid var(--hw-tint);
+}
+.chip--ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.chip--warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.chip--risk{background:var(--risk-bg);color:var(--risk);border-color:var(--risk)}
+.chip--info{background:var(--info-bg);color:var(--info);border-color:var(--info)}
+.chip--neutral{background:var(--bg3);color:var(--ink2);border-color:var(--line2)}
+
+.card{
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;
+}
+.card--accent{border-left:4px solid var(--hw)}
+.card__t{font-size:16px;font-weight:700;margin:0 0 6px}
+.card__d{font-size:14px;color:var(--ink2);margin:0}
+
+.kpi{display:flex;gap:14px;flex-wrap:wrap}
+.kpi__item{
+  flex:1 1 0;min-width:140px;background:var(--bg);border:1px solid var(--line);
+  border-top:3px solid var(--hw);border-radius:var(--radius);padding:14px 16px;
+}
+.kpi__v{font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--hw-dp)}
+:root[data-theme="dark"] .kpi__v{color:var(--hw)}
+.kpi__l{font-size:12px;color:var(--ink3);font-weight:600}
+
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--bg)}
+.tbl th,.tbl td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.tbl thead th{background:var(--hw-pale);color:var(--hw-dp);font-size:12.5px;
+  letter-spacing:.03em;text-transform:uppercase;border-color:var(--hw-tint)}
+.tbl tbody tr:nth-child(even){background:var(--bg2)}
+.tbl td.num{text-align:right;font-family:var(--mono)}
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius-sm)}
+
+.note{
+  border:1px solid var(--line);border-left:4px solid var(--ink3);
+  background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-size:14px;
+}
+.note__t{font-weight:700;font-size:13px;margin:0 0 4px;letter-spacing:.02em}
+.note--info{border-left-color:var(--info);background:var(--info-bg)}
+.note--info .note__t{color:var(--info)}
+.note--ok{border-left-color:var(--ok);background:var(--ok-bg)}
+.note--ok .note__t{color:var(--ok)}
+.note--warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.note--warn .note__t{color:var(--warn)}
+.note--risk{border-left-color:var(--risk);background:var(--risk-bg)}
+.note--risk .note__t{color:var(--risk)}
+
+/* 코드 블록 */
+.code{border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg)}
+.code__bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;color:var(--ink3)
+}
+.code__copy{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer
+}
+.code__copy:hover{border-color:var(--hw);color:var(--hw-dk)}
+.code pre{margin:0;padding:12px 14px;overflow-x:auto;font-size:13px;line-height:1.6}
+.code .cm{color:var(--ink4)}
+.code .hl{color:var(--hw-dk);font-weight:700}
+
+/* 단계 흐름 */
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.step{
+  flex:1 1 0;min-width:150px;position:relative;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px
+}
+.step__n{
+  display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:50%;background:var(--hw);color:#fff;font-size:12px;font-weight:800;margin-bottom:6px
+}
+.step__t{font-weight:700;font-size:14px}
+.step__d{font-size:12.5px;color:var(--ink3)}
+
+/* UI 목업 프레임 */
+.ui{border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--bg);box-shadow:var(--shadow)}
+.ui__bar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border-bottom:1px solid var(--line)}
+.ui__dot{width:9px;height:9px;border-radius:50%;background:var(--line2)}
+.ui__addr{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  padding:2px 8px;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+.ui__body{padding:14px}
+.ui-row{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.ui-row:last-child{border-bottom:0}
+.ui-btn{background:var(--hw);color:#fff;border:0;border-radius:5px;padding:6px 14px;font-size:12.5px;font-weight:700}
+.ui-btn--ghost{background:transparent;color:var(--hw-dk);border:1px solid var(--hw)}
+.ui-field{flex:1;border:1px solid var(--line2);border-radius:5px;padding:6px 9px;font-size:12.5px;color:var(--ink3);background:var(--bg2)}
+
+/* 출처 표기 */
+.ref{
+  font-size:.62em;font-weight:800;vertical-align:super;color:var(--hw-dk);
+  background:var(--hw-pale);border:1px solid var(--hw-tint);border-radius:4px;
+  padding:0 4px;margin-left:2px;cursor:pointer;text-decoration:none
+}
+.refs{list-style:none;padding:0;margin:0;font-size:13px}
+.refs li{display:grid;grid-template-columns:26px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.refs li:last-child{border-bottom:0}
+.refs .refs__n{color:var(--hw-dk);font-weight:800;font-family:var(--mono)}
+.refs .refs__src{color:var(--ink);font-weight:600}
+.refs .refs__meta{color:var(--ink3);font-size:12px;font-family:var(--mono);word-break:break-all}
+
+/* 그리드 */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.stack{display:flex;flex-direction:column;gap:12px}
+
+/* ---------- 다이어그램 캔버스 ---------- */
+.dgm{
+  position:relative;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--bg);overflow:hidden;display:flex;flex-direction:column
+}
+.dgm__bar{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:6px 8px;border-bottom:1px solid var(--line);background:var(--bg3);flex:0 0 auto
+}
+.dgm__bar .sp{flex:1}
+.dgm__btn{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--font)
+}
+.dgm__btn:hover{border-color:var(--hw);color:var(--hw-dk)}
+.dgm__btn.is-on{background:var(--hw);border-color:var(--hw);color:#fff}
+.dgm__hint{font-size:11.5px;color:var(--ink4)}
+.dgm__svg{display:block;width:100%;flex:1 1 auto;min-height:0;touch-action:none;cursor:grab;
+  background:radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0/20px 20px}
+.dgm__svg.is-panning{cursor:grabbing}
+.dgm[data-edit="off"] .dgm__bar{display:none}
+
+/* 화면 가득 펼치기 — 툴바의 "넓게" 버튼 / Esc 로 닫는다 */
+.dgm.is-max{
+  position:fixed;inset:14px;z-index:80;
+  width:auto !important;max-width:none !important;height:auto !important;
+  box-shadow:0 12px 48px rgba(20,20,20,.28);border-color:var(--line2)
+}
+html.dgm-locked,html.dgm-locked body{overflow:hidden}
+
+.dgm-node{cursor:move}
+.dgm-node .box{fill:var(--bg);stroke:var(--line2);stroke-width:1.5}
+.dgm-node .lbl{
+  font-family:var(--font);font-size:13.5px;font-weight:700;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;text-align:center;padding:4px 8px;line-height:1.3;overflow:hidden
+}
+.dgm-node .lbl .sub{font-size:11px;font-weight:500;color:var(--ink3);margin-top:2px}
+.dgm-node .lbl[contenteditable="true"]{outline:2px solid var(--hw);background:var(--bg);border-radius:4px}
+.dgm-node.is-sel .box{stroke:var(--hw);stroke-width:2.5}
+.dgm-node[data-tone="primary"] .box{fill:var(--hw);stroke:var(--hw-dk)}
+.dgm-node[data-tone="primary"] .lbl{color:#fff}
+.dgm-node[data-tone="primary"] .lbl .sub{color:rgba(255,255,255,.85)}
+.dgm-node[data-tone="accent"] .box{fill:var(--hw-pale);stroke:var(--hw)}
+.dgm-node[data-tone="accent"] .lbl{color:var(--hw-dp)}
+.dgm-node[data-tone="muted"] .box{fill:var(--bg3);stroke:var(--line2)}
+.dgm-node[data-tone="muted"] .lbl{color:var(--ink3)}
+.dgm-node[data-tone="ok"] .box{fill:var(--ok-bg);stroke:var(--ok)}
+.dgm-node[data-tone="ok"] .lbl{color:var(--ok)}
+.dgm-node[data-tone="warn"] .box{fill:var(--warn-bg);stroke:var(--warn)}
+.dgm-node[data-tone="warn"] .lbl{color:var(--warn)}
+.dgm-node[data-tone="risk"] .box{fill:var(--risk-bg);stroke:var(--risk)}
+.dgm-node[data-tone="risk"] .lbl{color:var(--risk)}
+.dgm-node[data-tone="info"] .box{fill:var(--info-bg);stroke:var(--info)}
+.dgm-node[data-tone="info"] .lbl{color:var(--info)}
+
+.dgm-grp .box{fill:var(--bg2);stroke:var(--line2);stroke-dasharray:6 4;stroke-width:1.5}
+.dgm-grp .gl{font-family:var(--font);font-size:11.5px;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;fill:var(--ink4)}
+.dgm-grp{cursor:move}
+
+.dgm-edge .wire{fill:none;stroke:var(--ink3);stroke-width:1.8}
+.dgm-edge .hit{fill:none;stroke:transparent;stroke-width:14;cursor:pointer}
+.dgm-edge.is-sel .wire{stroke:var(--hw);stroke-width:2.6}
+.dgm-edge[data-style="dash"] .wire{stroke-dasharray:6 4}
+.dgm-edge[data-tone="primary"] .wire{stroke:var(--hw)}
+.dgm-edge[data-tone="risk"] .wire{stroke:var(--risk)}
+.dgm-edge[data-tone="ok"] .wire{stroke:var(--ok)}
+.dgm-edge .elbl{
+  font-family:var(--font);font-size:11.5px;font-weight:600;color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;height:100%;text-align:center;
+}
+.dgm-edge .elbl span{background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--line)}
+
+.dgm__modal{
+  position:absolute;inset:0;background:rgba(0,0,0,.45);display:none;
+  align-items:center;justify-content:center;padding:24px;z-index:9
+}
+.dgm__modal.is-open{display:flex}
+.dgm__modal .pane{background:var(--bg);border-radius:var(--radius);width:min(680px,100%);
+  max-height:100%;display:flex;flex-direction:column;border:1px solid var(--line2)}
+.dgm__modal textarea{
+  flex:1;min-height:240px;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:12px;font-family:var(--mono);font-size:12px;resize:vertical;background:var(--bg2);color:var(--ink)
+}
+.dgm__modal .head,.dgm__modal .foot{display:flex;align-items:center;gap:8px;padding:10px 12px}
+.dgm__modal .head b{font-size:14px}
+.dgm__modal .sp{flex:1}
+
+/* ── 차트 (scripts/make-chart.sh 산출물) ─────────────────────────────────── */
+.cht{ margin:16px 0 18px; padding:14px 14px 10px; border:1px solid var(--line); border-radius:var(--radius); background:var(--bg2) }
+.cht__t{ margin:0 0 8px; font-size:13.5px; font-weight:700; color:var(--ink); letter-spacing:-.01em }
+.cht svg{ display:block; width:100%; height:auto; font-family:inherit }
+.cht rect, .cht circle{ cursor:default }
+.cht rect:hover, .cht circle:hover{ opacity:.75 }
+.cht__c{ margin:8px 0 0; font-size:12px; line-height:1.65; color:var(--ink3) }
+
+/* 인쇄 */
+@media print{
+  .cht{ page-break-inside:avoid; background:transparent }
+  body{background:#fff}
+  .no-print{display:none !important}
+  .dgm__bar{display:none !important}
+  .dgm__svg{background:none}
+  .dgm.is-max{position:static;inset:auto;box-shadow:none}
+}
+
+/* ── 한글 줄바꿈 ─────────────────────────────────────────────────────────────
+   브라우저 기본값은 낱말 한가운데를 끊는다. "남은 결/정" 처럼 갈라지면 제목이
+   읽히지 않는다. keep-all 은 띄어쓰기에서만 줄을 바꾼다.
+   반대로 긴 영문 식별자나 경로는 keep-all 이면 칸을 넘치므로 overflow-wrap 으로 받고,
+   코드·경로 계열은 어디서든 끊어 넘침을 막는다. */
+h1, h2, h3, h4, p, li, td, th, dt, dd,
+.card__d, .step__d, .note, .lead, .sub, figcaption {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.mono, pre, code, .refs__meta { word-break: break-all; overflow-wrap: normal }
+
+/* ============================================================
+   HW Doc Kit - 발표용(PPT형) 덱 레이아웃
+   슬라이드 논리 크기 1280x720 (16:9). JS가 --k 배율만 조정.
+   ============================================================ */
+:root{ --k:1; --stage-pad-x:64px; }
+
+.deck{
+  display:flex; flex-direction:column; align-items:center; gap:0;
+  padding:0; min-height:100vh; justify-content:center;
+}
+.slide{ width:calc(1280px * var(--k)); height:calc(720px * var(--k)); flex:0 0 auto; position:relative; }
+.deck:not(.is-overview) .slide{ display:none; }
+.deck:not(.is-overview) .slide.is-cur{ display:block; }
+
+.stage{
+  width:1280px; height:720px; transform:scale(var(--k)); transform-origin:top left;
+  background:var(--bg); position:relative; overflow:hidden;
+  box-shadow:var(--shadow); display:flex; flex-direction:column;
+  padding:44px var(--stage-pad-x) 62px;
+}
+.stage::before{ /* 상단 브랜드 스트립 */
+  content:''; position:absolute; left:0; top:0; width:100%; height:6px;
+  background:linear-gradient(90deg,var(--hw) 0%,var(--hw-dk) 62%,var(--hw-dp) 100%);
+}
+
+/* 슬라이드 헤더 */
+.s-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+  border-bottom:2px solid var(--hw); padding-bottom:12px; margin-bottom:22px; flex:0 0 auto; }
+.s-head__l{ min-width:0 }
+.s-head h2{ font-size:31px; letter-spacing:-.02em; }
+.s-head .kicker{ display:block; margin-bottom:5px; font-size:12px }
+.s-head__r{ text-align:right; font-size:12.5px; color:var(--ink3); white-space:nowrap }
+
+.s-body{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:16px; }
+.s-body.is-scroll{ overflow:hidden }
+.s-lead{ font-size:16px; color:var(--ink2); max-width:96ch }
+
+/* 슬라이드 푸터 */
+.s-foot{
+  position:absolute; left:var(--stage-pad-x); right:var(--stage-pad-x); bottom:18px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  font-size:11.5px; color:var(--ink4); border-top:1px solid var(--line); padding-top:8px;
+}
+.s-foot .pg{ font-family:var(--mono); font-weight:700; color:var(--hw-dk) }
+
+/* 타이틀 슬라이드 */
+.slide--title .stage{ padding:0; display:grid; grid-template-columns:1.35fr 1fr; }
+.slide--title .stage::before{ display:none } /* 우측 오렌지 패널이 브랜드를 대신함 */
+.t-left{ padding:76px 64px; display:flex; flex-direction:column; justify-content:center; gap:16px }
+.t-left h1{ font-size:48px; line-height:1.15; letter-spacing:-.03em }
+.t-left .sub{ font-size:19px; color:var(--ink2) }
+.t-meta{ margin-top:18px; display:flex; flex-wrap:wrap; gap:8px }
+.t-right{ background:var(--hw); position:relative; overflow:hidden }
+.t-right::after{
+  content:''; position:absolute; inset:0;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.16) 0 42%, transparent 42%),
+    linear-gradient(315deg, rgba(0,0,0,.14) 0 34%, transparent 34%);
+}
+.t-right .mark{
+  position:absolute; left:44px; bottom:44px; color:#fff; z-index:1;
+  font-size:13px; font-weight:800; letter-spacing:.22em; text-transform:uppercase;
+}
+
+/* 섹션 구분 슬라이드 */
+.slide--section .stage{ justify-content:center; background:var(--bg3) }
+.slide--section .s-no{ font-family:var(--mono); font-size:64px; font-weight:800; color:var(--hw); line-height:1 }
+.slide--section h2{ font-size:40px; margin-top:10px }
+.slide--section .s-desc{ font-size:16px; color:var(--ink3); margin-top:10px; max-width:70ch }
+
+/* 발표자 노트 */
+.notes{ display:none }
+.deck.is-notes .slide.is-cur .notes{
+  display:block; position:fixed; left:0; right:0; bottom:46px; z-index:20;
+  max-height:32vh; overflow:auto; background:var(--bg); border-top:2px solid var(--hw);
+  padding:12px 18px; font-size:14px; color:var(--ink2); box-shadow:0 -8px 24px rgba(0,0,0,.12);
+}
+.notes b{ color:var(--hw-dk); display:block; margin-bottom:4px; font-size:12px; letter-spacing:.1em; text-transform:uppercase }
+
+/* 오버뷰(썸네일 격자) */
+.deck.is-overview{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:18px; padding:24px; align-items:start; justify-content:start; min-height:auto;
+}
+.deck.is-overview .slide{ --k:.216; cursor:pointer; outline:1px solid var(--line); }
+.deck.is-overview .slide.is-cur{ outline:3px solid var(--hw) }
+.deck.is-overview .slide::after{
+  content:attr(data-n); position:absolute; right:6px; bottom:4px; font-size:11px;
+  font-family:var(--mono); font-weight:700; color:var(--ink4);
+}
+
+/* HUD */
+.hud{
+  position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex; align-items:center; gap:8px;
+  padding:6px 12px; background:var(--bg); border-top:1px solid var(--line); font-size:12px;
+}
+.hud .sp{ flex:1 }
+.hud button{
+  border:1px solid var(--line2); background:var(--bg); color:var(--ink2);
+  border-radius:5px; padding:3px 10px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font);
+}
+.hud button:hover{ border-color:var(--hw); color:var(--hw-dk) }
+.hud .cnt{ font-family:var(--mono); font-weight:700; color:var(--ink2) }
+.hud .ttl{ color:var(--ink4); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:40vw }
+.prog{ position:fixed; left:0; bottom:0; height:3px; background:var(--hw); z-index:31; transition:width .18s ease }
+
+@media print{
+  @page{ size:1280px 720px; margin:0 }
+  .hud,.prog,.notes{ display:none !important }
+  html,body{ background:#fff }
+  .deck,.deck.is-overview{ display:block; padding:0; gap:0 }
+  .deck .slide{ display:block !important; width:1280px; height:720px; page-break-after:always; outline:0 }
+  .deck .slide:last-child{ page-break-after:auto }
+  .stage{ transform:none; box-shadow:none }
+}
+
+/* 슬라이드에 차트를 얹을 때의 크기 억제 (references/chart.md) */
+.cht{ margin:4px 0 6px; padding:10px 12px 8px }
+.cht svg{ max-height:250px }
+.cht__t{ margin:0 0 6px; font-size:13px }
+.cht__c{ margin:6px 0 0; font-size:11.5px; line-height:1.55 }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- ========== 01 표지 ========== -->
+  <section class="slide slide--title">
+    <div class="stage">
+      <div class="t-left">
+        <span class="kicker">Technical Review</span>
+        <h1>OT LiDAR 필드 데이터<br>TimescaleDB 적재 검증</h1>
+        <p class="sub">Mqtt.Agent → Engine → EES Kafka Provider → Kafka → TimescaleDB 구간의 실측 결과와, 수신 측을 CDC 로 넓혔을 때의 경계</p>
+        <div class="t-meta">
+          <span class="chip chip--neutral">2026-09-11</span>
+          <span class="chip chip--neutral">장비 350대 · 3채널</span>
+          <span class="chip">v1.0 검토본</span>
+        </div>
+      </div>
+      <div class="t-right"><span class="mark">Internal Use Only</span></div>
+    </div>
+  </section>
+
+  <!-- ========== 02 목차 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">Agenda</span><h2>오늘 답할 네 가지 질문</h2></div>
+        <div class="s-head__r">발표 20분 · 논의 15분</div>
+      </div>
+      <div class="s-body">
+        <div class="g2" style="gap:14px 28px">
+          <div class="card card--accent"><p class="card__t">01. 지금 무엇이 돌고 있나</p><p class="card__d">토픽 22개가 EES 메시지 3개를 거쳐 Kafka 토픽 3개로 나가고, 소비자가 표 아홉 개에 나눠 담는 경로 전부</p></div>
+          <div class="card card--accent"><p class="card__t">02. TimescaleDB 를 왜 쓰나</p><p class="card__d">1개월 보존에서 실제로 얼마가 절약되는지, 그리고 <b>주기가 1초와 10분으로 갈리면</b> 전달 · 저장 · 관측에서 무엇이 달라지는지</p></div>
+          <div class="card card--accent"><p class="card__t">03. 지금 판에서 무엇이 위험한가</p><p class="card__d">이번 검증에서 실제로 드러난 결함 한 건과, 아직 확인하지 못한 항목</p></div>
+          <div class="card card--accent"><p class="card__t">04. CDC 는 무엇이 달라지나</p><p class="card__d">받는 쪽이 TimescaleDB 인지 아닌지보다, 보내는 쪽이 TimescaleDB 인지가 중요한 이유</p></div>
+        </div>
+        <div class="note note--info" style="margin-top:14px"><p class="note__t">이 문서의 수치는 전부 실측입니다</p>
+          2026-09-11 11:16~11:37 에 실제로 돌고 있는 스택에서 뽑았습니다. 추정으로 채운 값에는
+          <span class="chip chip--warn">추정</span> 칩을 붙여 구분했습니다.</div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>02 와 03 에서 논의가 길어지기 쉽다. 01 은 8분 안에 넘긴다. 04 는 질문이 나오면 상세 기술문서의 04절을 연다.</aside>
+  </section>
+
+  <!-- ========== 03 섹션 01 ========== -->
+  <section class="slide slide--section">
+    <div class="stage">
+      <div class="s-no">01</div>
+      <h2>지금 돌고 있는 파이프라인</h2>
+      <p class="s-desc">목표 구조는 Mqtt.Agent → Engine → HotData Provider → HotData 입니다. 지금 검증하는 것은 그중 Provider 자리에 Kafka Provider 를, 저장소 자리에 TimescaleDB 를 세운 판입니다.</p>
+    </div>
+  </section>
+
+  <!-- ========== 04 파이프라인 전체 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">01. 구조</span><h2>Provider 자리만 바꿔 끼운 판입니다</h2></div>
+        <div class="s-head__r">박스를 끌어 배치를 바꿀 수 있습니다</div>
+      </div>
+      <div class="s-body">
+        <div class="dgm" data-edit="on" style="flex:1;min-height:0">
+          <script type="application/json" class="dgm-data">
+{
+  "groups": [
+    {"id":"g1","label":"InterSysLink (기존 · 손대지 않음)","x":20,"y":20,"w":300,"h":330},
+    {"id":"g2","label":"이번 검증 범위","x":360,"y":20,"w":580,"h":330}
+  ],
+  "nodes": [
+    {"id":"lidar","label":"LiDAR 350대","sub":"조립 210 · 선행의장 140","x":50,"y":70,"w":240,"h":62,"tone":"muted"},
+    {"id":"agent","label":"Mqtt.Agent","sub":"MQTT 22토픽 · QoS 1 · tagMode=raw","x":50,"y":180,"w":240,"h":62,"tone":"muted"},
+    {"id":"engine","label":"Engine","sub":"태그 등록부 2,380개","x":50,"y":280,"w":240,"h":52,"tone":"muted"},
+    {"id":"prov","label":"EES Kafka Provider","sub":"OnChange 1s · Snapshot 60s (설정 확인)","x":400,"y":70,"w":250,"h":62,"tone":"accent"},
+    {"id":"kafka","label":"ot.lidar.status / actual / artifact","sub":"채널 하나에 토픽 하나","x":400,"y":180,"w":250,"h":62,"tone":"primary","shape":"pill"},
+    {"id":"tsdb","label":"TimescaleDB 2.29","sub":"하이퍼테이블 3 · 일반표 6","x":700,"y":70,"w":220,"h":62,"tone":"primary","shape":"store"},
+    {"id":"ingest","label":"lidar-ingest","sub":"Python · 50레코드 또는 1초 배치","x":700,"y":180,"w":220,"h":62,"tone":"accent"},
+    {"id":"rej","label":"lidar_ingest_reject","sub":"파싱 실패 항목만 격리","x":700,"y":285,"w":220,"h":48,"tone":"risk"}
+  ],
+  "edges": [
+    {"from":"lidar","to":"agent","label":"MQTT"},
+    {"from":"agent","to":"engine","label":"태그 값"},
+    {"from":"engine","to":"prov","label":"ParameterId + 값"},
+    {"from":"prov","to":"kafka","label":"produce","tone":"primary"},
+    {"from":"kafka","to":"ingest","label":"consume","tone":"primary"},
+    {"from":"ingest","to":"tsdb","label":"COMMIT 뒤 오프셋 커밋","tone":"ok"},
+    {"from":"ingest","to":"rej","label":"항목 단위 격리","tone":"risk","style":"dash"}
+  ]
+}
+          </script>
+        </div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>HotData Provider 자리에 Kafka Provider 를 끼웠고 HotData 자리에 TimescaleDB 를 세웠다. Agent 와 Engine 은 손대지 않았다. 격리 경로가 있어 항목 하나가 깨져도 레코드 전체를 버리지 않는다는 점을 강조.</aside>
+  </section>
+
+  <!-- ========== 05 메시지 한 건 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">01. 메시지</span><h2>레코드 하나에 장비 345대분이 실려 옵니다</h2></div>
+        <div class="s-head__r">EES Kafka Provider · data_type=value · V1.0</div>
+      </div>
+      <div class="s-body">
+        <div class="g2" style="flex:1;min-height:0">
+          <div class="stack">
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr><th style="width:36%">레코드 헤더</th><th style="width:28%">실제 값</th><th>뜻</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">uniqueid</td><td class="mono">6c9fff99-…</td><td>레코드마다 새로 생기는 GUID</td></tr>
+                  <tr><td class="mono">data_type</td><td class="mono">value</td><td>값 메시지 (cmd · alert 아님)</td></tr>
+                  <tr><td class="mono">message_version</td><td class="mono">1.0</td><td>포맷터 버전</td></tr>
+                  <tr><td class="mono">msg_timestamp</td><td class="mono">ns epoch</td><td>발신 시각</td></tr>
+                  <tr><td class="mono">request</td><td class="mono">ot.lidar.status</td><td>발신 측 send_topic — 채널 판정 근거</td></tr>
+                  <tr><td class="mono">project_id</td><td class="mono">ot.lidar.status</td><td>레코드 키와 같은 값</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="note note--info"><p class="note__t">헤더는 11개 계약, 받는 것은 9개</p>
+              <span class="mono">reply</span> · <span class="mono">replycluster</span> 는 빈 바이트로 오므로 표에 넣지 않습니다.<sup class="ref" data-ref="3">3</sup></div>
+          </div>
+          <div class="code">
+            <div class="code__bar"><span>ot.lidar.status · offset 3522 · item_count 345</span><button class="code__copy" type="button">복사</button></div>
+<pre>[{"content": {
+   "timestamp": 1789030763360318900,   <span class="cm">// ns epoch</span>
+   <span class="hl">"tid": "9",</span>              <span class="cm">// 장비 id 가 아니라 ParameterId</span>
+   "pm_mode": false,
+   "value": "{\"device_role\":\"LIDAR\",
+      \"site\":\"geoje\",\"zone\":\"ASSEMBLY\",
+      \"shop\":\"assembly1\",\"bay\":\"bay1\",
+      \"status\":\"ONLINE\",\"error_code\":null,
+      \"scan_rate_pts_per_sec\":255062,
+      \"temperature_c\":41.1,
+      \"connectivity_rssi\":-38,
+      \"fov_mode\":\"narrow\",
+      \"occurred_at\":\"2026-09-11T11:37:37.55+09:00\",
+      \"idempotency_key\":
+         \"LDR-GJ-A1B1-09:20260911T113737\"}"
+}}, <span class="cm">… 344개 더 …</span> ]</pre>
+          </div>
+        </div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>value 가 객체가 아니라 JSON 문자열인 것은 tagMode=raw 이기 때문. raw_payload 통째가 태그 하나의 STRING 값이다. 여기서 가장 중요한 것은 tid 가 숫자라는 점 — 다음 장으로 이어진다.</aside>
+  </section>
+
+  <!-- ========== 06 태그 등록부 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">01. 장비 축</span><h2>Kafka 만 읽어서는 어느 장비인지 알 수 없습니다</h2></div>
+        <div class="s-head__r">등록부 사본 <span class="mono">rdb.lidar_tag_catalog</span></div>
+      </div>
+      <div class="s-body">
+        <p class="s-lead">Provider 가 값을 실을 때 문자열 TagId 를 버리고 EES ParameterId(숫자)만 씁니다. 그리고 <span class="mono">raw_payload</span> 안에도 장비 id 필드가 없습니다.<sup class="ref" data-ref="4">4</sup></p>
+        <div class="g-2-1" style="flex:1;min-height:0">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th style="width:14%">채널</th><th style="width:30%">MQTT 토픽</th><th style="width:20%">Kafka 토픽</th><th style="width:13%">태그 수</th><th>ParameterId</th></tr></thead>
+              <tbody>
+                <tr><td><span class="chip">status</span></td><td class="mono">ot/device/{zone}/lidar/status</td><td class="mono">ot.lidar.status</td><td class="num">350</td><td class="mono">1 ~ 350</td></tr>
+                <tr><td><span class="chip chip--neutral">actual</span></td><td class="mono">ot/sensor/{stage}/actual</td><td class="mono">ot.lidar.actual</td><td class="num">980</td><td class="mono">351 ~ 1330</td></tr>
+                <tr><td><span class="chip chip--neutral">artifact</span></td><td class="mono">ot/pipeline/{zone}/{shop}/{bay}/artifact</td><td class="mono">ot.lidar.artifact</td><td class="num">1,050</td><td class="mono">1331 ~ 2380</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="stack">
+            <div class="card card--accent"><p class="card__t">되돌리는 방법</p><p class="card__d">Engine 의 <span class="mono">EES_TAG × TAG_CATALOG</span> 를 통째로 복사해 두고, 소비자가 기동할 때 메모리에 올려 <span class="mono">(send_topic, param_id) → 장비 id</span> 로 풉니다.</p></div>
+            <div class="note note--warn"><p class="note__t">사본이 낡으면 장비가 뒤바뀝니다</p>
+              번호는 메시지 안에서만 1부터 매기는 일련번호라, 태그를 다시 등록하면 구간이 통째로 밀립니다. 이번 검증에서 실제로 그 일이 일어났습니다 — 13쪽.</div>
+          </div>
+        </div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>MQTT 토픽은 22개인데 Kafka 토픽은 3개다. EES 메시지를 채널마다 하나씩 만들어 두었기 때문이고, 그래서 채널 판정을 토픽 이름의 마지막 마디로 한다. tid 가 숫자인 것은 Provider 의 설계이지 결함이 아니다.</aside>
+  </section>
+
+  <!-- ========== 07 실측 처리량 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">01. 실측</span><h2>장비 발생 시각에서 DB 커밋까지 평균 1.4초입니다</h2></div>
+        <div class="s-head__r">2026-09-11 11:16~11:37 · 15분 36초</div>
+      </div>
+      <div class="s-body">
+        <div class="kpi">
+          <div class="kpi__item"><div class="kpi__v">1.38s</div><div class="kpi__l">occurred_at → COMMIT p50<sup class="ref" data-ref="7">7</sup></div></div>
+          <div class="kpi__item"><div class="kpi__v">3.17s</div><div class="kpi__l">같은 구간 p99</div></div>
+          <div class="kpi__item"><div class="kpi__v">17.8ms</div><div class="kpi__l">배치 1회 평균 쓰기 시간</div></div>
+          <div class="kpi__item"><div class="kpi__v">0</div><div class="kpi__l">격리 · DB 오류 · 소비 지연</div></div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:18%">구간</th><th style="width:15%">관측값</th><th style="width:33%">무엇을 뜻하나</th><th>근거</th></tr></thead>
+            <tbody>
+              <tr><td>수신 레코드</td><td class="num">1,491건</td><td>레코드당 평균 200항목, status 는 345항목</td><td class="mono">rdb.lidar_status_message</td></tr>
+              <tr><td>파싱 항목</td><td class="num">297,495</td><td>status 296,427 · actual 407 · artifact 661</td><td class="mono">같은 표의 채널별 카운트</td></tr>
+              <tr><td>DB 배치</td><td class="num">1,873회</td><td>평균 162행 · 최대 대기 1초 또는 50레코드</td><td class="mono">lidar_ingest_batch_rows</td></tr>
+              <tr><td>중복 스킵</td><td class="num">1건</td><td>멱등 인덱스가 재전달을 걸러 냈다. 유실이 아니다</td><td class="mono">lidar_ingest_rows_duplicate_total</td></tr>
+              <tr><td>격리</td><td class="num">0건</td><td>발신 스키마와 적재 스키마가 어긋나지 않았다</td><td class="mono">lidar_ingest_rejects_total</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note note--ok" style="margin-top:10px"><p class="note__t">전달 보장</p>
+          DB 트랜잭션이 커밋된 뒤에만 Kafka 오프셋을 커밋합니다(at-least-once). MQTT 가 QoS 1 이라 재전달은 예외가 아니라 정상 동작이고,
+          <span class="mono">(idempotency_key, time)</span> 유니크 인덱스가 그것을 받아 냅니다.<sup class="ref" data-ref="1">1</sup></div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>1.4초 안에는 MQTT 홉·Agent·Engine·Provider·Kafka·소비자가 전부 들어 있다. DB 쓰기는 그중 17.8ms 뿐이라 병목은 DB 가 아니다. 질문이 나오면 Provider 의 발행 정책을 든다 — 등록부의 sendPolicy 가 mode=OnChange, intervalMs 미설정(기본 1,000ms), snapshotIntervalMs=60000 이다. 즉 1.4초 중 최대 1초가 ChangedBatch 대기다.</aside>
+  </section>
+
+  <!-- ========== 08 섹션 02 ========== -->
+  <section class="slide slide--section">
+    <div class="stage">
+      <div class="s-no">02</div>
+      <h2>TimescaleDB 로 무엇을 얻는가</h2>
+      <p class="s-desc">1개월 보존이 요구사항입니다. 그 조건에서 일반 PostgreSQL 과 실제로 얼마가 갈리는지 재 봤습니다.</p>
+    </div>
+  </section>
+
+  <!-- ========== 09 용량 차트 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">02. 보존 비용</span><h2>31일 보존이 349GB 에서 61GB 로 내려갑니다</h2></div>
+        <div class="s-head__r">실측 압축비 12.6배 적용 · 인덱스 제외</div>
+      </div>
+      <div class="s-body">
+      <figure class="cht">
+        <figcaption class="cht__t">31일 보존 창의 디스크 누계 — 일반 PostgreSQL vs TimescaleDB</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="31일 보존 창의 디스크 누계 — 일반 PostgreSQL vs TimescaleDB">
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">90</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">180</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">270</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">360</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">GB</text>
+          <text x="76.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">1일</text>
+          <text x="206.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">5일</text>
+          <text x="336.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">10일</text>
+          <text x="466.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">15일</text>
+          <text x="596.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">20일</text>
+          <text x="726.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">25일</text>
+          <text x="856.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">31일</text>
+          <polyline points="76.0,239.2 206.0,211.8 336.0,177.8 466.0,143.6 596.0,109.5 726.0,75.4 856.0,34.4 " fill="none" stroke="var(--info)" stroke-width="2.4"/>
+          <polygon points="76.0,246.0 76.0,239.2 206.0,211.8 336.0,177.8 466.0,143.6 596.0,109.5 726.0,75.4 856.0,34.4 856.0,246.0" fill="var(--info)" opacity=".12"/>
+          <circle cx="76.0" cy="239.2" r="3.4" fill="var(--info)"><title>1일 · 일반 PostgreSQL 11.3GB</title></circle>
+          <circle cx="206.0" cy="211.8" r="3.4" fill="var(--info)"><title>5일 · 일반 PostgreSQL 56.4GB</title></circle>
+          <circle cx="336.0" cy="177.8" r="3.4" fill="var(--info)"><title>10일 · 일반 PostgreSQL 112GB</title></circle>
+          <circle cx="466.0" cy="143.6" r="3.4" fill="var(--info)"><title>15일 · 일반 PostgreSQL 169GB</title></circle>
+          <circle cx="596.0" cy="109.5" r="3.4" fill="var(--info)"><title>20일 · 일반 PostgreSQL 225GB</title></circle>
+          <circle cx="726.0" cy="75.4" r="3.4" fill="var(--info)"><title>25일 · 일반 PostgreSQL 281GB</title></circle>
+          <circle cx="856.0" cy="34.4" r="3.4" fill="var(--info)"><title>31일 · 일반 PostgreSQL 349GB</title></circle>
+          <text x="856.0" y="25.4" text-anchor="middle" font-size="12" font-weight="700" fill="var(--info)">349</text>
+          <polyline points="76.0,239.2 206.0,224.4 336.0,221.4 466.0,218.5 596.0,215.5 726.0,212.6 856.0,209.1 " fill="none" stroke="var(--hw)" stroke-width="2.4"/>
+          <polygon points="76.0,246.0 76.0,239.2 206.0,224.4 336.0,221.4 466.0,218.5 596.0,215.5 726.0,212.6 856.0,209.1 856.0,246.0" fill="var(--hw)" opacity=".12"/>
+          <circle cx="76.0" cy="239.2" r="3.4" fill="var(--hw)"><title>1일 · TimescaleDB (3일 후 압축) 11.3GB</title></circle>
+          <circle cx="206.0" cy="224.4" r="3.4" fill="var(--hw)"><title>5일 · TimescaleDB (3일 후 압축) 35.7GB</title></circle>
+          <circle cx="336.0" cy="221.4" r="3.4" fill="var(--hw)"><title>10일 · TimescaleDB (3일 후 압축) 40.6GB</title></circle>
+          <circle cx="466.0" cy="218.5" r="3.4" fill="var(--hw)"><title>15일 · TimescaleDB (3일 후 압축) 45.4GB</title></circle>
+          <circle cx="596.0" cy="215.5" r="3.4" fill="var(--hw)"><title>20일 · TimescaleDB (3일 후 압축) 50.3GB</title></circle>
+          <circle cx="726.0" cy="212.6" r="3.4" fill="var(--hw)"><title>25일 · TimescaleDB (3일 후 압축) 55.1GB</title></circle>
+          <circle cx="856.0" cy="209.1" r="3.4" fill="var(--hw)"><title>31일 · TimescaleDB (3일 후 압축) 60.9GB</title></circle>
+          <text x="856.0" y="200.1" text-anchor="middle" font-size="12" font-weight="700" fill="var(--hw)">60.9</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="656.4" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="684.4" y="11" font-size="12.5" fill="var(--ink2)">TimescaleDB (3일 후 압축)</text>
+          <rect x="517.6" y="6" width="22" height="4" rx="2" fill="var(--info)"/>
+          <text x="545.6" y="11" font-size="12.5" fill="var(--ink2)">일반 PostgreSQL</text>
+        </svg>
+        <p class="cht__c">두 선은 3일째까지 붙어 있다가 압축 정책이 도는 순간 갈라진다. 일반 PostgreSQL 은 하루 11.3GB 씩 직선으로 오르고, TimescaleDB 는 압축 구간에 들어간 뒤로 하루 0.97GB 만 는다. 31일 시점에 349GB 대 61GB 로 5.7배 차이다.</p>
+      </figure>
+
+        <div class="note note--info"><p class="note__t">무엇을 실측했나</p>
+          운영 표 <span class="mono">tsdb.lidar_status</span> 의 사본 321,061행을 컬럼스토어로 전환했습니다.
+          <span class="mono">111MB → 8,984kB</span>, 행당 <span class="mono">362B → 28.7B</span>.<sup class="ref" data-ref="5">5</sup>
+          보존 창 전체로는 최근 3일이 압축되지 않은 채 남으므로 5.7배이고, 압축 구간만 보면 12.6배입니다.</div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>용량보다 더 큰 차이는 지우는 방식이다. 일반 PostgreSQL 로 31일 보존을 하면 매일 3,000만 행을 DELETE 해야 하고 그만큼 VACUUM 이 따라온다. TimescaleDB 는 청크째 DROP 이라 그 비용이 없다.</aside>
+  </section>
+
+  <!-- ========== 10 혼재 처리 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">02. 혼재</span><h2>실시간과 10분 주기를 같은 DB 에서 따로 받습니다</h2></div>
+        <div class="s-head__r">채널별 청크 · 집계 설정</div>
+      </div>
+      <div class="s-body">
+        <p class="s-lead">초당 350행과 10분당 1행을 한 표에 담으면 어느 쪽에 맞춰도 다른 쪽이 망가집니다. 채널을 표로 나누고 청크 간격을 따로 준 이유입니다.</p>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:14%">채널</th><th style="width:16%">유입</th><th style="width:13%">청크 간격</th><th style="width:18%">하루 행 수</th><th>연속 집계가 답하는 질문</th></tr></thead>
+            <tbody>
+              <tr><td><span class="chip">status</span></td><td>1초 / 대</td><td class="mono">6시간</td><td class="num">30,240,000</td><td>장비별 1분 온도 · 스캔속도 · RSSI, 오류 코드별 건수</td></tr>
+              <tr><td><span class="chip chip--neutral">actual</span></td><td>10분 / 대</td><td class="mono">1일</td><td class="num">50,400</td><td>장비 · 공정별 1분 정합 신뢰도와 진척률</td></tr>
+              <tr><td><span class="chip chip--neutral">artifact</span></td><td>10분 / 대 × 12건</td><td class="mono">6시간</td><td class="num">604,800</td><td>산출물 종류별 1분 건수와 누적 바이트</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="g2" style="margin-top:12px">
+          <div class="card card--accent"><p class="card__t">보존은 두 층입니다</p><p class="card__d">원본 31일, 연속 집계 1년. 원본이 사라져도 1분 단위 추이는 남습니다. 원본 삭제는 DELETE 가 아니라 청크 DROP 이라 VACUUM 부담이 없습니다.</p></div>
+          <div class="card card--accent"><p class="card__t">대시보드는 집계만 읽습니다</p><p class="card__d">장비 350대 × 필드를 Prometheus 레이블로 올리면 시계열이 터집니다. 전체 집계는 Prometheus 가, 장비 단위 추이는 TimescaleDB 직결 SQL 이 맡습니다.</p></div>
+        </div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>하루 행 수는 운영 전제(status 실시간, 나머지 10분)로 계산했다. 발행기 기본값은 actual·artifact 가 1분이라 10배 크다 — 질문 나오면 그렇게 답한다. 연속 집계는 materialized_only=false 라 최근 2분 구간은 원본에서 실시간으로 메워 조회된다.</aside>
+  </section>
+
+
+  <!-- ========== 10b 도착 패턴 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">02. 주기</span><h2>10분 주기는 총량이 아니라 도착 모양을 바꿉니다</h2></div>
+        <div class="s-head__r">상태 1초 · 실적 10분 · 산출물 10분</div>
+      </div>
+      <div class="s-body">
+        <p class="s-lead">주기가 1분에서 10분으로 늘면 적재 <b>평균</b>은 오히려 16% 줄어듭니다. 바뀌는 것은 순간값입니다 — 10분에 한 번 4,550행이 한꺼번에 들어옵니다.</p>
+      <figure class="cht">
+        <figcaption class="cht__t">시나리오별 순간 적재 요구와 현 스택의 실측 처리량</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="시나리오별 순간 적재 요구와 현 스택의 실측 처리량">
+          <rect x="76" y="47.6" width="780.0" height="198.4" fill="var(--hw-pale)" stroke="var(--hw-tint)" stroke-dasharray="4 3"/>
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">2,500</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">5,000</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">7,500</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">10,000</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">행/초</text>
+          <text x="173.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">발행기 기본값 1초·1분</text>
+          <text x="368.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">운영 전제 평균 1초·10분</text>
+          <text x="563.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">status 피크 4배 가정</text>
+          <text x="758.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">10분 채널 동시 발행</text>
+          <rect x="144.2" y="236.7" width="55.5" height="9.3" fill="var(--hw)" rx="1.5"><title>발행기 기본값 1초·1분 · 순간 적재 요구 426행/초</title></rect>
+          <text x="172.0" y="232.7" text-anchor="middle" font-size="12" fill="var(--ink2)">426</text>
+          <rect x="339.2" y="238.2" width="55.5" height="7.8" fill="var(--hw)" rx="1.5"><title>운영 전제 평균 1초·10분 · 순간 적재 요구 358행/초</title></rect>
+          <text x="367.0" y="234.2" text-anchor="middle" font-size="12" fill="var(--ink2)">358</text>
+          <rect x="534.2" y="215.5" width="55.5" height="30.5" fill="var(--hw)" rx="1.5"><title>status 피크 4배 가정 · 순간 적재 요구 1,400행/초</title></rect>
+          <text x="562.0" y="211.5" text-anchor="middle" font-size="12" fill="var(--ink2)">1,400</text>
+          <rect x="729.2" y="146.8" width="55.5" height="99.2" fill="var(--hw)" rx="1.5"><title>10분 채널 동시 발행 · 순간 적재 요구 4,550행/초</title></rect>
+          <text x="757.0" y="142.8" text-anchor="middle" font-size="12" fill="var(--ink2)">4,550</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="755.2" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="783.2" y="11" font-size="12.5" fill="var(--ink2)">순간 적재 요구</text>
+          <text x="82" y="35.6" font-size="12" fill="var(--hw-dk)" paint-order="stroke" stroke="var(--bg2)" stroke-width="3.5" stroke-linejoin="round">여유 구간 9101/s</text>
+        </svg>
+        <p class="cht__c">주기를 10분으로 늘리면 평균 적재율은 426에서 358행/초로 오히려 16% 줄어든다. 문제는 평균이 아니라 10분에 한 번 4,550행이 한꺼번에 도착하는 경우이고, 그마저 실측 처리량 9,101행/초의 절반이다.</p>
+      </figure>
+        <div class="note note--ok"><p class="note__t">가장 나쁜 경우도 실측 처리량의 절반입니다</p>
+          9,101행/초는 5.1 의 배치 쓰기 평균 17.8ms 에 배치당 162행을 나눈 값으로, 채널별 INSERT 와 상태 표 UPSERT 가
+          전부 끝난 뒤의 <b>실효 처리량</b>입니다. 다만 동시 발행은 현 발행기가 장비마다 시차를 두므로
+          <b>아직 한 번도 관측되지 않았습니다</b> — PoC 에서 확인할 항목입니다.</div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>평균이 줄어든다는 점을 먼저 말하고 안심시킨 뒤, 문제는 버스트라고 넘어간다. 4,550 = 350대 × 13건(실적 1 + 산출물 12)이다. 질문이 나오면 현 발행기는 offset 으로 시차를 두므로 실제로는 초당 7.6행으로 퍼진다고 답한다.</aside>
+  </section>
+
+  <!-- ========== 10c 스냅샷 중복 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">02. 전달</span><h2>값 하나가 Kafka 로 열 번 나갑니다</h2></div>
+        <div class="s-head__r"><span class="mono">snapshotIntervalMs=60000</span> 이 그대로일 때</div>
+      </div>
+      <div class="s-body">
+        <p class="s-lead">발행 정책은 실적 · 산출물이 1분 주기이던 판에서 정해졌습니다. 60초 스냅샷은 그대로인데 값은 600초에 한 번만 바뀌므로, 나머지 아홉 번은 같은 값이 다시 실려 나갑니다.</p>
+      <figure class="cht">
+        <figcaption class="cht__t">발행 주기별 같은 값의 반복 전송 배수 (snapshotIntervalMs=60000)</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="발행 주기별 같은 값의 반복 전송 배수 (snapshotIntervalMs=60000)">
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">3</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">6</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">9</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">12</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">배</text>
+          <text x="173.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">1분 주기</text>
+          <text x="368.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">2분 주기</text>
+          <text x="563.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">5분 주기</text>
+          <text x="758.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">10분 주기</text>
+          <rect x="144.2" y="227.8" width="55.5" height="18.2" fill="var(--hw)" rx="1.5"><title>1분 주기 · 한 값이 Kafka 로 나가는 횟수 1배</title></rect>
+          <text x="172.0" y="223.8" text-anchor="middle" font-size="12" fill="var(--ink2)">1</text>
+          <rect x="339.2" y="209.7" width="55.5" height="36.3" fill="var(--hw)" rx="1.5"><title>2분 주기 · 한 값이 Kafka 로 나가는 횟수 2배</title></rect>
+          <text x="367.0" y="205.7" text-anchor="middle" font-size="12" fill="var(--ink2)">2</text>
+          <rect x="534.2" y="155.2" width="55.5" height="90.8" fill="var(--hw)" rx="1.5"><title>5분 주기 · 한 값이 Kafka 로 나가는 횟수 5배</title></rect>
+          <text x="562.0" y="151.2" text-anchor="middle" font-size="12" fill="var(--ink2)">5</text>
+          <rect x="729.2" y="64.3" width="55.5" height="181.7" fill="var(--hw)" rx="1.5"><title>10분 주기 · 한 값이 Kafka 로 나가는 횟수 10배</title></rect>
+          <text x="757.0" y="60.3" text-anchor="middle" font-size="12" fill="var(--ink2)">10</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="671.6" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="699.6" y="11" font-size="12.5" fill="var(--ink2)">한 값이 Kafka 로 나가는 횟수</text>
+        </svg>
+        <p class="cht__c">snapshot 주기가 60초로 고정된 채 발행 주기만 10분으로 늘면, 값 하나가 바뀌지 않은 채 10번 실려 나간다. 멱등 인덱스가 DB 행은 막지만 Kafka 대역과 파싱 비용은 그대로 든다.</p>
+      </figure>
+        <div class="note note--risk"><p class="note__t">DB 에 65만 행을 넣으려고 655만 항목을 파싱합니다</p>
+          멱등 인덱스가 DB 행은 막아 주므로 <b>데이터는 틀리지 않습니다.</b> 대신 Kafka 대역과 소비자 파싱이 열 배로 듭니다.
+          실적 · 산출물의 <span class="mono">snapshotIntervalMs</span> 만 <span class="mono">600000</span> 으로 바꾸면 중복이 0 이 됩니다 —
+          채널별로 정책을 나눌 수 있는지가 <b>ISL 측에 확인할 첫 번째 항목</b>입니다.</div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>status 는 1초 주기가 스냅샷 60초보다 짧아 OnChange 가 지배하므로 이 문제가 없다. 관측 15분 동안 중복 스킵이 1건뿐이었던 것이 근거다. 이 슬라이드는 ISL 측 담당자가 있으면 그 자리에서 답이 나올 수 있으니 질문을 던지고 넘어간다.</aside>
+  </section>
+
+  <!-- ========== 10d 대시보드 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">02. 관측</span><h2>대시보드가 10분 주기에서 거짓말을 시작합니다</h2></div>
+        <div class="s-head__r">창 길이와 임계가 1초 주기 전제</div>
+      </div>
+      <div class="s-body">
+        <p class="s-lead">패널과 경보는 전부 1초 흐름을 전제로 창을 잡아 두었습니다. 발행 주기가 관측 창보다 길어지면 <b>정상과 장애가 같은 모양</b>이 됩니다.</p>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:22%">패널 · 경보</th><th style="width:20%">현재 창 · 임계</th><th style="width:30%">10분 주기에서</th><th>고칠 값</th></tr></thead>
+            <tbody>
+              <tr><td>채널별 수신 항목/초</td><td class="mono">rate(...[1m])</td><td><span class="chip chip--risk">깨짐</span> 열 칸 중 아홉이 빈칸이라 장애와 구분되지 않는다</td><td class="mono">[15m]</td></tr>
+              <tr><td class="mono">LidarIngestStalled</td><td class="mono">sum(rate([3m]))==0</td><td><span class="chip chip--risk">못 잡음</span> status 만 살아 있어도 합이 0 이 아니다</td><td>채널별로 쪼갠다</td></tr>
+              <tr><td class="mono">LidarKafkaLagHigh</td><td class="mono">레코드 &gt; 200</td><td><span class="chip chip--risk">못 잡음</span> 산출물 버스트는 4,200항목이지만 레코드로는 9개뿐</td><td>지연 <b>시간</b> 기준</td></tr>
+              <tr><td class="mono">LidarDataStale</td><td class="mono">freshness &gt; 120s</td><td><span class="chip chip--warn">부분</span> status 만 본다. 나머지 둘은 끊겨도 조용하다</td><td>채널별 신선도</td></tr>
+              <tr><td>연속 집계 1분 버킷</td><td class="mono">time_bucket 1분</td><td><span class="chip chip--risk">톱니</span> 버킷 열 개 중 아홉이 비어 선이 끊긴다</td><td>10분 버킷 집계</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note note--warn" style="margin-top:12px"><p class="note__t">경험칙은 창 = 발행 주기 × 1.5 입니다</p>
+          <span class="mono">rate()</span> 는 창 안에 점이 최소 둘 있어야 값을 냅니다. 10분 주기면 창은 15분이어야 합니다.
+          새로 넣을 패널은 여섯이고, 그중 셋은 소비자가 지표를 먼저 내야 만들 수 있습니다.</div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>이 표는 기술문서 8.6 의 요약이다. 전체 아홉 건 중 다섯만 실었다. 새 패널 여섯과 새 지표 둘(last_item_ts, batch_rows_max)은 8.7 에 있다. 질문이 나오면 기술문서를 연다.</aside>
+  </section>
+
+  <!-- ========== 11 압축 축 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">02. 한계</span><h2>압축은 축을 잘못 잡으면 오히려 커집니다</h2></div>
+        <div class="s-head__r">세 채널에 같은 <span class="mono">segmentby=tid</span> 를 걸어 둔 상태</div>
+      </div>
+      <div class="s-body">
+      <figure class="cht">
+        <figcaption class="cht__t">채널·세그먼트 축별 컬럼스토어 압축비 (실측)</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="채널·세그먼트 축별 컬럼스토어 압축비 (실측)">
+          <rect x="76" y="230.4" width="780.0" height="15.6" fill="var(--hw-pale)" stroke="var(--hw-tint)" stroke-dasharray="4 3"/>
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">3</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">7</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">10</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">14</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">배</text>
+          <text x="154.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">status·tid</text>
+          <text x="310.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">actual·tid</text>
+          <text x="466.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">actual·stage</text>
+          <text x="622.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">artifact·tid</text>
+          <text x="778.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">artifact·type</text>
+          <rect x="130.6" y="49.8" width="43.8" height="196.2" fill="var(--hw)" rx="1.5"><title>status·tid · 압축 전 / 압축 후 12.6배</title></rect>
+          <text x="152.5" y="45.8" text-anchor="middle" font-size="12" fill="var(--ink2)">12.6</text>
+          <rect x="286.6" y="241.3" width="43.8" height="4.7" fill="var(--hw)" rx="1.5"><title>actual·tid · 압축 전 / 압축 후 0.3배</title></rect>
+          <text x="308.5" y="237.3" text-anchor="middle" font-size="12" fill="var(--ink2)">0.3</text>
+          <rect x="442.6" y="210.2" width="43.8" height="35.8" fill="var(--hw)" rx="1.5"><title>actual·stage · 압축 전 / 압축 후 2.3배</title></rect>
+          <text x="464.5" y="206.2" text-anchor="middle" font-size="12" fill="var(--ink2)">2.3</text>
+          <rect x="598.6" y="235.1" width="43.8" height="10.9" fill="var(--hw)" rx="1.5"><title>artifact·tid · 압축 전 / 압축 후 0.7배</title></rect>
+          <text x="620.5" y="231.1" text-anchor="middle" font-size="12" fill="var(--ink2)">0.7</text>
+          <rect x="754.6" y="193.1" width="43.8" height="52.9" fill="var(--hw)" rx="1.5"><title>artifact·type · 압축 전 / 압축 후 3.4배</title></rect>
+          <text x="776.5" y="189.1" text-anchor="middle" font-size="12" fill="var(--ink2)">3.4</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="732.4" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="760.4" y="11" font-size="12.5" fill="var(--ink2)">압축 전 / 압축 후</text>
+          <text x="82" y="218.4" font-size="12" fill="var(--hw-dk)" paint-order="stroke" stroke="var(--bg2)" stroke-width="3.5" stroke-linejoin="round">1배 아래는 역효과</text>
+        </svg>
+        <p class="cht__c">status 는 장비 축으로 묶어 12.6배 줄었지만, actual·artifact 를 같은 장비 축으로 묶으면 오히려 커진다. 세그먼트당 행이 1.6개·6.5개뿐이라 압축 헤더가 데이터보다 크기 때문이다. 축을 stage·artifact_type 으로 바꾸면 2.3배·3.4배로 돌아선다.</p>
+      </figure>
+
+        <div class="note note--warn"><p class="note__t">지금 설정으로는 두 채널이 손해입니다</p>
+          세 하이퍼테이블에 모두 <span class="mono">segmentby='tid'</span> 가 걸려 있습니다. status 는 세그먼트당 917행이라 잘 듣지만
+          actual 은 1.6행 · artifact 는 6.5행뿐이라 압축 헤더가 데이터보다 큽니다. 다만 이 표본은 15분치이고
+          31일 규모에서는 세그먼트당 행이 크게 늘어납니다 — <b>1일치를 쌓아 다시 재고 축을 확정할 것</b>을 권합니다.</div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>이 실험은 운영 표를 건드리지 않고 scratch 스키마에 사본을 떠서 했다. 압축 정책이 3일 후에 돌기 때문에 실제 운영에서는 아직 한 번도 압축이 일어나지 않았다. 지금 화면의 압축률 패널이 0인 것은 정상이다.</aside>
+  </section>
+
+  <!-- ========== 12 섹션 03 + 결함 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">03. 결함</span><h2>actual 채널의 장비 축이 100% 틀려 있었습니다</h2></div>
+        <div class="s-head__r">원인은 등록부 사본이 낡은 것</div>
+      </div>
+      <div class="s-body">
+        <div class="g-2-1" style="flex:1;min-height:0">
+          <div class="stack">
+      <figure class="cht">
+        <figcaption class="cht__t">채널별 장비 축(tid) 해석 정확도 — 15분 관측</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="채널별 장비 축(tid) 해석 정확도 — 15분 관측">
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">25</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">50</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">75</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">100</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">%</text>
+          <text x="206.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">status</text>
+          <text x="466.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">actual</text>
+          <text x="726.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">artifact</text>
+          <rect x="167.0" y="28.0" width="75.0" height="218.0" fill="var(--hw)" rx="1.5"><title>status · 올바른 장비로 해석된 비율 100%</title></rect>
+          <text x="204.5" y="24.0" text-anchor="middle" font-size="12" fill="var(--ink2)">100</text>
+          <rect x="427.0" y="246.0" width="75.0" height="0.0" fill="var(--hw)" rx="1.5"><title>actual · 올바른 장비로 해석된 비율 0%</title></rect>
+          <text x="464.5" y="242.0" text-anchor="middle" font-size="12" fill="var(--ink2)">0</text>
+          <rect x="687.0" y="232.0" width="75.0" height="14.0" fill="var(--hw)" rx="1.5"><title>artifact · 올바른 장비로 해석된 비율 6.4%</title></rect>
+          <text x="724.5" y="228.0" text-anchor="middle" font-size="12" fill="var(--ink2)">6.4</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="709.6" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="737.6" y="11" font-size="12.5" fill="var(--ink2)">올바른 장비로 해석된 비율</text>
+        </svg>
+        <p class="cht__c">status 401,154건은 전부 맞았고 actual 601건은 한 건도 맞지 않았다. 태그 등록부 사본이 지금의 등록부보다 오래돼 채널별 번호 구간이 어긋난 탓이며, 페이로드 자체는 멀쩡하다.</p>
+      </figure>
+
+          </div>
+          <div class="stack">
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr><th>채널</th><th>지금 등록부</th><th>적재된 사본</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">status</td><td class="mono">1~350</td><td class="mono">1~350</td></tr>
+                  <tr><td class="mono">actual</td><td class="mono">351~1330</td><td class="mono">1401~2310</td></tr>
+                  <tr><td class="mono">artifact</td><td class="mono">1331~2380</td><td class="mono">351~1400</td></tr>
+                  <tr><td>합계</td><td class="num">2,380</td><td class="num">2,310</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="note note--risk"><p class="note__t">조용히 틀리는 경로</p>
+              <span class="mono">(토픽, 숫자)</span> 정확 조회가 빗나가면 소비자가 숫자만으로 한 번 더 찾습니다. 그 뒷문이 다른 채널의 태그를 물어 와
+              <b>미해석으로 남기는 대신 틀린 장비를 붙였습니다.</b></div>
+            <div class="note note--ok"><p class="note__t">조치</p>
+              <span class="mono">export-tag-catalog.py</span> 재실행 후 볼륨 초기화. 함께 제안 — 채널이 어긋나면 뒷문을 쓰지 말고 <span class="mono">#숫자</span> 로 남긴다.</div>
+          </div>
+        </div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>중요한 것은 적재가 멈추지 않았고 데이터도 잃지 않았다는 점이다. 페이로드의 hull_no·block_id·zone 은 멀쩡하므로 블록 축 집계는 영향이 없다. 틀린 것은 tid 컬럼 하나다. lidar_ingest_tag_channel_mismatch_total 이 3,491 로 이미 세고 있었고 경보도 정의되어 있다 — 계측이 제 역할을 했다.</aside>
+  </section>
+
+  <!-- ========== 13 CDC ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">04. CDC</span><h2>받는 쪽이 TimescaleDB 인지는 차이가 없습니다</h2></div>
+        <div class="s-head__r">문제는 보내는 쪽입니다</div>
+      </div>
+      <div class="s-body">
+        <div class="g2">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th style="width:30%">항목</th><th style="width:32%">target = PostgreSQL 16</th><th>target = TimescaleDB 2.29</th></tr></thead>
+              <tbody>
+                <tr><td>표 구성</td><td>일반 표</td><td>일반 표 — 한 줄씩 같다</td></tr>
+                <tr><td>핸들러 · 매핑</td><td>동일</td><td>동일</td></tr>
+                <tr><td>슬롯 · publication</td><td>동일</td><td>동일 (슬롯 이름만 분리)</td></tr>
+                <tr><td>하이퍼테이블</td><td>없음</td><td>없음 — 만들지 않는다</td></tr>
+                <tr><td>실제 차이</td><td>없음</td><td>확장이 켜져 있어 수신 측에서 청크 · 압축을 붙여 볼 수 있다</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="stack">
+            <div class="note note--risk"><p class="note__t">source 가 TimescaleDB 면 8곳이 깨집니다</p>
+              논리 디코딩이 부모가 아니라 <span class="mono">_hyper_1_1_chunk</span> 이름으로 나오고, 압축은 대량 DELETE 로 보이며,
+              <span class="mono">drop_chunks</span> 는 CDC 에 아예 보이지 않습니다.<sup class="ref" data-ref="6">6</sup></div>
+            <div class="card card--accent"><p class="card__t">그래서 스키마를 둘로 갈랐습니다</p><p class="card__d">
+              <span class="mono">tsdb</span> 는 하이퍼테이블과 연속 집계 — CDC 대상이 아닙니다.
+              <span class="mono">rdb</span> 는 일반 표 — publication 에 실립니다. 주석이 아니라 구조가 막습니다.</p></div>
+            <div class="card"><p class="card__t">그럼 수신 측은 무엇을 보나</p><p class="card__d">원문 하이퍼테이블은 못 옮기지만, 그것을 유계 축으로 접은 상태 표 셋
+              (<span class="mono">lidar_device_state</span> · <span class="mono">lidar_block_progress</span> · <span class="mono">lidar_block_artifact</span>)은 일반 표라 그대로 실립니다.</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>질문이 가장 많이 나오는 장이다. 핵심 한 문장 — 확장을 얹는 것은 인프라 3줄이고, 테이블을 하이퍼테이블로 바꾸는 것은 파이프라인 재설계다. 상태 표 셋은 행 수가 350·349·349 로 유계라서 CDC 로 옮길 수 있다는 점이 설계의 핵심.</aside>
+  </section>
+
+  <!-- ========== 14 권고 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">결론</span><h2>구조는 확인됐고, 확정할 것이 여섯 남았습니다</h2></div>
+        <div class="s-head__r">판단 요청</div>
+      </div>
+      <div class="s-body">
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:14%">구분</th><th style="width:32%">지금 상태</th><th style="width:32%">다음 행동</th><th>판단 필요</th></tr></thead>
+            <tbody>
+              <tr><td><span class="chip chip--ok">확인됨</span></td><td>적재 경로 · 멱등 · 격리 · 지연 1.4초</td><td>그대로 둔다</td><td>—</td></tr>
+              <tr><td><span class="chip chip--risk">결함</span></td><td>태그 등록부 사본이 낡아 장비 축이 어긋남</td><td>사본 재추출 + 뒷문 제거</td><td>재추출 주기</td></tr>
+              <tr><td><span class="chip chip--risk">신규</span></td><td>10분 주기에서 스냅샷이 같은 값을 열 번 보낸다</td><td>실적 · 산출물만 <span class="mono">snapshotIntervalMs</span> 분리</td><td>ISL 측 설정 권한</td></tr>
+              <tr><td><span class="chip chip--warn">미확정</span></td><td>10분 채널이 동시 발행인지 시차 발행인지 모른다</td><td><span class="mono">--burst</span> 로 재현 후 현장 대조</td><td>측정 일정</td></tr>
+              <tr><td><span class="chip chip--warn">미확정</span></td><td>압축 축이 세 채널 모두 <span class="mono">tid</span> — 10분 주기면 세그먼트당 행이 1/10</td><td>1일치 쌓아 재측정 후 축 확정</td><td>측정 시점</td></tr>
+              <tr><td><span class="chip chip--warn">미확정</span></td><td>페이로드 규격이 ISL 벤더 합의 전</td><td>확정되면 컬럼과 빌더를 함께 고친다</td><td>합의 일정</td></tr>
+              <tr><td><span class="chip chip--info">경계</span></td><td>replication slot 은 만료되지 않는다</td><td>CDC 미사용 구간에는 슬롯을 지운다</td><td>운영 절차</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="steps">
+          <div class="step"><span class="step__n">1</span><div class="step__t">오늘</div><div class="step__d">채널별 sendPolicy 가능 여부 확인</div></div>
+          <div class="step"><span class="step__n">2</span><div class="step__t">이번 주</div><div class="step__d">10분 버스트 재현 · 태그 사본 재추출</div></div>
+          <div class="step"><span class="step__n">3</span><div class="step__t">1일 적재</div><div class="step__d">압축 축 재측정 · 대시보드 창 교체</div></div>
+          <div class="step"><span class="step__n">4</span><div class="step__t">31일차</div><div class="step__d">보존 정책 · 디스크 실측 대조</div></div>
+        </div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>압축 정책이 3일 후라 오늘 판단할 수 없는 것이 있다는 점을 분명히 한다. 31일차 실측 대조까지 가야 이 검증이 끝난다.</aside>
+  </section>
+
+  <!-- ========== 15 출처 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">Reference</span><h2>출처</h2></div>
+        <div class="s-head__r">확인일 2026-09-11</div>
+      </div>
+      <div class="s-body">
+        <ol class="refs">
+          <li id="ref-1"><span class="refs__n">1</span><span>
+            <span class="refs__src">적재 처리량 · 지연 · 배치 실측 (15분 36초)</span>
+            <span class="refs__meta">data · lidar-ingest /metrics 와 rdb.lidar_status_message, 2026-09-11 11:16~11:37</span></span></li>
+          <li id="ref-2"><span class="refs__n">2</span><span>
+            <span class="refs__src">발행 규모 · 상태 전이 · 산출물 12건 구성</span>
+            <span class="refs__meta">code · util/mqtt-lidar-sim/lidar-sim.cs 와 README.md (389beac)</span></span></li>
+          <li id="ref-3"><span class="refs__n">3</span><span>
+            <span class="refs__src">EES V1.0 헤더 11개 계약과 값 페이로드 형식</span>
+            <span class="refs__meta">code · intersyslink-v4/src/Edge/Providers/EES/Kafka/.../V1_0/EesHeaderBuilderV1_0.cs, ValueMessageFormatterV1_0.cs</span></span></li>
+          <li id="ref-7"><span class="refs__n">7</span><span>
+            <span class="refs__src">발행 정책 실제 설정값 — OnChange · intervalMs 미설정 · snapshot 60s</span>
+            <span class="refs__meta">data · isl-secondary.db 의 EES_CONNECTION.ConfigJson (ot.lidar.all), 조회 2026-09-11</span></span></li>
+          <li id="ref-4"><span class="refs__n">4</span><span>
+            <span class="refs__src">태그 등록부 ParameterId 구간 (등록부 원본 대조)</span>
+            <span class="refs__meta">data · isl-secondary.db 의 EES_MESSAGE × EES_TAG, 조회 2026-09-11</span></span></li>
+          <li id="ref-5"><span class="refs__n">5</span><span>
+            <span class="refs__src">컬럼스토어 압축비 실측 (321,061행 사본)</span>
+            <span class="refs__meta">data · chunk_compression_stats(), scratch 스키마 사본, 2026-09-11</span></span></li>
+          <li id="ref-6"><span class="refs__n">6</span><span>
+            <span class="refs__src">원천이 TimescaleDB 일 때 깨지는 지점 8건 (B안)</span>
+            <span class="refs__meta">doc · docs/cdc/timescaledb-cdc-impact.html, 2026-09-07</span></span></li>
+        </ol>
+        <div class="note"><p class="note__t">함께 보는 문서</p>
+          필드 단위 계약, 표별 컬럼, 재현 절차, 테스트 전략은 <span class="mono">docs/cdc/lidar-tsdb-pipeline.html</span> 에 있습니다.</div>
+      </div>
+      <div class="s-foot"><span>OT LiDAR 필드 데이터 TimescaleDB 적재 검증</span><span class="pg"></span></div>
+    </div>
+  </section>
+
+</div>
+
+<div class="prog" id="prog"></div>
+<div class="hud no-print">
+  <button id="bPrev" type="button">이전</button>
+  <button id="bNext" type="button">다음</button>
+  <span class="cnt" id="hudCnt">1 / 1</span>
+  <span class="sp"></span>
+  <span class="ttl">방향키 이동 · O 전체보기 · N 노트 · F 전체화면 · T 테마</span>
+  <span class="sp"></span>
+  <button id="bOver" type="button">전체보기</button>
+  <button id="bNote" type="button">노트</button>
+  <button id="bTheme" type="button">테마</button>
+  <button id="bPrint" type="button">PDF</button>
+</div>
+
+<script>
+/* ============================================================
+   HW Doc Kit - diagram engine (의존성 없음, 단일 파일 내장용)
+   drawio 느낌의 조작: 드래그 이동 / 연결 / 라벨 인라인 편집 /
+   팬·줌 / 톤 변경 / 삭제 / Ctrl+Z / JSON 내보내기(붙여넣기로 영구 반영)
+
+   마크업 (자세한 내용은 references/diagram.md):
+     div.dgm[data-edit=on] 안에
+     script[type=application/json][class=dgm-data] 로 노드·엣지 JSON 을 넣습니다.
+   ============================================================ */
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var GRID = 10;
+  var TONES = ['neutral', 'primary', 'accent', 'muted', 'ok', 'warn', 'risk', 'info'];
+
+  function s(n, a) {
+    var e = document.createElementNS(NS, n);
+    for (var k in (a || {})) e.setAttribute(k, a[k]);
+    return e;
+  }
+  function h(t, c, txt) {
+    var e = document.createElement(t);
+    if (c) e.className = c;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+  function btn(label, title) {
+    var b = h('button', 'dgm__btn', label);
+    b.type = 'button';
+    if (title) b.title = title;
+    return b;
+  }
+  function snap(v) { return Math.round(v / GRID) * GRID; }
+
+  function boxShape(n) {
+    var sh = n.shape || 'rect', w = n.w, ht = n.h;
+    if (sh === 'diamond')
+      return s('path', { 'class': 'box', d: 'M' + w / 2 + ',0 L' + w + ',' + ht / 2 + ' L' + w / 2 + ',' + ht + ' L0,' + ht / 2 + ' Z' });
+    if (sh === 'store') {
+      var r = Math.min(14, ht / 4);
+      var d = 'M0,' + r +
+        ' C0,' + (r * .45) + ' ' + (w * .22) + ',0 ' + (w / 2) + ',0' +
+        ' C' + (w * .78) + ',0 ' + w + ',' + (r * .45) + ' ' + w + ',' + r +
+        ' L' + w + ',' + (ht - r) +
+        ' C' + w + ',' + (ht - r * .45) + ' ' + (w * .78) + ',' + ht + ' ' + (w / 2) + ',' + ht +
+        ' C' + (w * .22) + ',' + ht + ' 0,' + (ht - r * .45) + ' 0,' + (ht - r) + ' Z';
+      return s('path', { 'class': 'box', d: d });
+    }
+    if (sh === 'note') {
+      var f = 14;
+      return s('path', { 'class': 'box', d: 'M0,0 L' + (w - f) + ',0 L' + w + ',' + f + ' L' + w + ',' + ht + ' L0,' + ht + ' Z' });
+    }
+    var rx = sh === 'pill' ? ht / 2 : (sh === 'round' ? 12 : 4);
+    return s('rect', { 'class': 'box', x: 0, y: 0, width: w, height: ht, rx: rx });
+  }
+
+  /* 노드 두 개 사이의 직교(엘보) 경로 */
+  function route(a, b) {
+    var ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    var dx = bc.x - ac.x, dy = bc.y - ac.y, p1, p2, dir;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      dir = 'h';
+      p1 = { x: dx > 0 ? a.x + a.w : a.x, y: ac.y };
+      p2 = { x: dx > 0 ? b.x : b.x + b.w, y: bc.y };
+    } else {
+      dir = 'v';
+      p1 = { x: ac.x, y: dy > 0 ? a.y + a.h : a.y };
+      p2 = { x: bc.x, y: dy > 0 ? b.y : b.y + b.h };
+    }
+    var d, mid;
+    if (dir === 'h') {
+      var mx = (p1.x + p2.x) / 2;
+      d = 'M' + p1.x + ',' + p1.y + ' L' + mx + ',' + p1.y + ' L' + mx + ',' + p2.y + ' L' + p2.x + ',' + p2.y;
+      mid = { x: mx, y: (p1.y + p2.y) / 2 };
+    } else {
+      var my = (p1.y + p2.y) / 2;
+      d = 'M' + p1.x + ',' + p1.y + ' L' + p1.x + ',' + my + ' L' + p2.x + ',' + my + ' L' + p2.x + ',' + p2.y;
+      mid = { x: (p1.x + p2.x) / 2, y: my };
+    }
+    return { d: d, mid: mid };
+  }
+
+  /* 원본 JSON 이 바뀌었는지 보는 값. 문서를 고쳐 다시 배포하면 해시가 달라져
+     예전 편집본을 버린다 — 안 그러면 저자가 고친 그림이 영원히 안 보인다. */
+  function srcHash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) + h + s.charCodeAt(i)) | 0; }
+    return String(h);
+  }
+
+  function Diagram(root) {
+    this.root = root;
+    this.editable = root.getAttribute('data-edit') !== 'off';
+
+    /* 저장 키 — data-key 가 있으면 그것을, 없으면 문서 안에서의 순번을 쓴다.
+       순번은 그림을 추가·삭제하면 밀리지만, 그때는 해시도 함께 달라져 저장본이 버려진다. */
+    var all = document.querySelectorAll('.dgm');
+    this.key = 'hwdgm:' + (location.pathname.split('/').pop() || 'doc') + ':'
+      + (root.getAttribute('data-key') || Array.prototype.indexOf.call(all, root));
+
+    var tag = root.querySelector('script.dgm-data');
+    this.srcHash = srcHash(tag ? tag.textContent : '');
+
+    this.data = this.read();
+    var saved = this.loadSaved();
+    if (saved) this.data = saved;
+    this.view = { tx: 0, ty: 0, k: 1 };
+    this.sel = null;          /* {type:'node'|'edge'|'group', id} */
+    this.linkMode = false;
+    this.linkFrom = null;
+    this.undo = [];
+    this.build();
+    this.render();
+    this.fit();
+    this.ready = true;
+    this.markSaved(!!this._restored);
+  }
+
+  Diagram.prototype.read = function () {
+    var tag = this.root.querySelector('script.dgm-data');
+    var d = { nodes: [], edges: [], groups: [] };
+    if (tag) { try { d = JSON.parse(tag.textContent); } catch (e) { console.warn('[dgm] JSON 파싱 실패', e); } }
+    d.nodes = d.nodes || []; d.edges = d.edges || []; d.groups = d.groups || [];
+    d.nodes.forEach(function (n) {
+      n.w = n.w || 170; n.h = n.h || 62;
+      n.shape = n.shape || 'rect'; n.tone = n.tone || 'neutral';
+      n.x = n.x || 0; n.y = n.y || 0;
+    });
+    return d;
+  };
+
+  Diagram.prototype.build = function () {
+    var self = this;
+    var bar = h('div', 'dgm__bar no-print');
+    var mk = function (label, title, fn) { var b = btn(label, title); b.addEventListener('click', fn); bar.appendChild(b); return b; };
+
+    mk('박스', '새 박스 추가', function () { self.addNode(); });
+    this.bLink = mk('연결', '두 박스를 차례로 클릭해 화살표 연결', function () { self.toggleLink(); });
+    mk('색', '선택 항목의 톤 변경', function () { self.cycleTone(); });
+    mk('모양', '선택 박스의 모양 변경', function () { self.cycleShape(); });
+    mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
+    bar.appendChild(h('span', 'sp'));
+    mk('−', '축소', function () { self.zoom(1 / 1.2); });
+    mk('+', '확대', function () { self.zoom(1.2); });
+    mk('맞춤', '화면에 맞추기', function () { self.fit(); });
+    this.bMax = mk('넓게', '화면 가득 펼치기 (Esc 로 닫기)', function () { self.toggleMax(); });
+    mk('JSON', '수정 결과를 JSON으로 복사해 원본 파일에 붙여넣기', function () { self.openJson(); });
+    this.bReset = mk('원래대로', '이 브라우저에 저장된 편집 내용을 지운다', function () { self.resetSaved(); });
+    bar.appendChild(h('span', 'dgm__hint', '드래그 이동 · 더블클릭 라벨수정 · 휠 줌 · 빈 곳 드래그 팬'));
+
+    var svg = s('svg', { 'class': 'dgm__svg' });
+    var defs = s('defs');
+    [['ar-default', 'var(--ink3)'], ['ar-primary', 'var(--hw)'], ['ar-risk', 'var(--risk)'], ['ar-ok', 'var(--ok)']]
+      .forEach(function (m) {
+        var mk2 = s('marker', {
+          id: m[0] + '-' + Math.random().toString(36).slice(2, 7),
+          viewBox: '0 0 10 10', refX: 9, refY: 5,
+          markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'
+        });
+        var p = s('path', { d: 'M0,1 L10,5 L0,9 z' });
+        p.setAttribute('style', 'fill:' + m[1]);
+        mk2.appendChild(p); defs.appendChild(mk2);
+        self['mk_' + m[0].slice(3)] = mk2.getAttribute('id');
+      });
+    svg.appendChild(defs);
+
+    this.gRoot = s('g');
+    this.gGroups = s('g'); this.gEdges = s('g'); this.gNodes = s('g');
+    this.gRoot.appendChild(this.gGroups);
+    this.gRoot.appendChild(this.gEdges);
+    this.gRoot.appendChild(this.gNodes);
+    svg.appendChild(this.gRoot);
+
+    this.svg = svg;
+    this.root.insertBefore(svg, this.root.firstChild);
+    if (this.editable) this.root.insertBefore(bar, svg);
+
+    /* JSON 모달 */
+    var modal = h('div', 'dgm__modal no-print');
+    var pane = h('div', 'pane');
+    var head = h('div', 'head'); head.appendChild(h('b', null, '다이어그램 JSON'));
+    head.appendChild(h('span', 'sp'));
+    var closeB = btn('닫기'); head.appendChild(closeB);
+    var ta = h('textarea'); ta.spellcheck = false;
+    var foot = h('div', 'foot');
+    var copyB = btn('전체 복사'); var applyB = btn('붙여넣은 JSON 적용');
+    foot.appendChild(h('span', 'dgm__hint', '원본 HTML의 dgm-data 블록에 붙여넣으면 수정이 영구 반영됩니다'));
+    foot.appendChild(h('span', 'sp')); foot.appendChild(applyB); foot.appendChild(copyB);
+    pane.appendChild(head); pane.appendChild(ta); pane.appendChild(foot);
+    modal.appendChild(pane); this.root.appendChild(modal);
+    this.modal = modal; this.ta = ta;
+    closeB.addEventListener('click', function () { modal.classList.remove('is-open'); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('is-open'); });
+    copyB.addEventListener('click', function () {
+      ta.select(); ta.setSelectionRange(0, ta.value.length);
+      try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); }
+      copyB.textContent = '복사됨'; setTimeout(function () { copyB.textContent = '전체 복사'; }, 1200);
+    });
+    applyB.addEventListener('click', function () {
+      try {
+        var d = JSON.parse(ta.value);
+        self.push(); self.data = d; self.data.nodes = d.nodes || []; self.data.edges = d.edges || []; self.data.groups = d.groups || [];
+        self.render(); self.fit(); modal.classList.remove('is-open');
+      } catch (e) { alert('JSON 형식이 올바르지 않습니다: ' + e.message); }
+    });
+
+    this.bind();
+  };
+
+  /* ---------- 렌더 ---------- */
+  Diagram.prototype.render = function () {
+    var self = this;
+    this.gGroups.textContent = ''; this.gEdges.textContent = ''; this.gNodes.textContent = '';
+    this.index = {};
+    this.data.nodes.forEach(function (n) { self.index[n.id] = n; });
+
+    this.data.groups.forEach(function (g) {
+      var el = s('g', { 'class': 'dgm-grp', 'data-id': g.id, transform: 'translate(' + g.x + ',' + g.y + ')' });
+      el.appendChild(s('rect', { 'class': 'box', x: 0, y: 0, width: g.w, height: g.h, rx: 10 }));
+      var t = s('text', { 'class': 'gl', x: 12, y: 20 }); t.textContent = g.label || '';
+      el.appendChild(t);
+      self.gGroups.appendChild(el);
+    });
+
+    this.data.edges.forEach(function (e, i) {
+      var a = self.index[e.from], b = self.index[e.to];
+      if (!a || !b) return;
+      var r = route(a, b);
+      var g = s('g', { 'class': 'dgm-edge', 'data-i': i });
+      if (e.tone) g.setAttribute('data-tone', e.tone);
+      if (e.style) g.setAttribute('data-style', e.style);
+      var wire = s('path', { 'class': 'wire', d: r.d });
+      var mid = e.tone === 'primary' ? self.mk_primary : e.tone === 'risk' ? self.mk_risk : e.tone === 'ok' ? self.mk_ok : self.mk_default;
+      if (e.arrow !== false) wire.setAttribute('marker-end', 'url(#' + mid + ')');
+      g.appendChild(s('path', { 'class': 'hit', d: r.d }));
+      g.appendChild(wire);
+      if (e.label) {
+        var txt = String(e.label), wpx = 0;
+        for (var ci = 0; ci < txt.length; ci++) wpx += txt.charCodeAt(ci) > 0x2E80 ? 12.5 : 7;
+        var w = Math.max(34, Math.ceil(wpx) + 22);
+        var fo = s('foreignObject', { x: r.mid.x - w / 2, y: r.mid.y - 11, width: w, height: 22 });
+        var div = h('div', 'elbl'); div.appendChild(h('span', null, e.label));
+        fo.appendChild(div); g.appendChild(fo);
+      }
+      self.gEdges.appendChild(g);
+    });
+
+    this.data.nodes.forEach(function (n) {
+      var g = s('g', { 'class': 'dgm-node', 'data-id': n.id, 'data-tone': n.tone, transform: 'translate(' + n.x + ',' + n.y + ')' });
+      g.appendChild(boxShape(n));
+      var pad = n.shape === 'diamond' ? Math.round(n.w * .18) : 0;
+      var fo = s('foreignObject', { x: pad, y: 0, width: n.w - pad * 2, height: n.h });
+      var lbl = h('div', 'lbl');
+      lbl.appendChild(h('span', 't', n.label || ''));
+      if (n.sub) lbl.appendChild(h('span', 'sub', n.sub));
+      fo.appendChild(lbl); g.appendChild(fo);
+      self.gNodes.appendChild(g);
+    });
+
+    this.paint();
+  };
+
+  /* render 는 모든 변경 뒤에 불린다 — 여기 한 곳만 잡으면 끌기·라벨 편집·추가·삭제가
+     모두 저장된다. 첫 그리기와 되돌리기 때는 건너뛴다. */
+  (function (orig) {
+    Diagram.prototype.render = function () {
+      orig.call(this);
+      if (this.ready && !this._skipSave) this.save();
+    };
+  })(Diagram.prototype.render);
+
+  Diagram.prototype.paint = function () {
+    var self = this;
+    this.gRoot.setAttribute('transform', 'translate(' + this.view.tx + ',' + this.view.ty + ') scale(' + this.view.k + ')');
+    Array.prototype.forEach.call(this.root.querySelectorAll('.is-sel'), function (e) { e.classList.remove('is-sel'); });
+    if (!this.sel) return;
+    var q = this.sel.type === 'edge' ? '.dgm-edge[data-i="' + this.sel.id + '"]'
+      : this.sel.type === 'group' ? '.dgm-grp[data-id="' + this.sel.id + '"]'
+        : '.dgm-node[data-id="' + this.sel.id + '"]';
+    var el = this.root.querySelector(q);
+    if (el) el.classList.add('is-sel');
+  };
+
+  /* ---------- 좌표 ---------- */
+  Diagram.prototype.world = function (ev) {
+    var r = this.svg.getBoundingClientRect();
+    return { x: (ev.clientX - r.left - this.view.tx) / this.view.k, y: (ev.clientY - r.top - this.view.ty) / this.view.k };
+  };
+
+  /* 화면 가득 펼치기. 다른 다이어그램이 펼쳐져 있으면 먼저 닫는다. */
+  Diagram.prototype.toggleMax = function (force) {
+    var self = this;
+    var on = (force == null) ? !this.root.classList.contains('is-max') : !!force;
+    if (on) {
+      var cur = document.querySelector('.dgm.is-max');
+      if (cur && cur !== this.root && cur.__dgm) cur.__dgm.toggleMax(false);
+    }
+    this.root.classList.toggle('is-max', on);
+    document.documentElement.classList.toggle('dgm-locked', on);
+    if (this.bMax) {
+      this.bMax.classList.toggle('is-on', on);
+      this.bMax.textContent = on ? '닫기' : '넓게';
+      this.bMax.title = on ? '원래 크기로 (Esc)' : '화면 가득 펼치기 (Esc 로 닫기)';
+    }
+    (window.requestAnimationFrame || setTimeout)(function () { self.fit(); });
+  };
+
+  Diagram.prototype.fit = function () {
+    var items = this.data.nodes.concat(this.data.groups);
+    var r = this.svg.getBoundingClientRect();
+    // CSS transform:scale() 이 걸린 무대(발표용 .stage) 안에서는 getBoundingClientRect 가
+    // "화면에 보이는" 크기를 돌려준다. 그 값으로 배율을 잡으면 큰 화면에서 상한(1.6배)까지
+    // 확대돼 그림이 잘리고, 작은 화면에서는 필요 이상 줄어든다.
+    // clientWidth/Height 는 변환 전 레이아웃 크기라 무대 배율과 무관하다.
+    var W = this.svg.clientWidth || r.width || 800;
+    var H = this.svg.clientHeight || r.height || 420;
+    if (!items.length) { this.view = { tx: 20, ty: 20, k: 1 }; return this.paint(); }
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    items.forEach(function (n) {
+      x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+      x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h);
+    });
+    var pad = 24, bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
+    var k = Math.min(W / bw, H / bh, 1.6);
+    this.view.k = k;
+    this.view.tx = (W - bw * k) / 2 - (x0 - pad) * k;
+    this.view.ty = (H - bh * k) / 2 - (y0 - pad) * k;
+    this.paint();
+  };
+
+  Diagram.prototype.zoom = function (f, cx, cy) {
+    var r = this.svg.getBoundingClientRect();
+    cx = cx == null ? r.width / 2 : cx; cy = cy == null ? r.height / 2 : cy;
+    var k0 = this.view.k, k1 = Math.max(.25, Math.min(3, k0 * f));
+    this.view.tx = cx - (cx - this.view.tx) * (k1 / k0);
+    this.view.ty = cy - (cy - this.view.ty) * (k1 / k0);
+    this.view.k = k1; this.paint();
+  };
+
+  /* ---------- 편집 내용 보관 (브라우저 안에만) ----------
+     끌어 옮기고 라벨을 고친 결과가 새로고침에도 남는다. 저장 위치는 이 브라우저의
+     localStorage 라 다른 사람에게는 전달되지 않는다 — 문서 자체에 반영하려면
+     JSON 버튼으로 내보내 원본 파일에 붙여넣어야 한다. */
+  Diagram.prototype.save = function () {
+    if (!this.editable || !this.key) return;
+    var self = this;
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(function () {
+      try {
+        localStorage.setItem(self.key, JSON.stringify({ v: self.srcHash, d: self.data }));
+        self.markSaved(true);
+      } catch (e) { /* 사생활 보호 모드 등 — 저장만 안 될 뿐 편집은 된다 */ }
+    }, 250);
+  };
+
+  Diagram.prototype.loadSaved = function () {
+    try {
+      var raw = localStorage.getItem(this.key);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || o.v !== this.srcHash || !o.d) { localStorage.removeItem(this.key); return null; }
+      this._restored = true;
+      return o.d;
+    } catch (e) { return null; }
+  };
+
+  Diagram.prototype.resetSaved = function () {
+    try { localStorage.removeItem(this.key); } catch (e) { }
+    this.data = this.read();
+    this.sel = null;
+    this._skipSave = true;
+    this.render();
+    this._skipSave = false;
+    this.fit();
+    this.markSaved(false);
+  };
+
+  /* 저장됨 표시. 버튼 라벨만 잠깐 바꾼다 — 별도 알림창은 발표 중에 방해가 된다. */
+  Diagram.prototype.markSaved = function (on) {
+    if (!this.bReset) return;
+    this.bReset.classList.toggle('is-on', !!on);
+    this.bReset.title = on ? '이 브라우저에 저장된 편집 내용을 지우고 원래대로' : '원래대로 (저장된 편집 없음)';
+  };
+
+  /* ---------- 편집 ---------- */
+  Diagram.prototype.push = function () {
+    this.undo.push(JSON.stringify(this.data));
+    if (this.undo.length > 40) this.undo.shift();
+  };
+  Diagram.prototype.popUndo = function () {
+    if (!this.undo.length) return;
+    this.data = JSON.parse(this.undo.pop());
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.addNode = function () {
+    this.push();
+    var id = 'n' + Date.now().toString(36).slice(-5);
+    var r = this.svg.getBoundingClientRect();
+    var wx = snap((r.width / 2 - this.view.tx) / this.view.k - 85);
+    var wy = snap((r.height / 2 - this.view.ty) / this.view.k - 31);
+    this.data.nodes.push({ id: id, label: '새 단계', x: wx, y: wy, w: 170, h: 62, shape: 'rect', tone: 'neutral' });
+    this.sel = { type: 'node', id: id };
+    this.render();
+  };
+  Diagram.prototype.toggleLink = function () {
+    this.linkMode = !this.linkMode; this.linkFrom = null;
+    this.bLink.classList.toggle('is-on', this.linkMode);
+  };
+  Diagram.prototype.cycleTone = function () {
+    if (!this.sel) return;
+    this.push();
+    if (this.sel.type === 'node') {
+      var n = this.index[this.sel.id];
+      n.tone = TONES[(TONES.indexOf(n.tone) + 1) % TONES.length];
+    } else if (this.sel.type === 'edge') {
+      var order = [undefined, 'primary', 'ok', 'risk'];
+      var e = this.data.edges[this.sel.id];
+      e.tone = order[(order.indexOf(e.tone) + 1) % order.length];
+    }
+    this.render();
+  };
+  Diagram.prototype.cycleShape = function () {
+    if (!this.sel || this.sel.type !== 'node') return;
+    var SH = ['rect', 'round', 'pill', 'diamond', 'store', 'note'];
+    this.push();
+    var n = this.index[this.sel.id];
+    n.shape = SH[(SH.indexOf(n.shape) + 1) % SH.length];
+    this.render();
+  };
+  Diagram.prototype.remove = function () {
+    if (!this.sel) return;
+    this.push();
+    var self = this;
+    if (this.sel.type === 'node') {
+      this.data.nodes = this.data.nodes.filter(function (n) { return n.id !== self.sel.id; });
+      this.data.edges = this.data.edges.filter(function (e) { return e.from !== self.sel.id && e.to !== self.sel.id; });
+    } else if (this.sel.type === 'edge') {
+      this.data.edges.splice(this.sel.id, 1);
+    } else {
+      this.data.groups = this.data.groups.filter(function (g) { return g.id !== self.sel.id; });
+    }
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.openJson = function () {
+    this.ta.value = JSON.stringify(this.data, null, 2);
+    this.modal.classList.add('is-open');
+  };
+
+  /* ---------- 이벤트 ---------- */
+  Diagram.prototype.bind = function () {
+    var self = this, drag = null, pan = null;
+
+    this.svg.addEventListener('pointerdown', function (ev) {
+      if (ev.target.closest('[contenteditable="true"]')) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      var edgeEl = ev.target.closest('.dgm-edge');
+      var grpEl = ev.target.closest('.dgm-grp');
+
+      if (self.linkMode && nodeEl) {
+        var id = nodeEl.getAttribute('data-id');
+        if (!self.linkFrom) { self.linkFrom = id; self.sel = { type: 'node', id: id }; self.paint(); }
+        else if (self.linkFrom !== id) {
+          self.push();
+          self.data.edges.push({ from: self.linkFrom, to: id, label: '' });
+          self.linkFrom = null; self.toggleLink(); self.render();
+        }
+        return;
+      }
+      if (nodeEl && self.editable) {
+        self.sel = { type: 'node', id: nodeEl.getAttribute('data-id') };
+        var n = self.index[self.sel.id];
+        var w = self.world(ev);
+        drag = { kind: 'node', obj: n, dx: w.x - n.x, dy: w.y - n.y, moved: false };
+        self.push();
+      } else if (grpEl && self.editable) {
+        self.sel = { type: 'group', id: grpEl.getAttribute('data-id') };
+        var g = self.data.groups.filter(function (q) { return q.id === self.sel.id; })[0];
+        var w2 = self.world(ev);
+        drag = { kind: 'group', obj: g, dx: w2.x - g.x, dy: w2.y - g.y, moved: false };
+        self.push();
+      } else if (edgeEl) {
+        self.sel = { type: 'edge', id: +edgeEl.getAttribute('data-i') };
+      } else {
+        self.sel = null;
+        pan = { x: ev.clientX, y: ev.clientY, tx: self.view.tx, ty: self.view.ty };
+        self.svg.classList.add('is-panning');
+      }
+      self.svg.setPointerCapture(ev.pointerId);
+      self.paint();
+    });
+
+    this.svg.addEventListener('pointermove', function (ev) {
+      if (drag) {
+        var w = self.world(ev);
+        drag.obj.x = snap(w.x - drag.dx); drag.obj.y = snap(w.y - drag.dy);
+        drag.moved = true;
+        self.render();
+      } else if (pan) {
+        self.view.tx = pan.tx + (ev.clientX - pan.x);
+        self.view.ty = pan.ty + (ev.clientY - pan.y);
+        self.paint();
+      }
+    });
+
+    var end = function (ev) {
+      if (drag && !drag.moved) self.undo.pop();
+      drag = null; pan = null;
+      self.svg.classList.remove('is-panning');
+      try { self.svg.releasePointerCapture(ev.pointerId); } catch (e) { }
+    };
+    this.svg.addEventListener('pointerup', end);
+    this.svg.addEventListener('pointercancel', end);
+
+    this.svg.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      var r = self.svg.getBoundingClientRect();
+      self.zoom(ev.deltaY < 0 ? 1.12 : 1 / 1.12, ev.clientX - r.left, ev.clientY - r.top);
+    }, { passive: false });
+
+    this.svg.addEventListener('dblclick', function (ev) {
+      if (!self.editable) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      if (nodeEl) return self.edit(nodeEl.querySelector('.lbl .t'), function (v) {
+        self.index[nodeEl.getAttribute('data-id')].label = v;
+      });
+      var edgeEl = ev.target.closest('.dgm-edge');
+      if (edgeEl) {
+        var i = +edgeEl.getAttribute('data-i');
+        var v = prompt('연결 라벨', self.data.edges[i].label || '');
+        if (v !== null) { self.push(); self.data.edges[i].label = v; self.render(); }
+      }
+    });
+
+    this.root.addEventListener('keydown', function (ev) {
+      if (ev.target.getAttribute && ev.target.getAttribute('contenteditable') === 'true') return;
+      if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); self.remove(); }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); self.popUndo(); }
+    });
+    this.root.tabIndex = 0;
+
+    // 폭이 바뀌면 다시 그리는 것만으로는 부족하다 — 좁아진 칸에 옛 배율로 그리면 넘쳐서 잘린다.
+    // fit() 으로 배율까지 다시 잡아야 항상 전체가 보인다.
+    var ro = window.ResizeObserver ? new ResizeObserver(function () { self.fit(); }) : null;
+    if (ro) ro.observe(this.svg);
+  };
+
+  Diagram.prototype.edit = function (el, done) {
+    if (!el) return;
+    var self = this;
+    this.push();
+    el.parentNode.setAttribute('contenteditable', 'true');
+    el.parentNode.focus();
+    var save = function () {
+      el.parentNode.removeAttribute('contenteditable');
+      done(el.textContent.trim());
+      self.render();
+    };
+    el.parentNode.addEventListener('blur', save, { once: true });
+    el.parentNode.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); el.parentNode.blur(); }
+      if (ev.key === 'Escape') { el.parentNode.removeAttribute('contenteditable'); self.popUndo(); }
+      ev.stopPropagation();
+    });
+    var rg = document.createRange(); rg.selectNodeContents(el);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+  };
+
+  function initAll(scope) {
+    var list = (scope || document).querySelectorAll('.dgm');
+    Array.prototype.forEach.call(list, function (el) {
+      if (el.__dgm) return;
+      el.__dgm = new Diagram(el);
+    });
+  }
+  /* Esc 는 펼쳐 놓은 다이어그램을 닫는다. 라벨 편집 중의 Esc 는
+     edit() 안에서 stopPropagation 되므로 여기까지 오지 않는다. */
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var el = document.querySelector('.dgm.is-max');
+    if (el && el.__dgm) { ev.preventDefault(); el.__dgm.toggleMax(false); }
+  });
+
+  window.HWDiagram = { initAll: initAll, Diagram: Diagram };
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', function () { initAll(); });
+  else initAll();
+})();
+
+/* ============================================================
+   HW Doc Kit - 발표 덱 런타임 (네비게이션 / 배율 / 오버뷰 / 노트)
+   ============================================================ */
+(function () {
+  'use strict';
+  var deck = document.getElementById('deck');
+  if (!deck) return;
+  var slides = Array.prototype.slice.call(deck.querySelectorAll('.slide'));
+  var cur = 0;
+
+  slides.forEach(function (sl, i) {
+    sl.setAttribute('data-n', i + 1);
+    var foot = sl.querySelector('.s-foot .pg');
+    if (foot && !foot.textContent.trim()) foot.textContent = (i + 1) + ' / ' + slides.length;
+    sl.addEventListener('click', function () {
+      if (deck.classList.contains('is-overview')) { go(i); overview(false); }
+    });
+  });
+
+  function scale() {
+    var hud = 46, pad = deck.classList.contains('is-overview') ? 0 : 28;
+    var k = Math.min((window.innerWidth - pad * 2) / 1280, (window.innerHeight - hud - pad) / 720);
+    document.documentElement.style.setProperty('--k', Math.max(.15, k).toFixed(4));
+  }
+
+  function go(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach(function (s, j) { s.classList.toggle('is-cur', j === cur); });
+    var c = document.getElementById('hudCnt');
+    if (c) c.textContent = (cur + 1) + ' / ' + slides.length;
+    var p = document.getElementById('prog');
+    if (p) p.style.width = ((cur + 1) / slides.length * 100).toFixed(2) + '%';
+    if (location.hash !== '#' + (cur + 1)) history.replaceState(null, '', '#' + (cur + 1));
+    if (window.HWDiagram) window.HWDiagram.initAll(slides[cur]);
+    var d = slides[cur].querySelectorAll('.dgm');
+    Array.prototype.forEach.call(d, function (el) { if (el.__dgm) el.__dgm.fit(); });
+  }
+
+  function overview(on) {
+    deck.classList.toggle('is-overview', on == null ? !deck.classList.contains('is-overview') : on);
+    scale();
+    if (deck.classList.contains('is-overview')) window.HWDiagram && window.HWDiagram.initAll(deck);
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (/^(INPUT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'PageDown' || k === ' ') { e.preventDefault(); go(cur + 1); }
+    else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); go(cur - 1); }
+    else if (k === 'Home') go(0);
+    else if (k === 'End') go(slides.length - 1);
+    else if (k === 'o' || k === 'O') overview();
+    else if (k === 'n' || k === 'N') deck.classList.toggle('is-notes');
+    else if (k === 't' || k === 'T') theme();
+    else if (k === 'f' || k === 'F') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }
+  });
+
+  function theme() {
+    var r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  }
+
+  function bind(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+  bind('bPrev', function () { go(cur - 1); });
+  bind('bNext', function () { go(cur + 1); });
+  bind('bOver', function () { overview(); });
+  bind('bNote', function () { deck.classList.toggle('is-notes'); });
+  bind('bTheme', theme);
+  bind('bPrint', function () { window.print(); });
+
+  window.addEventListener('resize', scale);
+  window.addEventListener('hashchange', function () {
+    var n = parseInt(location.hash.slice(1), 10);
+    if (n && n - 1 !== cur) go(n - 1);
+  });
+
+  /* 코드 복사 버튼 */
+  Array.prototype.forEach.call(document.querySelectorAll('.code__copy'), function (b) {
+    b.addEventListener('click', function () {
+      var pre = b.closest('.code').querySelector('pre');
+      try { navigator.clipboard.writeText(pre.innerText); } catch (e) { }
+      var t = b.textContent; b.textContent = '복사됨';
+      setTimeout(function () { b.textContent = t; }, 1200);
+    });
+  });
+
+  /* 각주 -> 출처 슬라이드 이동 */
+  Array.prototype.forEach.call(document.querySelectorAll('.ref[data-ref]'), function (r) {
+    r.addEventListener('click', function () {
+      var tgt = document.querySelector('#ref-' + r.getAttribute('data-ref'));
+      if (!tgt) return;
+      var sl = tgt.closest('.slide');
+      go(slides.indexOf(sl));
+      tgt.animate([{ background: 'var(--hw-pale)' }, { background: 'transparent' }], { duration: 1400 });
+    });
+  });
+
+  scale();
+  var start = parseInt(location.hash.slice(1), 10);
+  go(start ? start - 1 : 0);
+  window.addEventListener('beforeprint', function () { document.documentElement.style.setProperty('--k', 1); });
+  window.addEventListener('afterprint', scale);
+})();
+</script>
+</body>
+</html>

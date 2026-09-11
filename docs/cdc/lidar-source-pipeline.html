@@ -1,0 +1,1802 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LiDAR 소스 DB 적재 경로</title>
+<style>
+/* ============================================================
+   HW Doc Kit - design tokens & base primitives
+   금지: 이모지, 보라/바이올렛/인디고 계열, 무지개 그라데이션
+   기준색: 한화 오렌지 계열
+   ============================================================ */
+:root{
+  /* brand */
+  --hw:#F37321;          /* 기본 오렌지 */
+  --hw-dk:#D2590F;       /* 진한 오렌지 (호버/강조선) */
+  --hw-dp:#A8420A;       /* 가장 진한 오렌지 (제목 강조) */
+  --hw-lt:#FFB27A;       /* 밝은 오렌지 (보조 채움) */
+  --hw-pale:#FFF1E7;     /* 아주 옅은 오렌지 (배경 톤) */
+  --hw-tint:#FDE3D1;     /* 옅은 오렌지 (테두리/칩) */
+
+  /* ink & surface */
+  --ink:#141414; --ink2:#3F3F3F; --ink3:#6E6E6E; --ink4:#9A9A9A;
+  --bg:#FFFFFF; --bg2:#FAF8F6; --bg3:#F2EEEA;
+  --line:#E4E1DE; --line2:#CFCAC5;
+
+  /* semantic (보라 금지 - 보색은 청록/황토/벽돌색으로) */
+  --ok:#2E7D5B; --ok-bg:#E8F3EE;
+  --warn:#B8791A; --warn-bg:#FBF1DF;
+  --risk:#C0392B; --risk-bg:#FBEAE7;
+  --info:#2A6F97; --info-bg:#E7F0F6;
+
+  --radius:10px; --radius-sm:6px;
+  --shadow:0 1px 2px rgba(20,20,20,.06), 0 8px 24px rgba(20,20,20,.06);
+  --font:"Pretendard","Malgun Gothic","Apple SD Gothic Neo","Segoe UI",system-ui,sans-serif;
+  --mono:"D2Coding","Cascadia Mono","Consolas","JetBrains Mono",ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --hw:#FF8A3D; --hw-dk:#F37321; --hw-dp:#FFB27A; --hw-lt:#7A3E14; --hw-pale:#241812; --hw-tint:#4A2A15;
+  --ink:#F2EFEC; --ink2:#CFC9C3; --ink3:#9E9691; --ink4:#77706B;
+  --bg:#141312; --bg2:#1C1A18; --bg3:#252220;
+  --line:#332F2C; --line2:#464038;
+  --ok:#5CB58C; --ok-bg:#17251F; --warn:#D9A445; --warn-bg:#2A2317;
+  --risk:#E2705F; --risk-bg:#2A1917; --info:#6BA6CC; --info-bg:#161F26;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font); color:var(--ink); background:var(--bg2);
+  -webkit-font-smoothing:antialiased; line-height:1.55;
+  font-variant-numeric:tabular-nums;
+}
+h1,h2,h3,h4{margin:0; line-height:1.25; font-weight:700; letter-spacing:-.01em}
+p{margin:0 0 .6em}
+a{color:var(--hw-dk); text-underline-offset:2px}
+:root[data-theme="dark"] a{color:var(--hw)}
+code,kbd,pre,samp{font-family:var(--mono)}
+hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+
+/* ---------- 공통 프리미티브 ---------- */
+.kicker{
+  font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--hw-dk);
+}
+.rule{height:3px;background:var(--hw);border-radius:2px;width:56px}
+.muted{color:var(--ink3)}
+.small{font-size:13px}
+.mono{font-family:var(--mono);font-size:.92em}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;
+  background:var(--hw-pale);color:var(--hw-dp);border:1px solid var(--hw-tint);
+}
+.chip--ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.chip--warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.chip--risk{background:var(--risk-bg);color:var(--risk);border-color:var(--risk)}
+.chip--info{background:var(--info-bg);color:var(--info);border-color:var(--info)}
+.chip--neutral{background:var(--bg3);color:var(--ink2);border-color:var(--line2)}
+
+.card{
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;
+}
+.card--accent{border-left:4px solid var(--hw)}
+.card__t{font-size:16px;font-weight:700;margin:0 0 6px}
+.card__d{font-size:14px;color:var(--ink2);margin:0}
+
+.kpi{display:flex;gap:14px;flex-wrap:wrap}
+.kpi__item{
+  flex:1 1 0;min-width:140px;background:var(--bg);border:1px solid var(--line);
+  border-top:3px solid var(--hw);border-radius:var(--radius);padding:14px 16px;
+}
+.kpi__v{font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--hw-dp)}
+:root[data-theme="dark"] .kpi__v{color:var(--hw)}
+.kpi__l{font-size:12px;color:var(--ink3);font-weight:600}
+
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--bg)}
+.tbl th,.tbl td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.tbl thead th{background:var(--hw-pale);color:var(--hw-dp);font-size:12.5px;
+  letter-spacing:.03em;text-transform:uppercase;border-color:var(--hw-tint)}
+.tbl tbody tr:nth-child(even){background:var(--bg2)}
+.tbl td.num{text-align:right;font-family:var(--mono)}
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius-sm)}
+
+.note{
+  border:1px solid var(--line);border-left:4px solid var(--ink3);
+  background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-size:14px;
+}
+.note__t{font-weight:700;font-size:13px;margin:0 0 4px;letter-spacing:.02em}
+.note--info{border-left-color:var(--info);background:var(--info-bg)}
+.note--info .note__t{color:var(--info)}
+.note--ok{border-left-color:var(--ok);background:var(--ok-bg)}
+.note--ok .note__t{color:var(--ok)}
+.note--warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.note--warn .note__t{color:var(--warn)}
+.note--risk{border-left-color:var(--risk);background:var(--risk-bg)}
+.note--risk .note__t{color:var(--risk)}
+
+/* 코드 블록 */
+.code{border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg)}
+.code__bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;color:var(--ink3)
+}
+.code__copy{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer
+}
+.code__copy:hover{border-color:var(--hw);color:var(--hw-dk)}
+.code pre{margin:0;padding:12px 14px;overflow-x:auto;font-size:13px;line-height:1.6}
+.code .cm{color:var(--ink4)}
+.code .hl{color:var(--hw-dk);font-weight:700}
+
+/* 단계 흐름 */
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.step{
+  flex:1 1 0;min-width:150px;position:relative;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px
+}
+.step__n{
+  display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:50%;background:var(--hw);color:#fff;font-size:12px;font-weight:800;margin-bottom:6px
+}
+.step__t{font-weight:700;font-size:14px}
+.step__d{font-size:12.5px;color:var(--ink3)}
+
+/* UI 목업 프레임 */
+.ui{border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--bg);box-shadow:var(--shadow)}
+.ui__bar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border-bottom:1px solid var(--line)}
+.ui__dot{width:9px;height:9px;border-radius:50%;background:var(--line2)}
+.ui__addr{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  padding:2px 8px;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+.ui__body{padding:14px}
+.ui-row{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.ui-row:last-child{border-bottom:0}
+.ui-btn{background:var(--hw);color:#fff;border:0;border-radius:5px;padding:6px 14px;font-size:12.5px;font-weight:700}
+.ui-btn--ghost{background:transparent;color:var(--hw-dk);border:1px solid var(--hw)}
+.ui-field{flex:1;border:1px solid var(--line2);border-radius:5px;padding:6px 9px;font-size:12.5px;color:var(--ink3);background:var(--bg2)}
+
+/* 출처 표기 */
+.ref{
+  font-size:.62em;font-weight:800;vertical-align:super;color:var(--hw-dk);
+  background:var(--hw-pale);border:1px solid var(--hw-tint);border-radius:4px;
+  padding:0 4px;margin-left:2px;cursor:pointer;text-decoration:none
+}
+.refs{list-style:none;padding:0;margin:0;font-size:13px}
+.refs li{display:grid;grid-template-columns:26px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.refs li:last-child{border-bottom:0}
+.refs .refs__n{color:var(--hw-dk);font-weight:800;font-family:var(--mono)}
+.refs .refs__src{color:var(--ink);font-weight:600}
+.refs .refs__meta{color:var(--ink3);font-size:12px;font-family:var(--mono);word-break:break-all}
+
+/* 그리드 */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.stack{display:flex;flex-direction:column;gap:12px}
+
+/* ---------- 다이어그램 캔버스 ---------- */
+.dgm{
+  position:relative;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--bg);overflow:hidden;display:flex;flex-direction:column
+}
+.dgm__bar{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:6px 8px;border-bottom:1px solid var(--line);background:var(--bg3);flex:0 0 auto
+}
+.dgm__bar .sp{flex:1}
+.dgm__btn{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--font)
+}
+.dgm__btn:hover{border-color:var(--hw);color:var(--hw-dk)}
+.dgm__btn.is-on{background:var(--hw);border-color:var(--hw);color:#fff}
+.dgm__hint{font-size:11.5px;color:var(--ink4)}
+.dgm__svg{display:block;width:100%;flex:1 1 auto;min-height:0;touch-action:none;cursor:grab;
+  background:radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0/20px 20px}
+.dgm__svg.is-panning{cursor:grabbing}
+.dgm[data-edit="off"] .dgm__bar{display:none}
+
+/* 화면 가득 펼치기 — 툴바의 "넓게" 버튼 / Esc 로 닫는다 */
+.dgm.is-max{
+  position:fixed;inset:14px;z-index:80;
+  width:auto !important;max-width:none !important;height:auto !important;
+  box-shadow:0 12px 48px rgba(20,20,20,.28);border-color:var(--line2)
+}
+html.dgm-locked,html.dgm-locked body{overflow:hidden}
+
+.dgm-node{cursor:move}
+.dgm-node .box{fill:var(--bg);stroke:var(--line2);stroke-width:1.5}
+.dgm-node .lbl{
+  font-family:var(--font);font-size:13.5px;font-weight:700;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;text-align:center;padding:4px 8px;line-height:1.3;overflow:hidden
+}
+.dgm-node .lbl .sub{font-size:11px;font-weight:500;color:var(--ink3);margin-top:2px}
+.dgm-node .lbl[contenteditable="true"]{outline:2px solid var(--hw);background:var(--bg);border-radius:4px}
+.dgm-node.is-sel .box{stroke:var(--hw);stroke-width:2.5}
+.dgm-node[data-tone="primary"] .box{fill:var(--hw);stroke:var(--hw-dk)}
+.dgm-node[data-tone="primary"] .lbl{color:#fff}
+.dgm-node[data-tone="primary"] .lbl .sub{color:rgba(255,255,255,.85)}
+.dgm-node[data-tone="accent"] .box{fill:var(--hw-pale);stroke:var(--hw)}
+.dgm-node[data-tone="accent"] .lbl{color:var(--hw-dp)}
+.dgm-node[data-tone="muted"] .box{fill:var(--bg3);stroke:var(--line2)}
+.dgm-node[data-tone="muted"] .lbl{color:var(--ink3)}
+.dgm-node[data-tone="ok"] .box{fill:var(--ok-bg);stroke:var(--ok)}
+.dgm-node[data-tone="ok"] .lbl{color:var(--ok)}
+.dgm-node[data-tone="warn"] .box{fill:var(--warn-bg);stroke:var(--warn)}
+.dgm-node[data-tone="warn"] .lbl{color:var(--warn)}
+.dgm-node[data-tone="risk"] .box{fill:var(--risk-bg);stroke:var(--risk)}
+.dgm-node[data-tone="risk"] .lbl{color:var(--risk)}
+.dgm-node[data-tone="info"] .box{fill:var(--info-bg);stroke:var(--info)}
+.dgm-node[data-tone="info"] .lbl{color:var(--info)}
+
+.dgm-grp .box{fill:var(--bg2);stroke:var(--line2);stroke-dasharray:6 4;stroke-width:1.5}
+.dgm-grp .gl{font-family:var(--font);font-size:11.5px;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;fill:var(--ink4)}
+.dgm-grp{cursor:move}
+
+.dgm-edge .wire{fill:none;stroke:var(--ink3);stroke-width:1.8}
+.dgm-edge .hit{fill:none;stroke:transparent;stroke-width:14;cursor:pointer}
+.dgm-edge.is-sel .wire{stroke:var(--hw);stroke-width:2.6}
+.dgm-edge[data-style="dash"] .wire{stroke-dasharray:6 4}
+.dgm-edge[data-tone="primary"] .wire{stroke:var(--hw)}
+.dgm-edge[data-tone="risk"] .wire{stroke:var(--risk)}
+.dgm-edge[data-tone="ok"] .wire{stroke:var(--ok)}
+.dgm-edge .elbl{
+  font-family:var(--font);font-size:11.5px;font-weight:600;color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;height:100%;text-align:center;
+}
+.dgm-edge .elbl span{background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--line)}
+
+.dgm__modal{
+  position:absolute;inset:0;background:rgba(0,0,0,.45);display:none;
+  align-items:center;justify-content:center;padding:24px;z-index:9
+}
+.dgm__modal.is-open{display:flex}
+.dgm__modal .pane{background:var(--bg);border-radius:var(--radius);width:min(680px,100%);
+  max-height:100%;display:flex;flex-direction:column;border:1px solid var(--line2)}
+.dgm__modal textarea{
+  flex:1;min-height:240px;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:12px;font-family:var(--mono);font-size:12px;resize:vertical;background:var(--bg2);color:var(--ink)
+}
+.dgm__modal .head,.dgm__modal .foot{display:flex;align-items:center;gap:8px;padding:10px 12px}
+.dgm__modal .head b{font-size:14px}
+.dgm__modal .sp{flex:1}
+
+/* ── 차트 (scripts/make-chart.sh 산출물) ─────────────────────────────────── */
+.cht{ margin:16px 0 18px; padding:14px 14px 10px; border:1px solid var(--line); border-radius:var(--radius); background:var(--bg2) }
+.cht__t{ margin:0 0 8px; font-size:13.5px; font-weight:700; color:var(--ink); letter-spacing:-.01em }
+.cht svg{ display:block; width:100%; height:auto; font-family:inherit }
+.cht rect, .cht circle{ cursor:default }
+.cht rect:hover, .cht circle:hover{ opacity:.75 }
+.cht__c{ margin:8px 0 0; font-size:12px; line-height:1.65; color:var(--ink3) }
+
+/* 인쇄 */
+@media print{
+  .cht{ page-break-inside:avoid; background:transparent }
+  body{background:#fff}
+  .no-print{display:none !important}
+  .dgm__bar{display:none !important}
+  .dgm__svg{background:none}
+  .dgm.is-max{position:static;inset:auto;box-shadow:none}
+}
+
+/* ── 한글 줄바꿈 ─────────────────────────────────────────────────────────────
+   브라우저 기본값은 낱말 한가운데를 끊는다. "남은 결/정" 처럼 갈라지면 제목이
+   읽히지 않는다. keep-all 은 띄어쓰기에서만 줄을 바꾼다.
+   반대로 긴 영문 식별자나 경로는 keep-all 이면 칸을 넘치므로 overflow-wrap 으로 받고,
+   코드·경로 계열은 어디서든 끊어 넘침을 막는다. */
+h1, h2, h3, h4, p, li, td, th, dt, dd,
+.card__d, .step__d, .note, .lead, .sub, figcaption {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.mono, pre, code, .refs__meta { word-break: break-all; overflow-wrap: normal }
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 레이아웃 (사이드 TOC + 본문 단일 컬럼)
+   ============================================================ */
+body{ background:var(--bg2) }
+
+.doc{ display:grid; grid-template-columns:270px minmax(0,1fr); align-items:start; }
+
+/* 사이드바 */
+.side{
+  position:sticky; top:0; height:100vh; overflow:auto;
+  background:var(--bg); border-right:1px solid var(--line); padding:20px 16px 40px;
+}
+.side__brand{ display:flex; align-items:center; gap:9px; margin-bottom:6px }
+.side__brand .bar{ width:5px; height:26px; background:var(--hw); border-radius:2px }
+.side__brand b{ font-size:14.5px; letter-spacing:-.01em }
+.side__meta{ font-size:11.5px; color:var(--ink4); margin:0 0 16px; font-family:var(--mono) }
+.toc{ list-style:none; margin:0; padding:0; font-size:13.5px }
+.toc li{ margin:1px 0 }
+.toc a{
+  display:block; padding:5px 10px; border-radius:6px; color:var(--ink2);
+  text-decoration:none; border-left:2px solid transparent;
+}
+.toc a:hover{ background:var(--bg3); color:var(--ink) }
+.toc a.is-cur{ background:var(--hw-pale); color:var(--hw-dp); font-weight:700; border-left-color:var(--hw) }
+.toc .sub a{ padding-left:22px; font-size:12.5px; color:var(--ink3) }
+.side__foot{ margin-top:18px; padding-top:14px; border-top:1px solid var(--line); display:flex; gap:6px; flex-wrap:wrap }
+.side__foot button{
+  border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:5px;
+  padding:3px 9px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:var(--font);
+}
+.side__foot button:hover{ border-color:var(--hw); color:var(--hw-dk) }
+
+/* 본문 */
+.main{ padding:34px 44px 100px; max-width:1040px; }
+.doc-head{ border-bottom:2px solid var(--hw); padding-bottom:18px; margin-bottom:26px }
+.doc-head h1{ font-size:32px; letter-spacing:-.025em; margin:6px 0 8px }
+.doc-head .sub{ font-size:15px; color:var(--ink2); max-width:80ch }
+.doc-head .meta{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px }
+
+.sec{ margin:0 0 44px; scroll-margin-top:18px }
+.sec > h2{
+  font-size:21px; margin:0 0 4px; display:flex; align-items:baseline; gap:10px;
+}
+.sec > h2 .n{ font-family:var(--mono); font-size:14px; font-weight:800; color:var(--hw) }
+.sec > .why{ font-size:13.5px; color:var(--ink3); margin:0 0 16px; padding-left:2px }
+.sec h3{ font-size:16px; margin:24px 0 10px; padding-left:10px; border-left:3px solid var(--hw-tint) }
+.sec h4{ font-size:14px; margin:16px 0 6px; color:var(--ink2) }
+.sec p, .sec li{ font-size:14.5px }
+.sec ul, .sec ol{ margin:0 0 12px; padding-left:20px }
+.sec li{ margin:3px 0 }
+
+/* 체크리스트 */
+.chk{ list-style:none; padding:0; margin:0 }
+.chk li{
+  display:flex; gap:10px; align-items:flex-start; padding:9px 12px;
+  border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--bg); margin-bottom:6px;
+}
+.chk input{ margin-top:3px; width:15px; height:15px; accent-color:var(--hw); flex:0 0 auto }
+.chk li.is-done{ background:var(--bg2); border-color:var(--line) }
+.chk li.is-done .t{ text-decoration:line-through; color:var(--ink4) }
+.chk .t{ font-weight:600; font-size:14px }
+.chk .d{ font-size:12.5px; color:var(--ink3); display:block; margin-top:2px }
+
+/* 시나리오 (Given/When/Then) */
+.gwt{ border:1px solid var(--line); border-left:4px solid var(--hw); border-radius:var(--radius-sm);
+  background:var(--bg); padding:14px 16px; margin:0 0 12px }
+.gwt__t{ font-weight:700; font-size:14.5px; margin:0 0 8px }
+.gwt dl{ margin:0; display:grid; grid-template-columns:64px 1fr; gap:4px 10px; font-size:13.5px }
+.gwt dt{ font-weight:800; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--hw-dk); padding-top:2px }
+.gwt dd{ margin:0; color:var(--ink2) }
+
+/* 작업 단위 카드 */
+.slice{ border:1px solid var(--line); border-radius:var(--radius); background:var(--bg); overflow:hidden; margin-bottom:12px }
+.slice__h{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg3); border-bottom:1px solid var(--line) }
+.slice__h .no{ font-family:var(--mono); font-weight:800; color:#fff; background:var(--hw);
+  border-radius:5px; padding:1px 8px; font-size:12px }
+.slice__h b{ font-size:14.5px }
+.slice__h .sp{ flex:1 }
+.slice__b{ padding:12px 14px; font-size:13.5px }
+.slice__b dl{ margin:0; display:grid; grid-template-columns:110px 1fr; gap:6px 12px }
+.slice__b dt{ color:var(--ink3); font-size:12.5px; font-weight:700 }
+.slice__b dd{ margin:0; color:var(--ink2) }
+
+/* 의사결정 기록 */
+.adr{ border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; background:var(--bg); margin-bottom:12px }
+.adr__t{ font-size:15px; font-weight:700; margin:0 0 8px }
+.adr dl{ margin:0; display:grid; grid-template-columns:96px 1fr; gap:5px 12px; font-size:13.5px }
+.adr dt{ color:var(--hw-dk); font-weight:700; font-size:12.5px }
+.adr dd{ margin:0; color:var(--ink2) }
+
+.dgm{ margin:0 0 14px; height:520px }
+/* 다이어그램은 본문 글줄 폭에 갇히지 않고 사이드바 오른쪽을 전부 쓴다.
+   270px 사이드바 + 본문 좌우 패딩 88px + 스크롤바 여유 18px 를 뺀 값. */
+@media (min-width:1001px){
+  .dgm{ width:min(calc(100vw - 376px), 1700px); max-width:none }
+}
+.tbl-wrap{ margin-bottom:14px }
+.note{ margin-bottom:12px }
+.code{ margin-bottom:14px }
+
+@media (max-width:1000px){
+  .doc{ grid-template-columns:1fr }
+  .side{ position:static; height:auto; border-right:0; border-bottom:1px solid var(--line) }
+  .main{ padding:24px 20px 60px }
+}
+@media print{
+  @page{ size:A4; margin:14mm }
+  .side{ display:none }
+  .doc{ display:block }
+  .main{ max-width:none; padding:0 }
+  .sec{ page-break-inside:avoid }
+  .dgm{ height:320px; width:auto }
+}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- ================= 사이드바 ================= -->
+  <aside class="side no-print">
+    <div class="side__brand"><span class="bar"></span><b>LiDAR 소스 적재 경로</b></div>
+    <p class="side__meta">v1.0 · 2026-09-11 · cdc</p>
+    <ul class="toc"></ul>
+    <div class="side__foot">
+      <button id="bTheme" type="button">테마</button>
+      <button id="bPrint" type="button">인쇄</button>
+      <button id="bReset" type="button">체크 초기화</button>
+    </div>
+  </aside>
+
+  <!-- ================= 본문 ================= -->
+  <main class="main">
+
+    <header class="doc-head">
+      <span class="kicker">Data Flow Document</span>
+      <h1>LiDAR 필드 데이터가 소스 DB 에 닿기까지</h1>
+      <p class="sub">장비에서 나온 값 하나가 MQTT 토픽 · Agent 태그 · Kafka 레코드를 거쳐
+        소스 DB 의 행 하나가 되기까지를 단계마다 필드 단위로 적는다. 알갱이가 단계마다 바뀌므로
+        "무엇이 하나로 세어지는가"를 각 절의 첫 표에 먼저 둔다.</p>
+      <div class="meta">
+        <span class="chip">장비 350대</span>
+        <span class="chip chip--neutral">MQTT 토픽 22 · 태그 2,520</span>
+        <span class="chip chip--neutral">Kafka 토픽 3</span>
+        <span class="chip chip--info">소스 DB 표 9개</span>
+        <span class="chip chip--warn">미확정: 페이로드 규격 · 발행 주기</span>
+      </div>
+    </header>
+
+    <!-- ---------- 0 ---------- -->
+    <section class="sec" id="s0">
+      <h2><span class="n">00</span>범위와 전제</h2>
+      <p class="why">경계를 먼저 못 박는다. 이 문서는 소스 DB 에 행이 들어가는 순간까지이고, 그 뒤는 다른 문서다.</p>
+      <div class="g2">
+        <div class="card card--accent">
+          <p class="card__t">이 문서가 다루는 구간</p>
+          <ul style="margin:6px 0 0">
+            <li>장비가 만드는 값과 그 필드 정의 (세 채널)</li>
+            <li>MQTT 브로커의 토픽 22개와 메시지 봉투</li>
+            <li>Mqtt.Agent 의 태그 2,520개와 태그 하나의 값</li>
+            <li>EES Kafka Provider 가 만드는 레코드 · 헤더 11개 · 항목 배열</li>
+            <li>소비자가 그 레코드를 풀어 소스 DB 표 9개에 넣는 과정</li>
+          </ul>
+        </div>
+        <div class="card">
+          <p class="card__t">다루지 않는 것</p>
+          <ul style="margin:6px 0 0">
+            <li>소스 DB 이후 구간 — CDC 로 targetdb 까지 가는 길<sup class="ref" data-ref="9">9</sup></li>
+            <li>보존 · 압축 · 용량 추정 — 파이프라인 기술 문서<sup class="ref" data-ref="10">10</sup></li>
+            <li>PCD 파일 본체 전송 — 선로에는 경로와 체크섬만 실린다</li>
+            <li>Grafana 대시보드와 경보 임계</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note note--warn">
+        <p class="note__t">전제 — Provider 선택이 이 문서의 모든 모양을 정한다</p>
+        지금 InterSysLink 에는 <b>hot DB Provider 역할이 없다.</b> 그래서 태그 값을 밖으로 내보내는 통로를
+        <b>EES Kafka Provider</b> 하나로 잡았다. 아래에 나오는 세 가지는 전부 그 선택에서 따라 나온 결과다.
+        DB Provider 였다면 어느 것도 생기지 않는다.
+        <ul style="margin:6px 0 0">
+          <li>MQTT 토픽 22개가 Kafka 토픽 <b>3개</b>로 접힌다 — 채널마다 EES 메시지가 하나씩이기 때문이다.</li>
+          <li>메시지 하나가 레코드 하나가 아니다. 항목 수백 개가 묶여 레코드 하나가 된다.</li>
+          <li>장비 id 가 선로에서 사라진다 — Provider 가 문자열 TagId 를 버리고 숫자 ParameterId 만 싣는다.</li>
+        </ul>
+      </div>
+
+      <div class="note note--info">
+        <p class="note__t">Aspire 를 띄우지 않을 때</p>
+        <span class="mono">util/mqtt-ees-bridge</span> 가 Agent + Provider 자리를 대신한다. 같은 헤더 11개,
+        같은 항목 모양, 같은 토픽 이름으로 Kafka 를 채우므로 <b>수신 측은 원본과 이것을 구분하지 못한다</b> —
+        구분할 근거가 레코드에 없다.<sup class="ref" data-ref="3">3</sup>
+        이 문서의 값은 두 경로 모두에 그대로 적용된다.
+      </div>
+    </section>
+
+    <!-- ---------- 1 ---------- -->
+    <section class="sec" id="s1">
+      <h2><span class="n">01</span>전체 워크플로우</h2>
+      <p class="why">박스를 끌어 배치를 바꿀 수 있다. 확정된 배치는 JSON 버튼으로 내보내 이 파일의 dgm-data 블록에 되붙인다.</p>
+
+      <div class="dgm" data-edit="on" style="height:440px">
+        <script type="application/json" class="dgm-data">
+{
+  "groups": [
+    {"id":"gI","label":"InterSysLink","x":530,"y":10,"w":510,"h":120},
+    {"id":"gT","label":"이 저장소 (src/timescaledb)","x":1050,"y":10,"w":510,"h":120}
+  ],
+  "nodes": [
+    {"id":"dev","label":"LiDAR 350대","sub":"조립 210 · 선행의장 140","x":40,"y":40,"w":220,"h":64,"tone":"muted"},
+    {"id":"brk","label":"EMQX 브로커","sub":"토픽 22개 · 426 msg/s","x":300,"y":40,"w":220,"h":64,"shape":"pill"},
+    {"id":"agt","label":"Mqtt.Agent + EES Provider","sub":"태그 2,520 · tagMode=raw","x":560,"y":40,"w":220,"h":64,"tone":"primary"},
+    {"id":"kfk","label":"ot.lidar.status / actual / artifact","sub":"토픽 3개 · 1파티션 · 초당 레코드 1","x":820,"y":40,"w":220,"h":64,"shape":"pill","tone":"primary"},
+    {"id":"ing","label":"lidar-ingest","sub":"소비자 · 오프셋 수동 커밋","x":1080,"y":40,"w":220,"h":64,"tone":"accent"},
+    {"id":"db","label":"lidar (TimescaleDB)","sub":"tsdb 3표 + rdb 6표","x":1340,"y":40,"w":220,"h":64,"shape":"store","tone":"accent"},
+    {"id":"brg","label":"mqtt-ees-bridge","sub":"Aspire 없이 같은 레코드를 만든다","x":560,"y":220,"w":220,"h":64,"tone":"muted","shape":"note"},
+    {"id":"cat","label":"rdb.lidar_tag_catalog","sub":"숫자 tid 를 장비 id 로 되돌린다","x":1080,"y":220,"w":220,"h":64,"shape":"store","tone":"warn"},
+    {"id":"rej","label":"rdb.lidar_ingest_reject","sub":"못 푼 항목을 원문째 격리","x":1340,"y":220,"w":220,"h":64,"shape":"store","tone":"risk"}
+  ],
+  "edges": [
+    {"from":"dev","to":"brk","label":"MQTT 3.1.1 · QoS 1","tone":"primary"},
+    {"from":"brk","to":"agt","label":"22토픽 구독","tone":"primary"},
+    {"from":"agt","to":"kfk","label":"produce","tone":"primary"},
+    {"from":"kfk","to":"ing","label":"consume","tone":"primary"},
+    {"from":"ing","to":"db","label":"INSERT + UPSERT","tone":"primary"},
+    {"from":"brk","to":"brg","style":"dash"},
+    {"from":"brg","to":"kfk","style":"dash"},
+    {"from":"cat","to":"ing","style":"dash"},
+    {"from":"ing","to":"rej","tone":"risk","style":"dash"}
+  ]
+}
+        </script>
+      </div>
+
+      <h3>알갱이가 단계마다 바뀐다</h3>
+      <p>같은 데이터를 두고도 "한 건"이 뜻하는 것이 단계마다 다르다. 이 표가 이 문서 전체의 뼈대다.
+        발행기 기본값(상태 1초 · 스캔 1분) 기준이다.<sup class="ref" data-ref="1">1</sup></p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:16%">단계</th><th style="width:22%">하나로 세는 단위</th><th style="width:14%">초당</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td>장비</td><td>측정 이벤트</td><td class="num mono">426</td><td>상태 350 + 스캔 76 (실측 427)</td></tr>
+            <tr><td>MQTT</td><td>메시지 (토픽 22개)</td><td class="num mono">426</td><td>이벤트 하나가 메시지 하나다</td></tr>
+            <tr><td>Agent 태그</td><td>태그 값 변경 (태그 2,520개)</td><td class="num mono">426</td><td>태그 하나의 값 = <span class="mono">raw_payload</span> 통째</td></tr>
+            <tr><td>Kafka 레코드</td><td><b>레코드 (토픽 3개)</b></td><td class="num mono">3</td><td>토픽마다 초당 1개 — 여기서 알갱이가 바뀐다</td></tr>
+            <tr><td>Kafka 항목</td><td>레코드 안의 <span class="mono">content</span></td><td class="num mono">426</td><td>status 350 · artifact 70 · actual 6</td></tr>
+            <tr><td>소스 DB</td><td>행</td><td class="num mono">426</td><td>항목 하나가 행 하나다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--info">
+        <p class="note__t">레코드 수와 행 수를 섞어 읽지 않는다</p>
+        Kafka 구간만 레코드로 세고 나머지는 전부 건수로 센다. 이 한 줄을 놓치면 "초당 3건"과 "초당 426건"이
+        같은 파이프라인의 같은 지점을 가리키는 것처럼 보인다. 발행 주기(1초 · 1분)는 레코드 빈도가 아니라
+        항목의 <span class="mono">timestamp</span> 에 남으므로, DB 에서는 원래 주기가 그대로 보인다.
+      </div>
+    </section>
+
+    <!-- ---------- 2 ---------- -->
+    <section class="sec" id="s2">
+      <h2><span class="n">02</span>장비에서 나오는 데이터</h2>
+      <p class="why">스키마만 적으면 나중에 대조가 안 된다. 필드마다 누가 그 값을 정하는지까지 적는다.</p>
+
+      <h3>장비 구성</h3>
+      <div class="kpi">
+        <div class="kpi__item"><div class="kpi__v">350</div><div class="kpi__l">LiDAR 총 대수</div></div>
+        <div class="kpi__item"><div class="kpi__v">210</div><div class="kpi__l">조립 · assembly1 · bay1~7 · 30대/bay</div></div>
+        <div class="kpi__item"><div class="kpi__v">140</div><div class="kpi__l">선행의장 · outfitting1 · bay1~7 · 20대/bay</div></div>
+        <div class="kpi__item"><div class="kpi__v">6</div><div class="kpi__l">공정 단계 (조립 4 · 의장 2)</div></div>
+      </div>
+      <p>장비 id 는 <span class="mono">LDR-{site}-{shop}{bay}-{seq}</span> 다 — <span class="mono">LDR-GJ-A1B3-07</span>
+        은 거제 assembly1 bay3 의 7번기다. 한 장비에는 팬틸트(<span class="mono">PTZ-GJ-A1B3-07</span>),
+        엣지 PC(<span class="mono">EDG-GJ-A1-03</span>), 추론 워크스테이션(<span class="mono">INF-GJ-A1-01</span>)이 딸려 있고
+        그 id 들이 실적 페이로드에 같이 실린다.<sup class="ref" data-ref="1">1</sup></p>
+
+      <h3>세 채널 — 박자가 서로 다르다</h3>
+      <p>상태는 초 단위로 계속 뛰고, 스캔은 분 단위로 한 번에 13건을 쏟아낸다. 그래서 장비마다 루프가 둘이다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:14%">채널</th><th style="width:16%">무엇인가</th><th style="width:12%">주기</th><th style="width:12%">장비당 건수</th><th style="width:22%">발행 id</th><th>멱등 키</th></tr></thead>
+          <tbody>
+            <tr><td><span class="chip">장비 상태</span></td><td>하트비트와 건강 상태</td><td class="mono">1초</td><td class="num mono">1</td><td class="mono">LDR-GJ-A1B3-07</td><td class="mono">{장비}:{yyyyMMddTHHmmss}</td></tr>
+            <tr><td><span class="chip chip--info">실적 결과</span></td><td>공정 스캔 1회의 판정</td><td class="mono">1분</td><td class="num mono">1</td><td class="mono">LDR-GJ-A1B3-07</td><td class="mono">{scan_id 앞 8자}:{stage}:{event}</td></tr>
+            <tr><td><span class="chip chip--warn">산출물 메타</span></td><td>스캔이 남긴 파일 정보</td><td class="mono">1분</td><td class="num mono">12</td><td class="mono">LDR-GJ-A1B3-07-SEGMENTED_PCD</td><td><span class="chip chip--risk">없음</span> 수신 측이 만든다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>산출물 12건은 정합 PCD 1 + 변환행렬 1 + 세그먼트 PCD 10 이다. 파일 본체는 보내지 않고
+        <span class="mono">storage_uri</span> · <span class="mono">file_size_bytes</span> · <span class="mono">checksum</span> 만 싣는다.
+        변환행렬만 숫자 16개뿐이라 예외적으로 메시지에 직접 들어간다.
+        <b><span class="mono">scan_id</span> 를 실적과 산출물이 공유한다 — 두 채널을 잇는 유일한 조인 키다.</b></p>
+
+      <h3>필드 카탈로그 (1) 장비 상태 · 15필드</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:26%">필드</th><th style="width:14%">타입</th><th style="width:26%">예시 값</th><th>누가 정하는가</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">device_role</td><td>string</td><td class="mono">LIDAR</td><td>고정값</td></tr>
+            <tr><td class="mono">site</td><td>string</td><td class="mono">geoje</td><td>배치 정보</td></tr>
+            <tr><td class="mono">zone</td><td>string</td><td class="mono">ASSEMBLY</td><td>ASSEMBLY · OUTFITTING</td></tr>
+            <tr><td class="mono">shop</td><td>string</td><td class="mono">assembly1</td><td>배치 정보</td></tr>
+            <tr><td class="mono">bay</td><td>string</td><td class="mono">bay3</td><td>bay1 ~ bay7</td></tr>
+            <tr><td class="mono">status</td><td>string</td><td class="mono">ONLINE</td><td>ONLINE · CALIBRATING · ERROR · OFFLINE</td></tr>
+            <tr><td class="mono">last_heartbeat_at</td><td>timestamptz</td><td class="mono">2026-09-10T12:59:23.3532050+09:00</td><td>OFFLINE 이면 멈춘다 — 죽은 장비의 신호</td></tr>
+            <tr><td class="mono">error_code</td><td>string · null</td><td class="mono">E-LDR-0203</td><td>ERROR 일 때만. 광학창 오염 · 모터 이상 등 4종</td></tr>
+            <tr><td class="mono">occurred_at</td><td>timestamptz</td><td class="mono">2026-09-10T12:59:23.3603189+09:00</td><td><b>장비 발생 시각. DB 의 <span class="mono">time</span> 이 된다</b></td></tr>
+            <tr><td class="mono">ingested_at</td><td>timestamptz</td><td class="mono">occurred_at + 0.2~1.4초</td><td>발신 측이 찍는다. DB 적재 시각이 아니다</td></tr>
+            <tr><td class="mono">idempotency_key</td><td>string</td><td class="mono">LDR-GJ-A1B3-07:20260910T125923</td><td>재전달을 거르는 근거</td></tr>
+            <tr><td class="mono">scan_rate_pts_per_sec</td><td>bigint</td><td class="num mono">229,866</td><td>OFFLINE 이면 0</td></tr>
+            <tr><td class="mono">temperature_c</td><td>double</td><td class="num mono">40.9</td><td>상태에 따라 같이 움직인다</td></tr>
+            <tr><td class="mono">connectivity_rssi</td><td>smallint</td><td class="num mono">-52</td><td>장비별 고정 시드 난수</td></tr>
+            <tr><td class="mono">fov_mode</td><td>string</td><td class="mono">wide</td><td>wide · narrow</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>필드 카탈로그 (2) 실적 결과 · 24필드</h3>
+      <p>위치 5필드(<span class="mono">site zone shop bay stage</span>)와 시각 3필드(<span class="mono">occurred_at ingested_at idempotency_key</span>)는
+        상태 채널과 같은 뜻이라 아래에서 생략한다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:26%">필드</th><th style="width:14%">타입</th><th style="width:26%">예시 값</th><th>누가 정하는가</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">stage</td><td>string</td><td class="mono">WELDING</td><td>조립 ARRANGEMENT·FITTING·WELDING·INSPECTION / 의장 WIRING·PIPING</td></tr>
+            <tr><td class="mono">record_type</td><td>string</td><td class="mono">ACTUAL</td><td>고정값</td></tr>
+            <tr><td class="mono">input_method</td><td>string</td><td class="mono">AUTO</td><td>고정값 — 사람이 입력한 실적과 구분</td></tr>
+            <tr><td class="mono">source_system</td><td>string</td><td class="mono">AI Inference Service</td><td>조립은 추론 서비스, 의장은 LiDAR Edge Service</td></tr>
+            <tr><td class="mono">hull_no</td><td>string</td><td class="mono">H1207</td><td>호선</td></tr>
+            <tr><td class="mono">block_id</td><td>string</td><td class="mono">B117S</td><td>블록. 진도율의 축</td></tr>
+            <tr><td class="mono">scan_id</td><td>uuid</td><td class="mono">4f21c9d8-...</td><td><b>산출물 12건과 공유하는 조인 키</b></td></tr>
+            <tr><td class="mono">scanned_at</td><td>timestamptz</td><td class="mono">occurred_at 과 같다</td><td>스캔 시각</td></tr>
+            <tr><td class="mono">pan_tilt</td><td>string</td><td class="mono">PTZ-GJ-A1B3-07</td><td>딸린 장비 id</td></tr>
+            <tr><td class="mono">edge_pc</td><td>string</td><td class="mono">EDG-GJ-A1-03</td><td>bay 단위로 공유</td></tr>
+            <tr><td class="mono">inference_ws</td><td>string</td><td class="mono">INF-GJ-A1-01</td><td>shop 단위로 공유</td></tr>
+            <tr><td class="mono">vision_ocr</td><td>string · null</td><td class="mono">OCR-GJ-bay3-01</td><td>7대 중 1대에만 달려 있다</td></tr>
+            <tr><td class="mono">event_type</td><td>string</td><td class="mono">PROGRESS</td><td>START · PROGRESS · COMPLETE</td></tr>
+            <tr><td class="mono">block_progress_rate</td><td>double</td><td class="num mono">62.4</td><td><b>되돌아가지 않는다.</b> COMPLETE 를 지나면 다음 블록에서 0부터</td></tr>
+            <tr><td class="mono">reference_cad_id</td><td>string</td><td class="mono">CAD-H1207-B117S</td><td>호선·블록에서 파생</td></tr>
+            <tr><td class="mono">match_confidence</td><td>double</td><td class="num mono">0.94</td><td>장비 상태가 나쁘면 같이 내려간다</td></tr>
+            <tr><td class="mono">model_version</td><td>string</td><td class="mono">seg-v1.4.2</td><td>세그멘테이션 모델</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>필드 카탈로그 (3) 산출물 메타 · 13필드</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:26%">필드</th><th style="width:14%">타입</th><th style="width:26%">예시 값</th><th>누가 정하는가</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">scan_id</td><td>uuid</td><td class="mono">4f21c9d8-...</td><td>같은 스캔의 실적과 같은 값</td></tr>
+            <tr><td class="mono">artifact_type</td><td>string</td><td class="mono">SEGMENTED_PCD</td><td>REGISTERED_PCD 1 · TRANSFORMATION_MATRIX 1 · SEGMENTED_PCD 10</td></tr>
+            <tr><td class="mono">hull_no</td><td>string</td><td class="mono">H1207</td><td>호선</td></tr>
+            <tr><td class="mono">block_id</td><td>string</td><td class="mono">B117S</td><td>블록</td></tr>
+            <tr><td class="mono">segment_id</td><td>string · null</td><td class="mono">SEG-003</td><td>세그먼트 PCD 에만 있다</td></tr>
+            <tr><td class="mono">storage_uri</td><td>string · null</td><td class="mono">file://ot-a/pcd/2026/09/10/4f21c9d8/seg-003.pcd</td><td>변환행렬에는 없다</td></tr>
+            <tr><td class="mono">file_size_bytes</td><td>bigint · null</td><td class="num mono">18,340,112</td><td>정합 PCD 150~240MB · 세그먼트 12~32MB</td></tr>
+            <tr><td class="mono">checksum</td><td>string · null</td><td class="mono">sha256:3f9a...</td><td>파일 본체 대신 싣는 유일한 무결성 근거</td></tr>
+            <tr><td class="mono">transformation_matrix</td><td>number[16] · null</td><td class="mono">[1.002, 0.01, ..., 1324.7]</td><td>4x4. 평행이동 성분만 mm 단위</td></tr>
+            <tr><td class="mono">produced_by_device_id</td><td>string</td><td class="mono">INF-GJ-A1-01</td><td>만든 것은 추론 워크스테이션이다</td></tr>
+            <tr><td class="mono">model_version</td><td>string</td><td class="mono">seg-v1.4.2</td><td>실적과 같은 값</td></tr>
+            <tr><td class="mono">occurred_at</td><td>timestamptz</td><td class="mono">2026-09-10T12:59:23.36+09:00</td><td>DB 의 <span class="mono">time</span></td></tr>
+            <tr><td class="mono">ingested_at</td><td>timestamptz</td><td class="mono">occurred_at + 0.2~2.4초</td><td>발신 측이 찍는다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">이 채널만 멱등 키가 없다</p>
+        산출물 페이로드에는 <span class="mono">idempotency_key</span> 가 없다. 수신 측이
+        <span class="mono">{scan_id}:{artifact_type}:{segment_id 또는 -}</span> 로 만들어 쓴다 —
+        한 스캔 안에서 (종류, 세그먼트)가 유일하기 때문이다. 재전달이 와도 같은 키가 나와 유니크 인덱스가 거른다.<sup class="ref" data-ref="5">5</sup>
+      </div>
+    </section>
+
+    <!-- ---------- 3 ---------- -->
+    <section class="sec" id="s3">
+      <h2><span class="n">03</span>MQTT 브로커의 토픽과 메시지</h2>
+      <p class="why">토픽 이름이 곧 태그 이름의 한 조각이 된다. 여기서 정한 문자열이 끝까지 따라간다.</p>
+
+      <h3>메시지 봉투는 세 채널이 같다</h3>
+      <p>Agent 의 계약(<span class="mono">Mqtt.Agent.Core.Domain.MqttPayloadParser</span>)이 받는 형식 그대로,
+        <span class="mono">id</span> 와 <span class="mono">raw_payload</span> 한 겹뿐이다.
+        필드 정의서의 중첩 객체는 브로커로 나갈 때 <b>평탄화한다</b> — 중첩을 두면 나중에
+        <span class="mono">tagMode=fields</span> 로 바꿨을 때 키 이름이 달라지기 때문이다.</p>
+      <div class="code">
+        <div class="code__bar"><span>ot/device/assembly/lidar/status — 메시지 1건</span><button class="code__copy" type="button">복사</button></div>
+<pre>{
+  "id": "<span class="hl">LDR-GJ-A1B3-07</span>",
+  "raw_payload": {
+    "device_role": "LIDAR",
+    "site": "geoje", "zone": "ASSEMBLY", "shop": "assembly1", "bay": "bay3",
+    "status": "ONLINE",
+    "last_heartbeat_at": "2026-09-10T12:59:23.3532050+09:00",
+    "error_code": null,
+    "occurred_at": "<span class="hl">2026-09-10T12:59:23.3603189+09:00</span>",   <span class="cm">// 태그의 changedAt 이 된다</span>
+    "ingested_at": "2026-09-10T12:59:24.5303189+09:00",
+    "idempotency_key": "LDR-GJ-A1B3-07:20260910T125923",
+    "scan_rate_pts_per_sec": 229866,
+    "temperature_c": 40.9,
+    "connectivity_rssi": -52,
+    "fov_mode": "wide"
+  }
+}</pre>
+      </div>
+
+      <h3>토픽 22개</h3>
+      <p>채널마다 토픽 모양이 다르다. 상태는 구역으로, 실적은 공정으로, 산출물은 공장·베이로 갈린다.
+        한 장비의 태그가 그 구역의 공정 토픽 전부에 걸린다 — 스캔마다 <span class="mono">stage</span> 가 바뀌기 때문이다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:12%">채널</th><th style="width:34%">토픽 패턴</th><th style="width:10%">토픽 수</th><th style="width:32%">실제 토픽</th><th>토픽당 태그</th></tr></thead>
+          <tbody>
+            <tr><td><span class="chip">상태</span></td><td class="mono">ot/device/{zone}/lidar/status</td><td class="num mono">2</td><td class="mono">.../assembly/... · .../outfitting/...</td><td class="num mono">210 · 140</td></tr>
+            <tr><td><span class="chip chip--info">실적</span></td><td class="mono">ot/sensor/{stage}/actual</td><td class="num mono">6</td><td class="mono">arrangement · fitting · welding · inspection · wiring · piping</td><td class="num mono">210 ×4 · 140 ×2</td></tr>
+            <tr><td><span class="chip chip--warn">산출물</span></td><td class="mono">ot/pipeline/{zone}/{shop}/{bay}/artifact</td><td class="num mono">14</td><td class="mono">assembly1/bay1~7 · outfitting1/bay1~7</td><td class="num mono">90 · 60</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>산출물 토픽의 태그 수가 장비 수의 3배인 것은 장비 하나가 종류마다 다른 id 로 발행하기 때문이다
+        (<span class="mono">-REGISTERED_PCD</span> · <span class="mono">-TRANSFORMATION_MATRIX</span> · <span class="mono">-SEGMENTED_PCD</span>).
+        조립 bay 하나에 30대이므로 90개다.</p>
+
+      <div class="g2">
+        <div class="note note--info"><p class="note__t">브로커 포트</p>
+          이 저장소 주변에 MQTT 를 받는 컨테이너가 셋이다. <span class="mono">mqtt-emqx</span> = <b>1884</b>,
+          <span class="mono">mqtt-mosquitto</span> = 1883, <span class="mono">mqtt-nats</span> = 1885.
+          기본값은 EMQX(1884)다.</div>
+        <div class="note note--warn"><p class="note__t">프로토콜 3.1.1 고정</p>
+          <span class="mono">MqttNetSession.BuildOptions</span> 와 같은 조건으로 붙기 위해서다.
+          v5 로 붙으면 브로커가 CONNACK <span class="mono">0x01</span> 로 즉시 끊는다.</div>
+      </div>
+    </section>
+
+    <!-- ---------- 4 ---------- -->
+    <section class="sec" id="s4">
+      <h2><span class="n">04</span>Mqtt.Agent 의 태그와 그 값</h2>
+      <p class="why">Agent 는 메시지를 저장하지 않는다. 토픽과 장비를 태그 하나로 접고, 그 태그의 값만 갱신한다.</p>
+
+      <h3>태그 하나가 무엇인가</h3>
+      <p>태그 id 는 <b>세 조각</b>이다 — 토픽의 <span class="mono">/</span> 는 <span class="mono">_</span> 로 접힌다.
+        세 채널 모두 <span class="mono">tagMode=raw</span> 라 <b><span class="mono">raw_payload</span> 객체 통째가
+        태그 하나의 STRING 값</b>이 된다. 필드마다 태그를 만들지 않는다.</p>
+      <div class="code">
+        <div class="code__bar"><span>태그 한 줄이 만들어지는 규칙</span><button class="code__copy" type="button">복사</button></div>
+<pre><span class="cm"># 들어온 MQTT 메시지</span>
+토픽   ot/device/assembly/lidar/status
+본문   {"id": "LDR-GJ-A1B3-07", "raw_payload": { ... }}
+
+<span class="cm"># Agent 안에서</span>
+TagId      <span class="hl">LDR-GJ-A1B3-07</span>.<span class="hl">ot_device_assembly_lidar_status</span>.<span class="hl">raw_payload</span>
+           └ 장비 id ────────┘ └ 토픽(/ 를 _ 로) ──────────┘ └ 필드 ┘
+dataType   STRING
+value      {"device_role":"LIDAR","site":"geoje", ... }   <span class="cm"># JSON 문자열 통째</span>
+changedAt  raw_payload.occurred_at                        <span class="cm"># 도착 시각이 아니다</span></pre>
+      </div>
+
+      <h3>태그 등록 — 파일 하나가 토픽 하나</h3>
+      <p>UI 의 MQTT 태그 가져오기는 한 파일이 정확히 한 토픽을 설명한다. 그래서 22개 토픽이면 CSV 22장이다.
+        발행기의 <span class="mono">--export-tags</span> 가 <b>발행 토픽에서 그대로</b> 뽑는다 — 발행기와 태그 목록을
+        따로 관리하면 반드시 어긋나므로 출처를 하나로 뒀다.<sup class="ref" data-ref="1">1</sup></p>
+      <div class="code">
+        <div class="code__bar"><span>docs/topic/mqtt-tags_..._ot_device_assembly_lidar_status.csv</span><button class="code__copy" type="button">복사</button></div>
+<pre>topic,qos,tagMode,deviceId,field,dataType,monitoring
+ot/device/assembly/lidar/status,1,<span class="hl">raw</span>,LDR-GJ-A1B1-01,raw_payload,STRING,true
+ot/device/assembly/lidar/status,1,raw,LDR-GJ-A1B1-02,raw_payload,STRING,true
+<span class="cm">... 210행 (조립 210대)</span></pre>
+      </div>
+
+      <h3>태그 2,520개의 내역</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:16%">채널</th><th style="width:16%">토픽</th><th style="width:24%">태그 수 계산</th><th style="width:14%">발행기 기준</th><th style="width:14%">ISL 등록부</th><th>차이</th></tr></thead>
+          <tbody>
+            <tr><td>상태</td><td class="num mono">2</td><td>350대 × 1</td><td class="num mono">350</td><td class="num mono">350</td><td><span class="chip chip--ok">일치</span></td></tr>
+            <tr><td>실적</td><td class="num mono">6</td><td>조립 210×4 + 의장 140×2</td><td class="num mono">1,120</td><td class="num mono">910</td><td><span class="chip chip--risk">210 누락</span> FITTING 전량</td></tr>
+            <tr><td>산출물</td><td class="num mono">14</td><td>350대 × 3종</td><td class="num mono">1,050</td><td class="num mono">1,050</td><td><span class="chip chip--ok">일치</span></td></tr>
+            <tr><td><b>합계</b></td><td class="num mono"><b>22</b></td><td></td><td class="num mono"><b>2,520</b></td><td class="num mono"><b>2,310</b></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">FITTING 210개가 등록부에 없다</p>
+        조립 공정 4종 중 <span class="mono">ot/sensor/fitting/actual</span> 만 태그 등록이 빠져 있다. 그래서
+        <b>조립 210대의 FITTING 실적이 InterSysLink 에서는 조용히 사라진다</b> — 등록 2,310 = 350 + 910 + 1,050 이고
+        실적은 1,120 이어야 하므로 차이 210 이 그대로 FITTING 이다.
+        브리지로 돌릴 때는 기본값(<span class="mono">AUTO_REGISTER_TAGS=true</span>)이 900000번부터 번호를 새로 매겨
+        살려 보내고, 그 사실이 <span class="mono">ees_bridge_tag_unregistered_total</span> 에 남는다.<sup class="ref" data-ref="3">3</sup>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">TagId 100자 상한</p>
+        Engine 의 <span class="mono">TagCatalogId</span> 컬럼 제약이자 <span class="mono">MqttTagId.MaxLength</span> 다.
+        산출물 채널은 id 에 <span class="mono">-TRANSFORMATION_MATRIX</span> 가 붙고 토픽에 shop·bay 까지 들어가
+        현재 <b>최대 97자</b>로 여유가 3자뿐이다. shop·bay 이름을 늘리면 넘치고, 넘친 태그는 내보내기에서 제외된다.
+      </div>
+    </section>
+
+    <!-- ---------- 5 ---------- -->
+    <section class="sec" id="s5">
+      <h2><span class="n">05</span>Kafka Provider 가 내보내는 레코드</h2>
+      <p class="why">여기서 알갱이가 바뀌고 장비 id 가 사라진다. 이 절이 이 문서에서 가장 중요한 구간이다.</p>
+
+      <h3>태그 값 하나가 레코드에 실리기까지</h3>
+      <div class="dgm" data-edit="on" style="height:400px">
+        <script type="application/json" class="dgm-data">
+{
+  "nodes": [
+    {"id":"m1","label":"MQTT 메시지 1건","sub":"{id, raw_payload}","x":30,"y":40,"w":200,"h":62,"tone":"primary"},
+    {"id":"t1","label":"태그 값 갱신","sub":"TagId = {장비}.{토픽}.raw_payload","x":290,"y":40,"w":230,"h":62},
+    {"id":"d1","label":"등록부에 있나","sub":"EES_TAG · ParameterId 조회","x":580,"y":34,"w":200,"h":74,"shape":"diamond"},
+    {"id":"it","label":"EES 항목 1개","sub":"timestamp · tid · value · pm_mode","x":840,"y":40,"w":220,"h":62,"tone":"accent"},
+    {"id":"bt","label":"묶음 마감","sub":"항목 500개 또는 1초 · 먼저 오는 쪽","x":1120,"y":34,"w":200,"h":74,"shape":"diamond"},
+    {"id":"dr","label":"버린다","sub":"미등록 · ISL 의 현재 동작","x":580,"y":200,"w":200,"h":62,"tone":"risk"},
+    {"id":"au","label":"번호를 새로 매긴다","sub":"미등록 · 브리지 기본값 900000~","x":840,"y":200,"w":220,"h":62,"tone":"warn"},
+    {"id":"rc","label":"Kafka 레코드 1개","sub":"헤더 11개 + 항목 배열","x":1120,"y":200,"w":200,"h":62,"tone":"ok"},
+    {"id":"tp","label":"ot.lidar.status","sub":"Key = 토픽 이름 · 1파티션","x":1120,"y":330,"w":200,"h":58,"shape":"pill","tone":"primary"}
+  ],
+  "edges": [
+    {"from":"m1","to":"t1","tone":"primary"},
+    {"from":"t1","to":"d1","tone":"primary"},
+    {"from":"d1","to":"it","tone":"primary"},
+    {"from":"d1","to":"dr","tone":"risk","style":"dash"},
+    {"from":"d1","to":"au","style":"dash"},
+    {"from":"au","to":"it","style":"dash"},
+    {"from":"it","to":"bt","tone":"primary"},
+    {"from":"bt","to":"rc","tone":"ok"},
+    {"from":"rc","to":"tp","label":"produce · acks=all","tone":"ok"}
+  ]
+}
+        </script>
+      </div>
+
+      <h3>MQTT 토픽 22개가 Kafka 토픽 3개로 접힌다</h3>
+      <p>EES 메시지 하나가 Kafka 토픽 하나이고, 채널마다 메시지를 따로 만들어 두었다
+        (<span class="mono">msgHeaderFormat.topic.send_topic</span>). 그래서 <b>토픽 하나에 채널 하나</b>가 실린다 —
+        수신 측이 채널을 토픽 이름의 마지막 마디로 판정할 수 있는 근거가 이것이다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:22%">Kafka 토픽</th><th style="width:30%">묶어 온 MQTT 토픽</th><th style="width:12%">레코드/초</th><th style="width:14%">항목/레코드</th><th>항목/초</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">ot.lidar.status</td><td class="mono">ot/device/{zone}/lidar/status (2개)</td><td class="num mono">1</td><td class="num mono">350</td><td class="num mono">350</td></tr>
+            <tr><td class="mono">ot.lidar.artifact</td><td class="mono">ot/pipeline/{zone}/{shop}/{bay}/artifact (14개)</td><td class="num mono">1</td><td class="num mono">70</td><td class="num mono">70</td></tr>
+            <tr><td class="mono">ot.lidar.actual</td><td class="mono">ot/sensor/{stage}/actual (6개)</td><td class="num mono">1</td><td class="num mono">6</td><td class="num mono">6</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>MQTT 메시지 하나가 Kafka 레코드 하나가 아니다.</b> 채널마다 따로 묶어 항목 500개 또는 1초 중 먼저 오는
+        쪽에서 끊는데, 지금 유량에서는 늘 시간 쪽이 먼저다. 그래서 토픽마다 초당 레코드 하나가 나가고,
+        채널 차이는 <b>레코드당 항목 수</b>로 나타난다. 1분 주기인 실적·산출물이 한 번에 터지지 않는 것은
+        발행기가 장비마다 시작을 밀어 두기 때문이다(<span class="mono">offset = interval × index / 350</span>).<sup class="ref" data-ref="3">3</sup></p>
+
+      <h3>레코드의 모양</h3>
+      <div class="code">
+        <div class="code__bar"><span>ot.lidar.status — 레코드 1개 (Key = "ot.lidar.status")</span><button class="code__copy" type="button">복사</button></div>
+<pre><span class="cm">// 헤더 11개 (Kafka 메시지 헤더)</span>
+project_id      = ot.lidar.status        <span class="cm">// send_topic 과 같은 값</span>
+infra_proc_name = ot.lidar.status
+task_area_code  = ot.lidar.status
+request         = ot.lidar.status        <span class="cm">// 수신 측이 채널 대조에 쓴다</span>
+data_type       = value
+method_id       = <span class="hl">TRACE</span>                  <span class="cm">// sendPolicy.mode=OnChange 이므로. 주기 스냅샷이면 BATCH</span>
+message_version = 1.0
+msg_timestamp   = 1789012763360318900    <span class="cm">// 레코드를 만든 시각의 ns epoch</span>
+uniqueid        = 3f0c...                <span class="cm">// 레코드마다 새 GUID</span>
+reply           =                        <span class="cm">// 빈 값</span>
+replycluster    =                        <span class="cm">// 빈 값</span>
+
+<span class="cm">// 본문 — 항목 350개의 배열</span>
+[{"content": {"timestamp": <span class="hl">1789012763353205000</span>,          <span class="cm">// raw_payload.occurred_at 의 ns epoch</span>
+              "tid": "<span class="hl">1</span>",                                 <span class="cm">// 숫자 ParameterId. TagId 가 아니다</span>
+              "value": "{\"device_role\":\"LIDAR\",...}",  <span class="cm">// raw_payload 통째의 JSON 문자열</span>
+              "pm_mode": false}},
+ ... 349건 더 ...]</pre>
+      </div>
+
+      <div class="note note--risk">
+        <p class="note__t">장비 id 가 선로에서 사라진다 — 이 문서에서 가장 자주 발이 걸리는 지점</p>
+        Provider 는 태그를 실을 때 문자열 TagId 를 버리고 등록부의 <b>ParameterId(숫자)</b> 만 싣는다
+        (<span class="mono">ValueMessageFormatterV1_0</span>). 그리고 <span class="mono">raw_payload</span> 안에도
+        장비 id 필드가 없다. 즉 <b>Kafka 만 읽어서는 어느 장비인지 알 수 없다.</b>
+        되돌리는 유일한 근거가 등록부 사본(<span class="mono">rdb.lidar_tag_catalog</span>)이다.
+        <div class="code" style="margin-top:10px">
+          <div class="code__bar"><span>숫자를 장비로 되돌리는 길</span><button class="code__copy" type="button">복사</button></div>
+<pre>MQTT   {"id": "LDR-GJ-A1B3-07"}  on  ot/device/assembly/lidar/status
+  TagId    LDR-GJ-A1B3-07.ot_device_assembly_lidar_status.raw_payload
+  조회표   (send_topic "ot.lidar.status", param_id 1)
+  tid      "1"        <span class="cm"># Kafka 에는 이것만 실린다</span></pre>
+        </div>
+      </div>
+
+      <div class="note note--warn">
+        <p class="note__t">조회 키가 (토픽, 숫자)인 이유</p>
+        ParameterId 는 워크플로우·PType 안에서만 1부터 매기는 일련번호다. 메시지가 다르면
+        <b>같은 숫자가 다른 태그를 가리킬 수 있다.</b> 그래서 <span class="mono">param_id</span> 단독이 아니라
+        <span class="mono">(send_topic, param_id)</span> 가 기본 키다.<sup class="ref" data-ref="5">5</sup>
+      </div>
+
+      <div class="note note--info">
+        <p class="note__t">토픽이 파티션 1개인 것은 설정 실수가 아니다</p>
+        Provider 는 Kafka Key 를 정규화한 <span class="mono">project_id</span> 로 쓰는데 그 값이 채널마다 상수다.
+        파티션을 늘려도 레코드는 전부 한 파티션에 간다 — 계약의 성질이다.
+      </div>
+    </section>
+
+    <!-- ---------- 6 ---------- -->
+    <section class="sec" id="s6">
+      <h2><span class="n">06</span>Kafka 에서 소스 DB 로</h2>
+      <p class="why">소비자가 하는 일은 다섯이다. 실패 경로까지 그려야 "안 들어온 데이터가 어디 있나"에 답할 수 있다.</p>
+
+      <h3>처리 순서</h3>
+      <div class="dgm" data-edit="on" style="height:460px">
+        <script type="application/json" class="dgm-data">
+{
+  "nodes": [
+    {"id":"p1","label":"레코드 수신","sub":"50건 또는 1초마다 한 배치","x":30,"y":40,"w":200,"h":62,"tone":"primary"},
+    {"id":"p2","label":"채널 판정","sub":"토픽 이름의 마지막 마디","x":290,"y":34,"w":190,"h":74,"shape":"diamond"},
+    {"id":"p3","label":"배열 풀기","sub":"레코드 1개 → 항목 N개","x":540,"y":40,"w":200,"h":62},
+    {"id":"p4","label":"숫자 tid 해석","sub":"(토픽, 숫자) 조회표","x":800,"y":34,"w":190,"h":74,"shape":"diamond"},
+    {"id":"p5","label":"행 만들기","sub":"raw_payload 키 = 컬럼 이름","x":1050,"y":40,"w":200,"h":62,"tone":"accent"},
+    {"id":"x1","label":"reject 격리","sub":"모르는 토픽 · 깨진 JSON · 필수 필드 없음","x":290,"y":210,"w":200,"h":62,"tone":"risk"},
+    {"id":"fb","label":"폴백 장비 축","sub":"상태는 멱등 키에서, 나머지는 #숫자","x":800,"y":210,"w":200,"h":62,"tone":"warn"},
+    {"id":"in","label":"하이퍼테이블 INSERT","sub":"ON CONFLICT (멱등키, time) DO NOTHING","x":1050,"y":210,"w":200,"h":62,"tone":"ok"},
+    {"id":"up","label":"상태 표 UPSERT","sub":"device_state · block_progress · block_artifact","x":1050,"y":350,"w":200,"h":62,"tone":"ok"},
+    {"id":"cm","label":"DB 커밋 후 오프셋 커밋","sub":"순서가 뒤집히면 유실된다","x":790,"y":350,"w":210,"h":62,"tone":"ok"}
+  ],
+  "edges": [
+    {"from":"p1","to":"p2","tone":"primary"},
+    {"from":"p2","to":"p3","tone":"primary"},
+    {"from":"p2","to":"x1","tone":"risk","style":"dash"},
+    {"from":"p3","to":"p4","tone":"primary"},
+    {"from":"p4","to":"p5","tone":"primary"},
+    {"from":"p4","to":"fb","style":"dash"},
+    {"from":"fb","to":"p5","style":"dash"},
+    {"from":"p5","to":"in","tone":"primary"},
+    {"from":"in","to":"up"},
+    {"from":"up","to":"cm","tone":"ok"}
+  ]
+}
+        </script>
+      </div>
+
+      <h3>소비자가 하는 일 다섯</h3>
+      <div class="steps">
+        <div class="step"><span class="step__n">1</span><div class="step__t">항목마다 한 행</div><div class="step__d">채널은 토픽이 정한다. 멱등 키 충돌이면 DO NOTHING</div></div>
+        <div class="step"><span class="step__n">2</span><div class="step__t">장비별 최신 상태 UPSERT</div><div class="step__d">배치 안에서 먼저 최신만 고른다. 오래된 이벤트는 못 덮는다</div></div>
+        <div class="step"><span class="step__n">3</span><div class="step__t">레코드 자체를 한 행</div><div class="step__d">헤더 · 오프셋 · 채널별 항목 수. 추적용</div></div>
+        <div class="step"><span class="step__n">4</span><div class="step__t">못 푼 항목 격리</div><div class="step__d">원문과 사유를 남기고, 나머지는 그대로 적재</div></div>
+        <div class="step"><span class="step__n">5</span><div class="step__t">지표 노출</div><div class="step__d">/metrics · 미해석 tid · 채널 불일치 · 종단 지연</div></div>
+      </div>
+
+      <h3>토픽이 표를 정한다</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:22%">Kafka 토픽</th><th style="width:26%">들어가는 표</th><th style="width:16%">스키마</th><th style="width:14%">행/초</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">ot.lidar.status</td><td class="mono">tsdb.lidar_status</td><td><span class="chip">하이퍼테이블</span></td><td class="num mono">350</td><td>6시간 청크 · segmentby = tid</td></tr>
+            <tr><td class="mono">ot.lidar.actual</td><td class="mono">tsdb.lidar_scan_actual</td><td><span class="chip">하이퍼테이블</span></td><td class="num mono">6</td><td>scan_id 로 산출물과 잇는다</td></tr>
+            <tr><td class="mono">ot.lidar.artifact</td><td class="mono">tsdb.lidar_scan_artifact</td><td><span class="chip">하이퍼테이블</span></td><td class="num mono">70</td><td>파일 본체는 오지 않는다</td></tr>
+            <tr><td>(레코드 자체)</td><td class="mono">rdb.lidar_status_message</td><td><span class="chip chip--info">일반 표</span></td><td class="num mono">3</td><td>레코드 1개 = 행 1개</td></tr>
+            <tr><td>(상태에서 파생)</td><td class="mono">rdb.lidar_device_state</td><td><span class="chip chip--info">일반 표</span></td><td class="num mono">350행 고정</td><td>장비별 최신 한 행</td></tr>
+            <tr><td>(실적에서 파생)</td><td class="mono">rdb.lidar_block_progress</td><td><span class="chip chip--info">일반 표</span></td><td class="mono">블록당 1행</td><td>공정별 완료 시각 · 누계 · 최대 진도율</td></tr>
+            <tr><td>(산출물에서 파생)</td><td class="mono">rdb.lidar_block_artifact</td><td><span class="chip chip--info">일반 표</span></td><td class="mono">블록당 1행</td><td>종류별 건수 · 용량 누계</td></tr>
+            <tr><td>(못 푼 항목)</td><td class="mono">rdb.lidar_ingest_reject</td><td><span class="chip chip--info">일반 표</span></td><td class="mono">0 이 정상</td><td>원문과 사유</td></tr>
+            <tr><td>(등록부 사본)</td><td class="mono">rdb.lidar_tag_catalog</td><td><span class="chip chip--info">일반 표</span></td><td class="num mono">2,310행</td><td>기동할 때 통째로 메모리에 읽는다</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>필드가 컬럼에 앉는 규칙</h3>
+      <p><b>컬럼 이름은 <span class="mono">raw_payload</span> 의 키를 그대로 쓴다.</b> 이름을 바꾸면 필드 정의서와 대조가 안 된다.
+        예외는 넷뿐이다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:20%">컬럼</th><th style="width:34%">원본</th><th>왜 이름이 다른가</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">time</td><td class="mono">raw_payload.occurred_at</td><td>하이퍼테이블의 파티션 컬럼. 도착 시각이 아니라 <b>장비 발생 시각</b>이라야 늦게 온 항목도 제 자리에 들어간다</td></tr>
+            <tr><td class="mono">tid</td><td>조회표가 푼 장비 id</td><td>못 풀면 <span class="mono">#2257</span> 로 남는다 — 틀린 장비를 지어내지 않는다</td></tr>
+            <tr><td class="mono">tag_id</td><td>조회표의 문자열 TagId</td><td>선로에는 실리지 않는 값이라 별도 컬럼</td></tr>
+            <tr><td class="mono">param_id</td><td class="mono">content.tid</td><td>실려 온 숫자를 그대로 보존한다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>나머지는 <span class="mono">json_populate_recordset</span> 이 JSON 키를 컬럼에 맞춰 캐스팅한다.
+        <span class="mono">timestamptz</span> 문자열은 PostgreSQL 이 직접 파싱하므로(7자리 소수초도 받는다)
+        파이썬에서 날짜를 다루지 않는다. 여기에 더해 <span class="mono">content_ts</span>(= <span class="mono">content.timestamp</span>),
+        <span class="mono">pm_mode</span>, <span class="mono">kafka_offset</span>, <span class="mono">received_at</span> 이 붙는다.</p>
+
+      <h3>중복과 유실을 무엇이 막는가</h3>
+      <div class="g2">
+        <div class="note note--ok"><p class="note__t">중복 — 유니크 인덱스</p>
+          MQTT 는 QoS 1, Kafka 는 at-least-once 라 재전달이 온다. 세 하이퍼테이블 모두
+          <span class="mono">(idempotency_key, time)</span> 유니크 인덱스를 두고
+          <span class="mono">ON CONFLICT DO NOTHING</span> 으로 넣는다. 하이퍼테이블의 유니크 인덱스는
+          파티션 컬럼을 반드시 포함해야 해서 <span class="mono">time</span> 이 같이 들어간다.</div>
+        <div class="note note--ok"><p class="note__t">유실 — 커밋 순서</p>
+          DB 트랜잭션이 커밋된 뒤에만 Kafka 오프셋을 커밋한다. DB 쓰기가 실패하면 오프셋을 커밋하지 않고
+          같은 배치를 다시 시도한다. 순서가 뒤집히면 실패한 배치가 조용히 사라진다.</div>
+      </div>
+
+      <h3>스키마 둘로 가른 선</h3>
+      <div class="note note--info">
+        <p class="note__t">rdb / tsdb — CDC 가 성립하는가로 가른다</p>
+        하이퍼테이블은 청크가 주기마다 새 표로 생기고, 압축이 행을 내부 청크로 옮기며, 보존이 청크째 DROP 한다.
+        어느 것도 행 단위 INSERT/UPDATE/DELETE 로 보이지 않아 <b>논리 복제가 성립하지 않는다.</b>
+        그래서 이 DB 의 진짜 경계를 주석이 아니라 스키마로 두었다 — publication 에 하이퍼테이블이
+        실수로 끼어드는 것을 구조가 막는다. CDC 로 나가는 것은 <span class="mono">rdb</span> 의 여섯 표뿐이고,
+        그 뒤 구간은 별도 문서다.<sup class="ref" data-ref="9">9</sup>
+      </div>
+    </section>
+
+    <!-- ---------- 7 ---------- -->
+    <section class="sec" id="s7">
+      <h2><span class="n">07</span>경계 조건과 지금 어긋나 있는 것</h2>
+      <p class="why">지금 돌려 보면 실제로 나오는 것들이다. 모르고 보면 데이터가 맞는 것처럼 읽힌다.</p>
+
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">상황</th><th style="width:38%">그대로 두면</th><th>대응</th></tr></thead>
+          <tbody>
+            <tr><td>실적·산출물의 tid 를 조회표가 못 푼다</td><td>실적은 장비 축이 <b>전부</b> 틀리고 산출물은 대부분 틀린다. 상태 채널만 멱등 키에서 장비를 되찾을 수 있다</td><td>조회표를 먼저 채운다. 못 풀면 <span class="mono">#숫자</span> 로 남겨 미해석을 눈에 보이게 둔다</td></tr>
+            <tr><td>FITTING 태그 미등록</td><td>조립 210대의 FITTING 실적이 ISL 에서 조용히 사라진다</td><td>등록부에 추가. 브리지 경로는 <span class="mono">AUTO_REGISTER_TAGS</span> 로 살려 보내고 지표에 남긴다</td></tr>
+            <tr><td>같은 블록이 한 배치에 여러 번</td><td>산출물은 한 스캔이 12건을 낸다. 그대로 UPSERT 하면 <span class="mono">cannot affect row a second time</span> 으로 배치가 통째로 죽는다</td><td>배치 안에서 먼저 블록 축으로 합친 뒤 넣는다. 합치는 규칙이 SQL 쪽과 같아야 한다</td></tr>
+            <tr><td>늦게 온 재전달</td><td>오래된 상태가 최신 값을 덮는다</td><td>최신 값 컬럼만 <span class="mono">last_event_at</span> 비교로 막는다. 누계는 조건 없이 더하고 마일스톤은 GREATEST 로 민다</td></tr>
+            <tr><td>Kafka 토픽을 지웠다</td><td>브로커가 <span class="mono">auto.create.topics.enable=false</span> 라 초당 426건이 계속 들어와도 토픽이 돌아오지 않는다. 실행 중 삭제는 <span class="mono">produce()</span> 가 예외를 내지 않고 전달 콜백으로만 온다</td><td>브리지가 기동할 때와 송신 실패 때 직접 만든다. 복구는 그 채널의 다음 발행 때(1분 주기면 최대 1분)</td></tr>
+            <tr><td>브리지·소비자가 죽어 있는 동안</td><td>MQTT 는 clean session 이라 그동안 온 메시지를 잃는다. Kafka 구간은 오프셋이 남아 다시 읽는다</td><td>브로커 큐(EMQX 기본 1000)를 금방 넘기므로 쌓다 버리는 대신 흘려보내는 쪽을 택했다. <span class="mono">MQTT_CLEAN_SESSION=false</span> 로 바꿀 수 있다</td></tr>
+            <tr><td>replication slot 을 둔 채 CDC 를 안 쓴다</td><td>슬롯은 만료되지 않는다. 붙잡은 WAL 이 계속 쌓여 <b>이 DB 디스크가 고갈된다</b></td><td><span class="mono">SELECT pg_drop_replication_slot('embedded_cdc_slot');</span></td></tr>
+            <tr><td>배치 창을 줄인다</td><td>항목 수는 그대로인데 레코드가 잘아져, 레코드 수로 눈금을 잡아 둔 Kafka 지연 경보의 의미가 달라진다</td><td><span class="mono">BATCH_MAX_WAIT_MS</span> 를 바꾸면 경보 임계도 같이 본다</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>아직 확정되지 않은 것 <span class="chip chk-count">0 / 0</span></h3>
+      <ul class="chk">
+        <li><input type="checkbox" id="c1"><span><span class="t">페이로드 규격 자체</span><span class="d">필드 정의서 6.2~6.4 의 제안 규격이며 ISL 벤더 합의 전이다</span></span></li>
+        <li><input type="checkbox" id="c2"><span><span class="t">상태 발행 주기</span><span class="d">컨플은 10분/대, cdc 검토문서 D1 은 1초. 지금 기본값은 1초 — 부하가 보이는 쪽이다</span></span></li>
+        <li><input type="checkbox" id="c3"><span><span class="t">스캔 주기와 세그먼트 수</span><span class="d">1분 · 10개로 잡아 두었다. 컨플 전제는 10분/대</span></span></li>
+        <li><input type="checkbox" id="c4"><span><span class="t">공정 이름 6종</span><span class="d">조립 4 · 의장 2 를 임시로 채웠다. 늘면 소비자의 마일스톤 매핑과 스키마를 같이 고친다</span></span></li>
+        <li><input type="checkbox" id="c5"><span><span class="t">shop · bay 구성</span><span class="d">assembly1 · outfitting1 × bay1~7. 이름을 늘리면 TagId 100자 상한에 걸린다</span></span></li>
+        <li><input type="checkbox" id="c6"><span><span class="t">method_id 값</span><span class="d">지금 TRACE(OnChange). 주기 스냅샷으로 가면 BATCH 로 바뀐다</span></span></li>
+        <li><input type="checkbox" id="c7"><span><span class="t">storage_uri 의 접근 경로와 보존</span><span class="d">파일 본체는 선로에 없다. 누가 언제까지 들고 있는지 미정</span></span></li>
+      </ul>
+    </section>
+
+    <!-- ---------- 8 ---------- -->
+    <section class="sec" id="s8">
+      <h2><span class="n">08</span>직접 돌려보기</h2>
+      <p class="why">위 그림 전체를 로컬에서 한 번에 띄울 수 있다. Aspire 없이도 같은 모양이 나온다.</p>
+
+      <div class="code">
+        <div class="code__bar"><span>기동 순서 (PowerShell)</span><button class="code__copy" type="button">복사</button></div>
+<pre><span class="cm"># 1. MQTT 브로커 (EMQX 1884)</span>
+cd util\docker-mqtt;            podman compose up -d
+
+<span class="cm"># 2. 소스 DB + 소비자 + 모니터링</span>
+cd src\timescaledb;             scripts\up.ps1
+
+<span class="cm"># 3. Kafka + 브리지 — Agent + Provider 자리를 대신한다</span>
+<span class="cm">#    -Tsdb 를 주면 이 Kafka 를 tsdb-net 에 alias kafka 로 붙여 소비자가 이쪽을 읽는다</span>
+cd util\mqtt-ees-bridge;        scripts\up.ps1 <span class="hl">-Tsdb</span>
+
+<span class="cm"># 4. 발행 — 350대 × 22토픽, 약 426 msg/s</span>
+util\mqtt-lidar-sim\1-publish.cmd
+
+<span class="cm"># 5. 확인</span>
+util\mqtt-ees-bridge\scripts\verify.ps1        <span class="cm"># 오프셋 · 지표 · 레코드 한 건 · 계약 검사</span>
+src\timescaledb\scripts\verify.ps1             <span class="cm"># 표별 행 수 · 채널 분포 · 장비 상태</span></pre>
+      </div>
+
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:34%">주소</th><th>무엇을 보는가</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">http://localhost:61080</td><td>Kafka UI — Topics → <span class="mono">ot.lidar.status</span> → Messages. 헤더 11개와 <span class="mono">content</span> 배열이 보이면 형식이 맞은 것</td></tr>
+            <tr><td class="mono">http://localhost:61090/metrics</td><td>브리지 지표 — 받은 메시지 · 만든 레코드/항목 · 미등록 태그</td></tr>
+            <tr><td class="mono">http://localhost:59080/metrics</td><td>소비자 지표 — 채널별 항목 · 미해석 tid · 종단 지연</td></tr>
+            <tr><td class="mono">localhost:59432</td><td>소스 DB <span class="mono">lidar</span> · postgres / postgres</td></tr>
+            <tr><td class="mono">http://localhost:59380</td><td>Grafana · admin / admin</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="g2">
+        <div class="note note--ok"><p class="note__t">성공 판정</p>
+          Kafka UI 의 세 토픽 오프셋이 모두 초당 1씩 오르고,
+          <span class="mono">SELECT count(*) FROM rdb.lidar_ingest_reject</span> 가 0 이며,
+          <span class="mono">SELECT count(DISTINCT tid) FROM rdb.lidar_device_state</span> 가 350 이면
+          그림 전체가 정상이다. <span class="mono">tid</span> 에 <span class="mono">#숫자</span> 가 섞여 있으면
+          조회표가 덜 찬 것이다.</div>
+        <div class="note note--warn"><p class="note__t">자주 나는 오류</p>
+          <b>Windows 예약 포트.</b> 59248~59347 구간은 호스트가 열지 못한다. 컨테이너는 멀쩡한데 브라우저만
+          안 열리면 이것부터 확인한다(<span class="mono">netsh interface ipv4 show excludedportrange protocol=tcp</span>).<br>
+          <b>alias 가 둘.</b> 같은 네트워크에 alias <span class="mono">kafka</span> 가 둘이면 소비자가 어느 쪽에 붙을지
+          알 수 없다. Aspire Kafka 를 먼저 떼고 붙인다.</div>
+      </div>
+    </section>
+
+    <!-- ---------- 9 ---------- -->
+    <section class="sec" id="s9">
+      <h2><span class="n">09</span>참고 자료</h2>
+      <ol class="refs">
+        <li><span class="refs__n">1</span><span><span class="refs__src">발행기 — 장비 구성 · 세 채널 · 페이로드 · 태그 CSV 생성</span>
+          <span class="refs__meta">code · util/mqtt-lidar-sim/lidar-sim.cs:575-700 · util/mqtt-lidar-sim/README.md (작업 트리, 브랜치 lidar-cdc-source)</span></span></li>
+        <li><span class="refs__n">2</span><span><span class="refs__src">태그 정의 CSV 22장 — 토픽별 태그 목록</span>
+          <span class="refs__meta">data · docs/topic/mqtt-tags_*.csv 21장 + docs/cdc/mqtt-tags_..._wiring_actual.csv · 합계 2,520행</span></span></li>
+        <li><span class="refs__n">3</span><span><span class="refs__src">브리지 — 헤더 11개 · 배치 규칙 · 숫자 tid · 실측 유량</span>
+          <span class="refs__meta">code · util/mqtt-ees-bridge/bridge/bridge.py:490-555 · util/mqtt-ees-bridge/README.md (실측 2026-09-11)</span></span></li>
+        <li><span class="refs__n">4</span><span><span class="refs__src">ISL 등록부 사본 — 태그 2,310개 (actual 910 · artifact 1,050 · status 350)</span>
+          <span class="refs__meta">data · src/timescaledb/infra/db/init/03-tag-catalog.sql · 원본 isl-secondary.db, 뽑은 시각 2026-09-10T15:30:58+09:00</span></span></li>
+        <li><span class="refs__n">5</span><span><span class="refs__src">소스 DB 스키마 — 표 9개 · 유니크 인덱스 · 하이퍼테이블 설정</span>
+          <span class="refs__meta">code · src/timescaledb/infra/db/init/01-schema.sql:38-400</span></span></li>
+        <li><span class="refs__n">6</span><span><span class="refs__src">소비자 — 채널 판정 · 항목 파싱 · UPSERT · 커밋 순서</span>
+          <span class="refs__meta">code · src/timescaledb/dev/ingest/ingest.py:1-60, 144-200, 505-640</span></span></li>
+        <li><span class="refs__n">7</span><span><span class="refs__src">CDC publication 설정 — rdb 여섯 표만 싣는 이유</span>
+          <span class="refs__meta">code · src/timescaledb/infra/db/init/04-cdc-lidar.sql:1-62</span></span></li>
+        <li><span class="refs__n">8</span><span><span class="refs__src">스택 기동 · 포트 · Kafka 네트워크 결선</span>
+          <span class="refs__meta">code · src/timescaledb/README.md · util/mqtt-ees-bridge/docker-compose.yml</span></span></li>
+        <li><span class="refs__n">9</span><span><span class="refs__src">소스 DB 이후 구간 — CDC 로 targetdb 까지</span>
+          <span class="refs__meta">doc · docs/cdc/lidar-cdc-db-flow.html</span></span></li>
+        <li><span class="refs__n">10</span><span><span class="refs__src">보존 · 압축 · 용량 · 주기 변경의 영향</span>
+          <span class="refs__meta">doc · docs/cdc/lidar-tsdb-pipeline.html · docs/cdc/lidar-tsdb-deck.html</span></span></li>
+      </ol>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   HW Doc Kit - diagram engine (의존성 없음, 단일 파일 내장용)
+   drawio 느낌의 조작: 드래그 이동 / 연결 / 라벨 인라인 편집 /
+   팬·줌 / 톤 변경 / 삭제 / Ctrl+Z / JSON 내보내기(붙여넣기로 영구 반영)
+
+   마크업 (자세한 내용은 references/diagram.md):
+     div.dgm[data-edit=on] 안에
+     script[type=application/json][class=dgm-data] 로 노드·엣지 JSON 을 넣습니다.
+   ============================================================ */
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var GRID = 10;
+  var TONES = ['neutral', 'primary', 'accent', 'muted', 'ok', 'warn', 'risk', 'info'];
+
+  function s(n, a) {
+    var e = document.createElementNS(NS, n);
+    for (var k in (a || {})) e.setAttribute(k, a[k]);
+    return e;
+  }
+  function h(t, c, txt) {
+    var e = document.createElement(t);
+    if (c) e.className = c;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+  function btn(label, title) {
+    var b = h('button', 'dgm__btn', label);
+    b.type = 'button';
+    if (title) b.title = title;
+    return b;
+  }
+  function snap(v) { return Math.round(v / GRID) * GRID; }
+
+  function boxShape(n) {
+    var sh = n.shape || 'rect', w = n.w, ht = n.h;
+    if (sh === 'diamond')
+      return s('path', { 'class': 'box', d: 'M' + w / 2 + ',0 L' + w + ',' + ht / 2 + ' L' + w / 2 + ',' + ht + ' L0,' + ht / 2 + ' Z' });
+    if (sh === 'store') {
+      var r = Math.min(14, ht / 4);
+      var d = 'M0,' + r +
+        ' C0,' + (r * .45) + ' ' + (w * .22) + ',0 ' + (w / 2) + ',0' +
+        ' C' + (w * .78) + ',0 ' + w + ',' + (r * .45) + ' ' + w + ',' + r +
+        ' L' + w + ',' + (ht - r) +
+        ' C' + w + ',' + (ht - r * .45) + ' ' + (w * .78) + ',' + ht + ' ' + (w / 2) + ',' + ht +
+        ' C' + (w * .22) + ',' + ht + ' 0,' + (ht - r * .45) + ' 0,' + (ht - r) + ' Z';
+      return s('path', { 'class': 'box', d: d });
+    }
+    if (sh === 'note') {
+      var f = 14;
+      return s('path', { 'class': 'box', d: 'M0,0 L' + (w - f) + ',0 L' + w + ',' + f + ' L' + w + ',' + ht + ' L0,' + ht + ' Z' });
+    }
+    var rx = sh === 'pill' ? ht / 2 : (sh === 'round' ? 12 : 4);
+    return s('rect', { 'class': 'box', x: 0, y: 0, width: w, height: ht, rx: rx });
+  }
+
+  /* 노드 두 개 사이의 직교(엘보) 경로 */
+  function route(a, b) {
+    var ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    var dx = bc.x - ac.x, dy = bc.y - ac.y, p1, p2, dir;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      dir = 'h';
+      p1 = { x: dx > 0 ? a.x + a.w : a.x, y: ac.y };
+      p2 = { x: dx > 0 ? b.x : b.x + b.w, y: bc.y };
+    } else {
+      dir = 'v';
+      p1 = { x: ac.x, y: dy > 0 ? a.y + a.h : a.y };
+      p2 = { x: bc.x, y: dy > 0 ? b.y : b.y + b.h };
+    }
+    var d, mid;
+    if (dir === 'h') {
+      var mx = (p1.x + p2.x) / 2;
+      d = 'M' + p1.x + ',' + p1.y + ' L' + mx + ',' + p1.y + ' L' + mx + ',' + p2.y + ' L' + p2.x + ',' + p2.y;
+      mid = { x: mx, y: (p1.y + p2.y) / 2 };
+    } else {
+      var my = (p1.y + p2.y) / 2;
+      d = 'M' + p1.x + ',' + p1.y + ' L' + p1.x + ',' + my + ' L' + p2.x + ',' + my + ' L' + p2.x + ',' + p2.y;
+      mid = { x: (p1.x + p2.x) / 2, y: my };
+    }
+    return { d: d, mid: mid };
+  }
+
+  /* 원본 JSON 이 바뀌었는지 보는 값. 문서를 고쳐 다시 배포하면 해시가 달라져
+     예전 편집본을 버린다 — 안 그러면 저자가 고친 그림이 영원히 안 보인다. */
+  function srcHash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) + h + s.charCodeAt(i)) | 0; }
+    return String(h);
+  }
+
+  function Diagram(root) {
+    this.root = root;
+    this.editable = root.getAttribute('data-edit') !== 'off';
+
+    /* 저장 키 — data-key 가 있으면 그것을, 없으면 문서 안에서의 순번을 쓴다.
+       순번은 그림을 추가·삭제하면 밀리지만, 그때는 해시도 함께 달라져 저장본이 버려진다. */
+    var all = document.querySelectorAll('.dgm');
+    this.key = 'hwdgm:' + (location.pathname.split('/').pop() || 'doc') + ':'
+      + (root.getAttribute('data-key') || Array.prototype.indexOf.call(all, root));
+
+    var tag = root.querySelector('script.dgm-data');
+    this.srcHash = srcHash(tag ? tag.textContent : '');
+
+    this.data = this.read();
+    var saved = this.loadSaved();
+    if (saved) this.data = saved;
+    this.view = { tx: 0, ty: 0, k: 1 };
+    this.sel = null;          /* {type:'node'|'edge'|'group', id} */
+    this.linkMode = false;
+    this.linkFrom = null;
+    this.undo = [];
+    this.build();
+    this.render();
+    this.fit();
+    this.ready = true;
+    this.markSaved(!!this._restored);
+  }
+
+  Diagram.prototype.read = function () {
+    var tag = this.root.querySelector('script.dgm-data');
+    var d = { nodes: [], edges: [], groups: [] };
+    if (tag) { try { d = JSON.parse(tag.textContent); } catch (e) { console.warn('[dgm] JSON 파싱 실패', e); } }
+    d.nodes = d.nodes || []; d.edges = d.edges || []; d.groups = d.groups || [];
+    d.nodes.forEach(function (n) {
+      n.w = n.w || 170; n.h = n.h || 62;
+      n.shape = n.shape || 'rect'; n.tone = n.tone || 'neutral';
+      n.x = n.x || 0; n.y = n.y || 0;
+    });
+    return d;
+  };
+
+  Diagram.prototype.build = function () {
+    var self = this;
+    var bar = h('div', 'dgm__bar no-print');
+    var mk = function (label, title, fn) { var b = btn(label, title); b.addEventListener('click', fn); bar.appendChild(b); return b; };
+
+    mk('박스', '새 박스 추가', function () { self.addNode(); });
+    this.bLink = mk('연결', '두 박스를 차례로 클릭해 화살표 연결', function () { self.toggleLink(); });
+    mk('색', '선택 항목의 톤 변경', function () { self.cycleTone(); });
+    mk('모양', '선택 박스의 모양 변경', function () { self.cycleShape(); });
+    mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
+    bar.appendChild(h('span', 'sp'));
+    mk('−', '축소', function () { self.zoom(1 / 1.2); });
+    mk('+', '확대', function () { self.zoom(1.2); });
+    mk('맞춤', '화면에 맞추기', function () { self.fit(); });
+    this.bMax = mk('넓게', '화면 가득 펼치기 (Esc 로 닫기)', function () { self.toggleMax(); });
+    mk('JSON', '수정 결과를 JSON으로 복사해 원본 파일에 붙여넣기', function () { self.openJson(); });
+    this.bReset = mk('원래대로', '이 브라우저에 저장된 편집 내용을 지운다', function () { self.resetSaved(); });
+    bar.appendChild(h('span', 'dgm__hint', '드래그 이동 · 더블클릭 라벨수정 · 휠 줌 · 빈 곳 드래그 팬'));
+
+    var svg = s('svg', { 'class': 'dgm__svg' });
+    var defs = s('defs');
+    [['ar-default', 'var(--ink3)'], ['ar-primary', 'var(--hw)'], ['ar-risk', 'var(--risk)'], ['ar-ok', 'var(--ok)']]
+      .forEach(function (m) {
+        var mk2 = s('marker', {
+          id: m[0] + '-' + Math.random().toString(36).slice(2, 7),
+          viewBox: '0 0 10 10', refX: 9, refY: 5,
+          markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'
+        });
+        var p = s('path', { d: 'M0,1 L10,5 L0,9 z' });
+        p.setAttribute('style', 'fill:' + m[1]);
+        mk2.appendChild(p); defs.appendChild(mk2);
+        self['mk_' + m[0].slice(3)] = mk2.getAttribute('id');
+      });
+    svg.appendChild(defs);
+
+    this.gRoot = s('g');
+    this.gGroups = s('g'); this.gEdges = s('g'); this.gNodes = s('g');
+    this.gRoot.appendChild(this.gGroups);
+    this.gRoot.appendChild(this.gEdges);
+    this.gRoot.appendChild(this.gNodes);
+    svg.appendChild(this.gRoot);
+
+    this.svg = svg;
+    this.root.insertBefore(svg, this.root.firstChild);
+    if (this.editable) this.root.insertBefore(bar, svg);
+
+    /* JSON 모달 */
+    var modal = h('div', 'dgm__modal no-print');
+    var pane = h('div', 'pane');
+    var head = h('div', 'head'); head.appendChild(h('b', null, '다이어그램 JSON'));
+    head.appendChild(h('span', 'sp'));
+    var closeB = btn('닫기'); head.appendChild(closeB);
+    var ta = h('textarea'); ta.spellcheck = false;
+    var foot = h('div', 'foot');
+    var copyB = btn('전체 복사'); var applyB = btn('붙여넣은 JSON 적용');
+    foot.appendChild(h('span', 'dgm__hint', '원본 HTML의 dgm-data 블록에 붙여넣으면 수정이 영구 반영됩니다'));
+    foot.appendChild(h('span', 'sp')); foot.appendChild(applyB); foot.appendChild(copyB);
+    pane.appendChild(head); pane.appendChild(ta); pane.appendChild(foot);
+    modal.appendChild(pane); this.root.appendChild(modal);
+    this.modal = modal; this.ta = ta;
+    closeB.addEventListener('click', function () { modal.classList.remove('is-open'); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('is-open'); });
+    copyB.addEventListener('click', function () {
+      ta.select(); ta.setSelectionRange(0, ta.value.length);
+      try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); }
+      copyB.textContent = '복사됨'; setTimeout(function () { copyB.textContent = '전체 복사'; }, 1200);
+    });
+    applyB.addEventListener('click', function () {
+      try {
+        var d = JSON.parse(ta.value);
+        self.push(); self.data = d; self.data.nodes = d.nodes || []; self.data.edges = d.edges || []; self.data.groups = d.groups || [];
+        self.render(); self.fit(); modal.classList.remove('is-open');
+      } catch (e) { alert('JSON 형식이 올바르지 않습니다: ' + e.message); }
+    });
+
+    this.bind();
+  };
+
+  /* ---------- 렌더 ---------- */
+  Diagram.prototype.render = function () {
+    var self = this;
+    this.gGroups.textContent = ''; this.gEdges.textContent = ''; this.gNodes.textContent = '';
+    this.index = {};
+    this.data.nodes.forEach(function (n) { self.index[n.id] = n; });
+
+    this.data.groups.forEach(function (g) {
+      var el = s('g', { 'class': 'dgm-grp', 'data-id': g.id, transform: 'translate(' + g.x + ',' + g.y + ')' });
+      el.appendChild(s('rect', { 'class': 'box', x: 0, y: 0, width: g.w, height: g.h, rx: 10 }));
+      var t = s('text', { 'class': 'gl', x: 12, y: 20 }); t.textContent = g.label || '';
+      el.appendChild(t);
+      self.gGroups.appendChild(el);
+    });
+
+    this.data.edges.forEach(function (e, i) {
+      var a = self.index[e.from], b = self.index[e.to];
+      if (!a || !b) return;
+      var r = route(a, b);
+      var g = s('g', { 'class': 'dgm-edge', 'data-i': i });
+      if (e.tone) g.setAttribute('data-tone', e.tone);
+      if (e.style) g.setAttribute('data-style', e.style);
+      var wire = s('path', { 'class': 'wire', d: r.d });
+      var mid = e.tone === 'primary' ? self.mk_primary : e.tone === 'risk' ? self.mk_risk : e.tone === 'ok' ? self.mk_ok : self.mk_default;
+      if (e.arrow !== false) wire.setAttribute('marker-end', 'url(#' + mid + ')');
+      g.appendChild(s('path', { 'class': 'hit', d: r.d }));
+      g.appendChild(wire);
+      if (e.label) {
+        var txt = String(e.label), wpx = 0;
+        for (var ci = 0; ci < txt.length; ci++) wpx += txt.charCodeAt(ci) > 0x2E80 ? 12.5 : 7;
+        var w = Math.max(34, Math.ceil(wpx) + 22);
+        var fo = s('foreignObject', { x: r.mid.x - w / 2, y: r.mid.y - 11, width: w, height: 22 });
+        var div = h('div', 'elbl'); div.appendChild(h('span', null, e.label));
+        fo.appendChild(div); g.appendChild(fo);
+      }
+      self.gEdges.appendChild(g);
+    });
+
+    this.data.nodes.forEach(function (n) {
+      var g = s('g', { 'class': 'dgm-node', 'data-id': n.id, 'data-tone': n.tone, transform: 'translate(' + n.x + ',' + n.y + ')' });
+      g.appendChild(boxShape(n));
+      var pad = n.shape === 'diamond' ? Math.round(n.w * .18) : 0;
+      var fo = s('foreignObject', { x: pad, y: 0, width: n.w - pad * 2, height: n.h });
+      var lbl = h('div', 'lbl');
+      lbl.appendChild(h('span', 't', n.label || ''));
+      if (n.sub) lbl.appendChild(h('span', 'sub', n.sub));
+      fo.appendChild(lbl); g.appendChild(fo);
+      self.gNodes.appendChild(g);
+    });
+
+    this.paint();
+  };
+
+  /* render 는 모든 변경 뒤에 불린다 — 여기 한 곳만 잡으면 끌기·라벨 편집·추가·삭제가
+     모두 저장된다. 첫 그리기와 되돌리기 때는 건너뛴다. */
+  (function (orig) {
+    Diagram.prototype.render = function () {
+      orig.call(this);
+      if (this.ready && !this._skipSave) this.save();
+    };
+  })(Diagram.prototype.render);
+
+  Diagram.prototype.paint = function () {
+    var self = this;
+    this.gRoot.setAttribute('transform', 'translate(' + this.view.tx + ',' + this.view.ty + ') scale(' + this.view.k + ')');
+    Array.prototype.forEach.call(this.root.querySelectorAll('.is-sel'), function (e) { e.classList.remove('is-sel'); });
+    if (!this.sel) return;
+    var q = this.sel.type === 'edge' ? '.dgm-edge[data-i="' + this.sel.id + '"]'
+      : this.sel.type === 'group' ? '.dgm-grp[data-id="' + this.sel.id + '"]'
+        : '.dgm-node[data-id="' + this.sel.id + '"]';
+    var el = this.root.querySelector(q);
+    if (el) el.classList.add('is-sel');
+  };
+
+  /* ---------- 좌표 ---------- */
+  Diagram.prototype.world = function (ev) {
+    var r = this.svg.getBoundingClientRect();
+    return { x: (ev.clientX - r.left - this.view.tx) / this.view.k, y: (ev.clientY - r.top - this.view.ty) / this.view.k };
+  };
+
+  /* 화면 가득 펼치기. 다른 다이어그램이 펼쳐져 있으면 먼저 닫는다. */
+  Diagram.prototype.toggleMax = function (force) {
+    var self = this;
+    var on = (force == null) ? !this.root.classList.contains('is-max') : !!force;
+    if (on) {
+      var cur = document.querySelector('.dgm.is-max');
+      if (cur && cur !== this.root && cur.__dgm) cur.__dgm.toggleMax(false);
+    }
+    this.root.classList.toggle('is-max', on);
+    document.documentElement.classList.toggle('dgm-locked', on);
+    if (this.bMax) {
+      this.bMax.classList.toggle('is-on', on);
+      this.bMax.textContent = on ? '닫기' : '넓게';
+      this.bMax.title = on ? '원래 크기로 (Esc)' : '화면 가득 펼치기 (Esc 로 닫기)';
+    }
+    (window.requestAnimationFrame || setTimeout)(function () { self.fit(); });
+  };
+
+  Diagram.prototype.fit = function () {
+    var items = this.data.nodes.concat(this.data.groups);
+    var r = this.svg.getBoundingClientRect();
+    // CSS transform:scale() 이 걸린 무대(발표용 .stage) 안에서는 getBoundingClientRect 가
+    // "화면에 보이는" 크기를 돌려준다. 그 값으로 배율을 잡으면 큰 화면에서 상한(1.6배)까지
+    // 확대돼 그림이 잘리고, 작은 화면에서는 필요 이상 줄어든다.
+    // clientWidth/Height 는 변환 전 레이아웃 크기라 무대 배율과 무관하다.
+    var W = this.svg.clientWidth || r.width || 800;
+    var H = this.svg.clientHeight || r.height || 420;
+    if (!items.length) { this.view = { tx: 20, ty: 20, k: 1 }; return this.paint(); }
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    items.forEach(function (n) {
+      x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+      x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h);
+    });
+    var pad = 24, bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
+    var k = Math.min(W / bw, H / bh, 1.6);
+    this.view.k = k;
+    this.view.tx = (W - bw * k) / 2 - (x0 - pad) * k;
+    this.view.ty = (H - bh * k) / 2 - (y0 - pad) * k;
+    this.paint();
+  };
+
+  Diagram.prototype.zoom = function (f, cx, cy) {
+    var r = this.svg.getBoundingClientRect();
+    cx = cx == null ? r.width / 2 : cx; cy = cy == null ? r.height / 2 : cy;
+    var k0 = this.view.k, k1 = Math.max(.25, Math.min(3, k0 * f));
+    this.view.tx = cx - (cx - this.view.tx) * (k1 / k0);
+    this.view.ty = cy - (cy - this.view.ty) * (k1 / k0);
+    this.view.k = k1; this.paint();
+  };
+
+  /* ---------- 편집 내용 보관 (브라우저 안에만) ----------
+     끌어 옮기고 라벨을 고친 결과가 새로고침에도 남는다. 저장 위치는 이 브라우저의
+     localStorage 라 다른 사람에게는 전달되지 않는다 — 문서 자체에 반영하려면
+     JSON 버튼으로 내보내 원본 파일에 붙여넣어야 한다. */
+  Diagram.prototype.save = function () {
+    if (!this.editable || !this.key) return;
+    var self = this;
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(function () {
+      try {
+        localStorage.setItem(self.key, JSON.stringify({ v: self.srcHash, d: self.data }));
+        self.markSaved(true);
+      } catch (e) { /* 사생활 보호 모드 등 — 저장만 안 될 뿐 편집은 된다 */ }
+    }, 250);
+  };
+
+  Diagram.prototype.loadSaved = function () {
+    try {
+      var raw = localStorage.getItem(this.key);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || o.v !== this.srcHash || !o.d) { localStorage.removeItem(this.key); return null; }
+      this._restored = true;
+      return o.d;
+    } catch (e) { return null; }
+  };
+
+  Diagram.prototype.resetSaved = function () {
+    try { localStorage.removeItem(this.key); } catch (e) { }
+    this.data = this.read();
+    this.sel = null;
+    this._skipSave = true;
+    this.render();
+    this._skipSave = false;
+    this.fit();
+    this.markSaved(false);
+  };
+
+  /* 저장됨 표시. 버튼 라벨만 잠깐 바꾼다 — 별도 알림창은 발표 중에 방해가 된다. */
+  Diagram.prototype.markSaved = function (on) {
+    if (!this.bReset) return;
+    this.bReset.classList.toggle('is-on', !!on);
+    this.bReset.title = on ? '이 브라우저에 저장된 편집 내용을 지우고 원래대로' : '원래대로 (저장된 편집 없음)';
+  };
+
+  /* ---------- 편집 ---------- */
+  Diagram.prototype.push = function () {
+    this.undo.push(JSON.stringify(this.data));
+    if (this.undo.length > 40) this.undo.shift();
+  };
+  Diagram.prototype.popUndo = function () {
+    if (!this.undo.length) return;
+    this.data = JSON.parse(this.undo.pop());
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.addNode = function () {
+    this.push();
+    var id = 'n' + Date.now().toString(36).slice(-5);
+    var r = this.svg.getBoundingClientRect();
+    var wx = snap((r.width / 2 - this.view.tx) / this.view.k - 85);
+    var wy = snap((r.height / 2 - this.view.ty) / this.view.k - 31);
+    this.data.nodes.push({ id: id, label: '새 단계', x: wx, y: wy, w: 170, h: 62, shape: 'rect', tone: 'neutral' });
+    this.sel = { type: 'node', id: id };
+    this.render();
+  };
+  Diagram.prototype.toggleLink = function () {
+    this.linkMode = !this.linkMode; this.linkFrom = null;
+    this.bLink.classList.toggle('is-on', this.linkMode);
+  };
+  Diagram.prototype.cycleTone = function () {
+    if (!this.sel) return;
+    this.push();
+    if (this.sel.type === 'node') {
+      var n = this.index[this.sel.id];
+      n.tone = TONES[(TONES.indexOf(n.tone) + 1) % TONES.length];
+    } else if (this.sel.type === 'edge') {
+      var order = [undefined, 'primary', 'ok', 'risk'];
+      var e = this.data.edges[this.sel.id];
+      e.tone = order[(order.indexOf(e.tone) + 1) % order.length];
+    }
+    this.render();
+  };
+  Diagram.prototype.cycleShape = function () {
+    if (!this.sel || this.sel.type !== 'node') return;
+    var SH = ['rect', 'round', 'pill', 'diamond', 'store', 'note'];
+    this.push();
+    var n = this.index[this.sel.id];
+    n.shape = SH[(SH.indexOf(n.shape) + 1) % SH.length];
+    this.render();
+  };
+  Diagram.prototype.remove = function () {
+    if (!this.sel) return;
+    this.push();
+    var self = this;
+    if (this.sel.type === 'node') {
+      this.data.nodes = this.data.nodes.filter(function (n) { return n.id !== self.sel.id; });
+      this.data.edges = this.data.edges.filter(function (e) { return e.from !== self.sel.id && e.to !== self.sel.id; });
+    } else if (this.sel.type === 'edge') {
+      this.data.edges.splice(this.sel.id, 1);
+    } else {
+      this.data.groups = this.data.groups.filter(function (g) { return g.id !== self.sel.id; });
+    }
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.openJson = function () {
+    this.ta.value = JSON.stringify(this.data, null, 2);
+    this.modal.classList.add('is-open');
+  };
+
+  /* ---------- 이벤트 ---------- */
+  Diagram.prototype.bind = function () {
+    var self = this, drag = null, pan = null;
+
+    this.svg.addEventListener('pointerdown', function (ev) {
+      if (ev.target.closest('[contenteditable="true"]')) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      var edgeEl = ev.target.closest('.dgm-edge');
+      var grpEl = ev.target.closest('.dgm-grp');
+
+      if (self.linkMode && nodeEl) {
+        var id = nodeEl.getAttribute('data-id');
+        if (!self.linkFrom) { self.linkFrom = id; self.sel = { type: 'node', id: id }; self.paint(); }
+        else if (self.linkFrom !== id) {
+          self.push();
+          self.data.edges.push({ from: self.linkFrom, to: id, label: '' });
+          self.linkFrom = null; self.toggleLink(); self.render();
+        }
+        return;
+      }
+      if (nodeEl && self.editable) {
+        self.sel = { type: 'node', id: nodeEl.getAttribute('data-id') };
+        var n = self.index[self.sel.id];
+        var w = self.world(ev);
+        drag = { kind: 'node', obj: n, dx: w.x - n.x, dy: w.y - n.y, moved: false };
+        self.push();
+      } else if (grpEl && self.editable) {
+        self.sel = { type: 'group', id: grpEl.getAttribute('data-id') };
+        var g = self.data.groups.filter(function (q) { return q.id === self.sel.id; })[0];
+        var w2 = self.world(ev);
+        drag = { kind: 'group', obj: g, dx: w2.x - g.x, dy: w2.y - g.y, moved: false };
+        self.push();
+      } else if (edgeEl) {
+        self.sel = { type: 'edge', id: +edgeEl.getAttribute('data-i') };
+      } else {
+        self.sel = null;
+        pan = { x: ev.clientX, y: ev.clientY, tx: self.view.tx, ty: self.view.ty };
+        self.svg.classList.add('is-panning');
+      }
+      self.svg.setPointerCapture(ev.pointerId);
+      self.paint();
+    });
+
+    this.svg.addEventListener('pointermove', function (ev) {
+      if (drag) {
+        var w = self.world(ev);
+        drag.obj.x = snap(w.x - drag.dx); drag.obj.y = snap(w.y - drag.dy);
+        drag.moved = true;
+        self.render();
+      } else if (pan) {
+        self.view.tx = pan.tx + (ev.clientX - pan.x);
+        self.view.ty = pan.ty + (ev.clientY - pan.y);
+        self.paint();
+      }
+    });
+
+    var end = function (ev) {
+      if (drag && !drag.moved) self.undo.pop();
+      drag = null; pan = null;
+      self.svg.classList.remove('is-panning');
+      try { self.svg.releasePointerCapture(ev.pointerId); } catch (e) { }
+    };
+    this.svg.addEventListener('pointerup', end);
+    this.svg.addEventListener('pointercancel', end);
+
+    this.svg.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      var r = self.svg.getBoundingClientRect();
+      self.zoom(ev.deltaY < 0 ? 1.12 : 1 / 1.12, ev.clientX - r.left, ev.clientY - r.top);
+    }, { passive: false });
+
+    this.svg.addEventListener('dblclick', function (ev) {
+      if (!self.editable) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      if (nodeEl) return self.edit(nodeEl.querySelector('.lbl .t'), function (v) {
+        self.index[nodeEl.getAttribute('data-id')].label = v;
+      });
+      var edgeEl = ev.target.closest('.dgm-edge');
+      if (edgeEl) {
+        var i = +edgeEl.getAttribute('data-i');
+        var v = prompt('연결 라벨', self.data.edges[i].label || '');
+        if (v !== null) { self.push(); self.data.edges[i].label = v; self.render(); }
+      }
+    });
+
+    this.root.addEventListener('keydown', function (ev) {
+      if (ev.target.getAttribute && ev.target.getAttribute('contenteditable') === 'true') return;
+      if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); self.remove(); }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); self.popUndo(); }
+    });
+    this.root.tabIndex = 0;
+
+    // 폭이 바뀌면 다시 그리는 것만으로는 부족하다 — 좁아진 칸에 옛 배율로 그리면 넘쳐서 잘린다.
+    // fit() 으로 배율까지 다시 잡아야 항상 전체가 보인다.
+    var ro = window.ResizeObserver ? new ResizeObserver(function () { self.fit(); }) : null;
+    if (ro) ro.observe(this.svg);
+  };
+
+  Diagram.prototype.edit = function (el, done) {
+    if (!el) return;
+    var self = this;
+    this.push();
+    el.parentNode.setAttribute('contenteditable', 'true');
+    el.parentNode.focus();
+    var save = function () {
+      el.parentNode.removeAttribute('contenteditable');
+      done(el.textContent.trim());
+      self.render();
+    };
+    el.parentNode.addEventListener('blur', save, { once: true });
+    el.parentNode.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); el.parentNode.blur(); }
+      if (ev.key === 'Escape') { el.parentNode.removeAttribute('contenteditable'); self.popUndo(); }
+      ev.stopPropagation();
+    });
+    var rg = document.createRange(); rg.selectNodeContents(el);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+  };
+
+  function initAll(scope) {
+    var list = (scope || document).querySelectorAll('.dgm');
+    Array.prototype.forEach.call(list, function (el) {
+      if (el.__dgm) return;
+      el.__dgm = new Diagram(el);
+    });
+  }
+  /* Esc 는 펼쳐 놓은 다이어그램을 닫는다. 라벨 편집 중의 Esc 는
+     edit() 안에서 stopPropagation 되므로 여기까지 오지 않는다. */
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var el = document.querySelector('.dgm.is-max');
+    if (el && el.__dgm) { ev.preventDefault(); el.__dgm.toggleMax(false); }
+  });
+
+  window.HWDiagram = { initAll: initAll, Diagram: Diagram };
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', function () { initAll(); });
+  else initAll();
+})();
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 런타임 (TOC 스크롤스파이 / 체크 상태 / 복사)
+   ============================================================ */
+(function () {
+  'use strict';
+  var KEY = 'hwdoc:' + (document.title || location.pathname);
+
+  /* --- TOC 자동 생성 (비어 있을 때만) --- */
+  var toc = document.querySelector('.toc');
+  if (toc && !toc.children.length) {
+    document.querySelectorAll('.sec').forEach(function (sec) {
+      if (!sec.id) return;
+      var h = sec.querySelector('h2');
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + sec.id;
+      a.textContent = h
+        ? Array.prototype.map.call(h.childNodes, function (x) { return x.textContent.trim(); })
+          .filter(Boolean).join(' ')
+        : sec.id;
+      li.appendChild(a); toc.appendChild(li);
+    });
+  }
+
+  /* --- 스크롤스파이 --- */
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var secs = links.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  if (window.IntersectionObserver && secs.length) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (a) { a.classList.toggle('is-cur', a.getAttribute('href') === '#' + e.target.id); });
+      });
+    }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
+    secs.forEach(function (s) { io.observe(s); });
+  }
+
+  /* --- 체크리스트 상태 저장 --- */
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { }
+  document.querySelectorAll('.chk input[type="checkbox"]').forEach(function (cb, i) {
+    var id = cb.id || ('chk' + i); cb.id = id;
+    if (saved[id]) cb.checked = true;
+    var sync = function () {
+      cb.closest('li').classList.toggle('is-done', cb.checked);
+      saved[id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) { }
+      count();
+    };
+    cb.addEventListener('change', sync);
+    cb.closest('li').classList.toggle('is-done', cb.checked);
+  });
+  function count() {
+    document.querySelectorAll('.chk').forEach(function (ul) {
+      var all = ul.querySelectorAll('input[type="checkbox"]');
+      var done = ul.querySelectorAll('input[type="checkbox"]:checked');
+      var badge = ul.previousElementSibling && ul.previousElementSibling.querySelector('.chk-count');
+      if (badge) badge.textContent = done.length + ' / ' + all.length;
+    });
+  }
+  count();
+
+  /* --- 코드 복사 --- */
+  document.querySelectorAll('.code__copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var pre = b.closest('.code').querySelector('pre');
+      try { navigator.clipboard.writeText(pre.innerText); } catch (e) { }
+      var t = b.textContent; b.textContent = '복사됨';
+      setTimeout(function () { b.textContent = t; }, 1200);
+    });
+  });
+
+  /* --- 사이드 버튼 --- */
+  function bind(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+  bind('bTheme', function () {
+    var r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  bind('bPrint', function () { window.print(); });
+  bind('bReset', function () {
+    if (!confirm('체크 상태를 모두 초기화할까요?')) return;
+    try { localStorage.removeItem(KEY); } catch (e) { }
+    location.reload();
+  });
+})();
+</script>
+</body>
+</html>

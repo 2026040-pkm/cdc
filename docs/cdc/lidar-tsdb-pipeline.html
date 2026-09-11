@@ -1,0 +1,2443 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OT LiDAR 필드 데이터 적재 파이프라인 · 기술 문서</title>
+<style>
+/* ============================================================
+   HW Doc Kit - design tokens & base primitives
+   금지: 이모지, 보라/바이올렛/인디고 계열, 무지개 그라데이션
+   기준색: 한화 오렌지 계열
+   ============================================================ */
+:root{
+  /* brand */
+  --hw:#F37321;          /* 기본 오렌지 */
+  --hw-dk:#D2590F;       /* 진한 오렌지 (호버/강조선) */
+  --hw-dp:#A8420A;       /* 가장 진한 오렌지 (제목 강조) */
+  --hw-lt:#FFB27A;       /* 밝은 오렌지 (보조 채움) */
+  --hw-pale:#FFF1E7;     /* 아주 옅은 오렌지 (배경 톤) */
+  --hw-tint:#FDE3D1;     /* 옅은 오렌지 (테두리/칩) */
+
+  /* ink & surface */
+  --ink:#141414; --ink2:#3F3F3F; --ink3:#6E6E6E; --ink4:#9A9A9A;
+  --bg:#FFFFFF; --bg2:#FAF8F6; --bg3:#F2EEEA;
+  --line:#E4E1DE; --line2:#CFCAC5;
+
+  /* semantic (보라 금지 - 보색은 청록/황토/벽돌색으로) */
+  --ok:#2E7D5B; --ok-bg:#E8F3EE;
+  --warn:#B8791A; --warn-bg:#FBF1DF;
+  --risk:#C0392B; --risk-bg:#FBEAE7;
+  --info:#2A6F97; --info-bg:#E7F0F6;
+
+  --radius:10px; --radius-sm:6px;
+  --shadow:0 1px 2px rgba(20,20,20,.06), 0 8px 24px rgba(20,20,20,.06);
+  --font:"Pretendard","Malgun Gothic","Apple SD Gothic Neo","Segoe UI",system-ui,sans-serif;
+  --mono:"D2Coding","Cascadia Mono","Consolas","JetBrains Mono",ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --hw:#FF8A3D; --hw-dk:#F37321; --hw-dp:#FFB27A; --hw-lt:#7A3E14; --hw-pale:#241812; --hw-tint:#4A2A15;
+  --ink:#F2EFEC; --ink2:#CFC9C3; --ink3:#9E9691; --ink4:#77706B;
+  --bg:#141312; --bg2:#1C1A18; --bg3:#252220;
+  --line:#332F2C; --line2:#464038;
+  --ok:#5CB58C; --ok-bg:#17251F; --warn:#D9A445; --warn-bg:#2A2317;
+  --risk:#E2705F; --risk-bg:#2A1917; --info:#6BA6CC; --info-bg:#161F26;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font); color:var(--ink); background:var(--bg2);
+  -webkit-font-smoothing:antialiased; line-height:1.55;
+  font-variant-numeric:tabular-nums;
+}
+h1,h2,h3,h4{margin:0; line-height:1.25; font-weight:700; letter-spacing:-.01em}
+p{margin:0 0 .6em}
+a{color:var(--hw-dk); text-underline-offset:2px}
+:root[data-theme="dark"] a{color:var(--hw)}
+code,kbd,pre,samp{font-family:var(--mono)}
+hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+
+/* ---------- 공통 프리미티브 ---------- */
+.kicker{
+  font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--hw-dk);
+}
+.rule{height:3px;background:var(--hw);border-radius:2px;width:56px}
+.muted{color:var(--ink3)}
+.small{font-size:13px}
+.mono{font-family:var(--mono);font-size:.92em}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;
+  background:var(--hw-pale);color:var(--hw-dp);border:1px solid var(--hw-tint);
+}
+.chip--ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.chip--warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.chip--risk{background:var(--risk-bg);color:var(--risk);border-color:var(--risk)}
+.chip--info{background:var(--info-bg);color:var(--info);border-color:var(--info)}
+.chip--neutral{background:var(--bg3);color:var(--ink2);border-color:var(--line2)}
+
+.card{
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;
+}
+.card--accent{border-left:4px solid var(--hw)}
+.card__t{font-size:16px;font-weight:700;margin:0 0 6px}
+.card__d{font-size:14px;color:var(--ink2);margin:0}
+
+.kpi{display:flex;gap:14px;flex-wrap:wrap}
+.kpi__item{
+  flex:1 1 0;min-width:140px;background:var(--bg);border:1px solid var(--line);
+  border-top:3px solid var(--hw);border-radius:var(--radius);padding:14px 16px;
+}
+.kpi__v{font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--hw-dp)}
+:root[data-theme="dark"] .kpi__v{color:var(--hw)}
+.kpi__l{font-size:12px;color:var(--ink3);font-weight:600}
+
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--bg)}
+.tbl th,.tbl td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.tbl thead th{background:var(--hw-pale);color:var(--hw-dp);font-size:12.5px;
+  letter-spacing:.03em;text-transform:uppercase;border-color:var(--hw-tint)}
+.tbl tbody tr:nth-child(even){background:var(--bg2)}
+.tbl td.num{text-align:right;font-family:var(--mono)}
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius-sm)}
+
+.note{
+  border:1px solid var(--line);border-left:4px solid var(--ink3);
+  background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-size:14px;
+}
+.note__t{font-weight:700;font-size:13px;margin:0 0 4px;letter-spacing:.02em}
+.note--info{border-left-color:var(--info);background:var(--info-bg)}
+.note--info .note__t{color:var(--info)}
+.note--ok{border-left-color:var(--ok);background:var(--ok-bg)}
+.note--ok .note__t{color:var(--ok)}
+.note--warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.note--warn .note__t{color:var(--warn)}
+.note--risk{border-left-color:var(--risk);background:var(--risk-bg)}
+.note--risk .note__t{color:var(--risk)}
+
+/* 코드 블록 */
+.code{border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg)}
+.code__bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;color:var(--ink3)
+}
+.code__copy{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer
+}
+.code__copy:hover{border-color:var(--hw);color:var(--hw-dk)}
+.code pre{margin:0;padding:12px 14px;overflow-x:auto;font-size:13px;line-height:1.6}
+.code .cm{color:var(--ink4)}
+.code .hl{color:var(--hw-dk);font-weight:700}
+
+/* 단계 흐름 */
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.step{
+  flex:1 1 0;min-width:150px;position:relative;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px
+}
+.step__n{
+  display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:50%;background:var(--hw);color:#fff;font-size:12px;font-weight:800;margin-bottom:6px
+}
+.step__t{font-weight:700;font-size:14px}
+.step__d{font-size:12.5px;color:var(--ink3)}
+
+/* UI 목업 프레임 */
+.ui{border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--bg);box-shadow:var(--shadow)}
+.ui__bar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border-bottom:1px solid var(--line)}
+.ui__dot{width:9px;height:9px;border-radius:50%;background:var(--line2)}
+.ui__addr{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  padding:2px 8px;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+.ui__body{padding:14px}
+.ui-row{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.ui-row:last-child{border-bottom:0}
+.ui-btn{background:var(--hw);color:#fff;border:0;border-radius:5px;padding:6px 14px;font-size:12.5px;font-weight:700}
+.ui-btn--ghost{background:transparent;color:var(--hw-dk);border:1px solid var(--hw)}
+.ui-field{flex:1;border:1px solid var(--line2);border-radius:5px;padding:6px 9px;font-size:12.5px;color:var(--ink3);background:var(--bg2)}
+
+/* 출처 표기 */
+.ref{
+  font-size:.62em;font-weight:800;vertical-align:super;color:var(--hw-dk);
+  background:var(--hw-pale);border:1px solid var(--hw-tint);border-radius:4px;
+  padding:0 4px;margin-left:2px;cursor:pointer;text-decoration:none
+}
+.refs{list-style:none;padding:0;margin:0;font-size:13px}
+.refs li{display:grid;grid-template-columns:26px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.refs li:last-child{border-bottom:0}
+.refs .refs__n{color:var(--hw-dk);font-weight:800;font-family:var(--mono)}
+.refs .refs__src{color:var(--ink);font-weight:600}
+.refs .refs__meta{color:var(--ink3);font-size:12px;font-family:var(--mono);word-break:break-all}
+
+/* 그리드 */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.stack{display:flex;flex-direction:column;gap:12px}
+
+/* ---------- 다이어그램 캔버스 ---------- */
+.dgm{
+  position:relative;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--bg);overflow:hidden;display:flex;flex-direction:column
+}
+.dgm__bar{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:6px 8px;border-bottom:1px solid var(--line);background:var(--bg3);flex:0 0 auto
+}
+.dgm__bar .sp{flex:1}
+.dgm__btn{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--font)
+}
+.dgm__btn:hover{border-color:var(--hw);color:var(--hw-dk)}
+.dgm__btn.is-on{background:var(--hw);border-color:var(--hw);color:#fff}
+.dgm__hint{font-size:11.5px;color:var(--ink4)}
+.dgm__svg{display:block;width:100%;flex:1 1 auto;min-height:0;touch-action:none;cursor:grab;
+  background:radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0/20px 20px}
+.dgm__svg.is-panning{cursor:grabbing}
+.dgm[data-edit="off"] .dgm__bar{display:none}
+
+/* 화면 가득 펼치기 — 툴바의 "넓게" 버튼 / Esc 로 닫는다 */
+.dgm.is-max{
+  position:fixed;inset:14px;z-index:80;
+  width:auto !important;max-width:none !important;height:auto !important;
+  box-shadow:0 12px 48px rgba(20,20,20,.28);border-color:var(--line2)
+}
+html.dgm-locked,html.dgm-locked body{overflow:hidden}
+
+.dgm-node{cursor:move}
+.dgm-node .box{fill:var(--bg);stroke:var(--line2);stroke-width:1.5}
+.dgm-node .lbl{
+  font-family:var(--font);font-size:13.5px;font-weight:700;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;text-align:center;padding:4px 8px;line-height:1.3;overflow:hidden
+}
+.dgm-node .lbl .sub{font-size:11px;font-weight:500;color:var(--ink3);margin-top:2px}
+.dgm-node .lbl[contenteditable="true"]{outline:2px solid var(--hw);background:var(--bg);border-radius:4px}
+.dgm-node.is-sel .box{stroke:var(--hw);stroke-width:2.5}
+.dgm-node[data-tone="primary"] .box{fill:var(--hw);stroke:var(--hw-dk)}
+.dgm-node[data-tone="primary"] .lbl{color:#fff}
+.dgm-node[data-tone="primary"] .lbl .sub{color:rgba(255,255,255,.85)}
+.dgm-node[data-tone="accent"] .box{fill:var(--hw-pale);stroke:var(--hw)}
+.dgm-node[data-tone="accent"] .lbl{color:var(--hw-dp)}
+.dgm-node[data-tone="muted"] .box{fill:var(--bg3);stroke:var(--line2)}
+.dgm-node[data-tone="muted"] .lbl{color:var(--ink3)}
+.dgm-node[data-tone="ok"] .box{fill:var(--ok-bg);stroke:var(--ok)}
+.dgm-node[data-tone="ok"] .lbl{color:var(--ok)}
+.dgm-node[data-tone="warn"] .box{fill:var(--warn-bg);stroke:var(--warn)}
+.dgm-node[data-tone="warn"] .lbl{color:var(--warn)}
+.dgm-node[data-tone="risk"] .box{fill:var(--risk-bg);stroke:var(--risk)}
+.dgm-node[data-tone="risk"] .lbl{color:var(--risk)}
+.dgm-node[data-tone="info"] .box{fill:var(--info-bg);stroke:var(--info)}
+.dgm-node[data-tone="info"] .lbl{color:var(--info)}
+
+.dgm-grp .box{fill:var(--bg2);stroke:var(--line2);stroke-dasharray:6 4;stroke-width:1.5}
+.dgm-grp .gl{font-family:var(--font);font-size:11.5px;font-weight:800;letter-spacing:.08em;
+  text-transform:uppercase;fill:var(--ink4)}
+.dgm-grp{cursor:move}
+
+.dgm-edge .wire{fill:none;stroke:var(--ink3);stroke-width:1.8}
+.dgm-edge .hit{fill:none;stroke:transparent;stroke-width:14;cursor:pointer}
+.dgm-edge.is-sel .wire{stroke:var(--hw);stroke-width:2.6}
+.dgm-edge[data-style="dash"] .wire{stroke-dasharray:6 4}
+.dgm-edge[data-tone="primary"] .wire{stroke:var(--hw)}
+.dgm-edge[data-tone="risk"] .wire{stroke:var(--risk)}
+.dgm-edge[data-tone="ok"] .wire{stroke:var(--ok)}
+.dgm-edge .elbl{
+  font-family:var(--font);font-size:11.5px;font-weight:600;color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;height:100%;text-align:center;
+}
+.dgm-edge .elbl span{background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--line)}
+
+.dgm__modal{
+  position:absolute;inset:0;background:rgba(0,0,0,.45);display:none;
+  align-items:center;justify-content:center;padding:24px;z-index:9
+}
+.dgm__modal.is-open{display:flex}
+.dgm__modal .pane{background:var(--bg);border-radius:var(--radius);width:min(680px,100%);
+  max-height:100%;display:flex;flex-direction:column;border:1px solid var(--line2)}
+.dgm__modal textarea{
+  flex:1;min-height:240px;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:12px;font-family:var(--mono);font-size:12px;resize:vertical;background:var(--bg2);color:var(--ink)
+}
+.dgm__modal .head,.dgm__modal .foot{display:flex;align-items:center;gap:8px;padding:10px 12px}
+.dgm__modal .head b{font-size:14px}
+.dgm__modal .sp{flex:1}
+
+/* ── 차트 (scripts/make-chart.sh 산출물) ─────────────────────────────────── */
+.cht{ margin:16px 0 18px; padding:14px 14px 10px; border:1px solid var(--line); border-radius:var(--radius); background:var(--bg2) }
+.cht__t{ margin:0 0 8px; font-size:13.5px; font-weight:700; color:var(--ink); letter-spacing:-.01em }
+.cht svg{ display:block; width:100%; height:auto; font-family:inherit }
+.cht rect, .cht circle{ cursor:default }
+.cht rect:hover, .cht circle:hover{ opacity:.75 }
+.cht__c{ margin:8px 0 0; font-size:12px; line-height:1.65; color:var(--ink3) }
+
+/* 인쇄 */
+@media print{
+  .cht{ page-break-inside:avoid; background:transparent }
+  body{background:#fff}
+  .no-print{display:none !important}
+  .dgm__bar{display:none !important}
+  .dgm__svg{background:none}
+  .dgm.is-max{position:static;inset:auto;box-shadow:none}
+}
+
+/* ── 한글 줄바꿈 ─────────────────────────────────────────────────────────────
+   브라우저 기본값은 낱말 한가운데를 끊는다. "남은 결/정" 처럼 갈라지면 제목이
+   읽히지 않는다. keep-all 은 띄어쓰기에서만 줄을 바꾼다.
+   반대로 긴 영문 식별자나 경로는 keep-all 이면 칸을 넘치므로 overflow-wrap 으로 받고,
+   코드·경로 계열은 어디서든 끊어 넘침을 막는다. */
+h1, h2, h3, h4, p, li, td, th, dt, dd,
+.card__d, .step__d, .note, .lead, .sub, figcaption {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.mono, pre, code, .refs__meta { word-break: break-all; overflow-wrap: normal }
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 레이아웃 (사이드 TOC + 본문 단일 컬럼)
+   ============================================================ */
+body{ background:var(--bg2) }
+
+.doc{ display:grid; grid-template-columns:270px minmax(0,1fr); align-items:start; }
+
+/* 사이드바 */
+.side{
+  position:sticky; top:0; height:100vh; overflow:auto;
+  background:var(--bg); border-right:1px solid var(--line); padding:20px 16px 40px;
+}
+.side__brand{ display:flex; align-items:center; gap:9px; margin-bottom:6px }
+.side__brand .bar{ width:5px; height:26px; background:var(--hw); border-radius:2px }
+.side__brand b{ font-size:14.5px; letter-spacing:-.01em }
+.side__meta{ font-size:11.5px; color:var(--ink4); margin:0 0 16px; font-family:var(--mono) }
+.toc{ list-style:none; margin:0; padding:0; font-size:13.5px }
+.toc li{ margin:1px 0 }
+.toc a{
+  display:block; padding:5px 10px; border-radius:6px; color:var(--ink2);
+  text-decoration:none; border-left:2px solid transparent;
+}
+.toc a:hover{ background:var(--bg3); color:var(--ink) }
+.toc a.is-cur{ background:var(--hw-pale); color:var(--hw-dp); font-weight:700; border-left-color:var(--hw) }
+.toc .sub a{ padding-left:22px; font-size:12.5px; color:var(--ink3) }
+.side__foot{ margin-top:18px; padding-top:14px; border-top:1px solid var(--line); display:flex; gap:6px; flex-wrap:wrap }
+.side__foot button{
+  border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:5px;
+  padding:3px 9px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:var(--font);
+}
+.side__foot button:hover{ border-color:var(--hw); color:var(--hw-dk) }
+
+/* 본문 */
+.main{ padding:34px 44px 100px; max-width:1040px; }
+.doc-head{ border-bottom:2px solid var(--hw); padding-bottom:18px; margin-bottom:26px }
+.doc-head h1{ font-size:32px; letter-spacing:-.025em; margin:6px 0 8px }
+.doc-head .sub{ font-size:15px; color:var(--ink2); max-width:80ch }
+.doc-head .meta{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px }
+
+.sec{ margin:0 0 44px; scroll-margin-top:18px }
+.sec > h2{
+  font-size:21px; margin:0 0 4px; display:flex; align-items:baseline; gap:10px;
+}
+.sec > h2 .n{ font-family:var(--mono); font-size:14px; font-weight:800; color:var(--hw) }
+.sec > .why{ font-size:13.5px; color:var(--ink3); margin:0 0 16px; padding-left:2px }
+.sec h3{ font-size:16px; margin:24px 0 10px; padding-left:10px; border-left:3px solid var(--hw-tint) }
+.sec h4{ font-size:14px; margin:16px 0 6px; color:var(--ink2) }
+.sec p, .sec li{ font-size:14.5px }
+.sec ul, .sec ol{ margin:0 0 12px; padding-left:20px }
+.sec li{ margin:3px 0 }
+
+/* 체크리스트 */
+.chk{ list-style:none; padding:0; margin:0 }
+.chk li{
+  display:flex; gap:10px; align-items:flex-start; padding:9px 12px;
+  border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--bg); margin-bottom:6px;
+}
+.chk input{ margin-top:3px; width:15px; height:15px; accent-color:var(--hw); flex:0 0 auto }
+.chk li.is-done{ background:var(--bg2); border-color:var(--line) }
+.chk li.is-done .t{ text-decoration:line-through; color:var(--ink4) }
+.chk .t{ font-weight:600; font-size:14px }
+.chk .d{ font-size:12.5px; color:var(--ink3); display:block; margin-top:2px }
+
+/* 시나리오 (Given/When/Then) */
+.gwt{ border:1px solid var(--line); border-left:4px solid var(--hw); border-radius:var(--radius-sm);
+  background:var(--bg); padding:14px 16px; margin:0 0 12px }
+.gwt__t{ font-weight:700; font-size:14.5px; margin:0 0 8px }
+.gwt dl{ margin:0; display:grid; grid-template-columns:64px 1fr; gap:4px 10px; font-size:13.5px }
+.gwt dt{ font-weight:800; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--hw-dk); padding-top:2px }
+.gwt dd{ margin:0; color:var(--ink2) }
+
+/* 작업 단위 카드 */
+.slice{ border:1px solid var(--line); border-radius:var(--radius); background:var(--bg); overflow:hidden; margin-bottom:12px }
+.slice__h{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg3); border-bottom:1px solid var(--line) }
+.slice__h .no{ font-family:var(--mono); font-weight:800; color:#fff; background:var(--hw);
+  border-radius:5px; padding:1px 8px; font-size:12px }
+.slice__h b{ font-size:14.5px }
+.slice__h .sp{ flex:1 }
+.slice__b{ padding:12px 14px; font-size:13.5px }
+.slice__b dl{ margin:0; display:grid; grid-template-columns:110px 1fr; gap:6px 12px }
+.slice__b dt{ color:var(--ink3); font-size:12.5px; font-weight:700 }
+.slice__b dd{ margin:0; color:var(--ink2) }
+
+/* 의사결정 기록 */
+.adr{ border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; background:var(--bg); margin-bottom:12px }
+.adr__t{ font-size:15px; font-weight:700; margin:0 0 8px }
+.adr dl{ margin:0; display:grid; grid-template-columns:96px 1fr; gap:5px 12px; font-size:13.5px }
+.adr dt{ color:var(--hw-dk); font-weight:700; font-size:12.5px }
+.adr dd{ margin:0; color:var(--ink2) }
+
+.dgm{ margin:0 0 14px; height:520px }
+/* 다이어그램은 본문 글줄 폭에 갇히지 않고 사이드바 오른쪽을 전부 쓴다.
+   270px 사이드바 + 본문 좌우 패딩 88px + 스크롤바 여유 18px 를 뺀 값. */
+@media (min-width:1001px){
+  .dgm{ width:min(calc(100vw - 376px), 1700px); max-width:none }
+}
+.tbl-wrap{ margin-bottom:14px }
+.note{ margin-bottom:12px }
+.code{ margin-bottom:14px }
+
+@media (max-width:1000px){
+  .doc{ grid-template-columns:1fr }
+  .side{ position:static; height:auto; border-right:0; border-bottom:1px solid var(--line) }
+  .main{ padding:24px 20px 60px }
+}
+@media print{
+  @page{ size:A4; margin:14mm }
+  .side{ display:none }
+  .doc{ display:block }
+  .main{ max-width:none; padding:0 }
+  .sec{ page-break-inside:avoid }
+  .dgm{ height:320px; width:auto }
+}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- ================= 사이드바 ================= -->
+  <aside class="side no-print">
+    <div class="side__brand"><span class="bar"></span><b>OT LiDAR 적재 파이프라인</b></div>
+    <p class="side__meta">v1.0 · 2026-09-11 · 실측 기반</p>
+    <ul class="toc"></ul>
+    <div class="side__foot">
+      <button id="bTheme" type="button">테마</button>
+      <button id="bPrint" type="button">인쇄</button>
+      <button id="bReset" type="button">체크 초기화</button>
+    </div>
+  </aside>
+
+  <!-- ================= 본문 ================= -->
+  <main class="main">
+
+    <header class="doc-head">
+      <span class="kicker">Technical Document</span>
+      <h1>OT LiDAR 필드 데이터 적재 파이프라인 · 기술 문서</h1>
+      <p class="sub">Mqtt.Agent 가 받은 LiDAR 350대의 세 채널이 EES Kafka Provider 를 거쳐 TimescaleDB 표 아홉 개에 담기기까지,
+        필드 하나까지의 계약과 실측치, 그리고 그 DB 를 CDC 원천으로 열었을 때의 경계를 정의합니다.</p>
+      <div class="meta">
+        <span class="chip">2026-09-11 실측</span>
+        <span class="chip chip--neutral">장비 350대 · 태그 2,380</span>
+        <span class="chip chip--info">TimescaleDB 2.29 / PostgreSQL 17</span>
+        <span class="chip chip--warn">미확정: 페이로드 규격 벤더 합의 전</span>
+      </div>
+    </header>
+
+    <!-- ---------- 0. 범위 ---------- -->
+    <section class="sec" id="s0">
+      <h2><span class="n">00</span>범위와 전제</h2>
+      <p class="why">목표 구조는 <span class="mono">Mqtt.Agent → Engine → HotData Provider → HotData</span> 입니다.
+        이 문서가 다루는 것은 그 구조의 Provider 자리에 <b>EES Kafka Provider</b> 를, 저장소 자리에 <b>TimescaleDB</b> 를 세워
+        먼저 돌려 본 판입니다. 두 자리를 바꿔 끼워도 앞단(Agent · Engine · 태그 등록)은 그대로이므로,
+        여기서 확인한 계약과 지연은 HotData 판으로 넘어갈 때 대부분 그대로 유효합니다.</p>
+      <div class="g2">
+        <div class="card card--accent">
+          <p class="card__t">이 문서가 정의하는 것</p>
+          <ul style="margin:6px 0 0">
+            <li>MQTT 토픽 22개 → EES 메시지 3개 → Kafka 토픽 3개의 매핑과, 그 사이에서 무엇이 유실되는가</li>
+            <li>세 채널 페이로드의 <b>필드 단위 계약</b> — 누가 어떤 값을 채우고 어느 컬럼에 앉는가</li>
+            <li>TimescaleDB 표 아홉 개의 역할 분담과 청크 · 압축 · 보존 정책의 근거</li>
+            <li>1개월 보존 조건에서의 실측 용량 · 압축비 · 지연</li>
+            <li>이 DB 를 CDC 원천으로 열 때 넘을 수 있는 선과 넘을 수 없는 선</li>
+          </ul>
+        </div>
+        <div class="card">
+          <p class="card__t">이 문서가 다루지 않는 것</p>
+          <ul style="margin:6px 0 0">
+            <li>HotData Provider 자체의 설계 — 아직 구현체가 없습니다</li>
+            <li>점군 파일(PCD) 본체의 저장 · 수명 관리. 메시지에는 <span class="mono">storage_uri</span> 만 옵니다</li>
+            <li>Mqtt.Agent · Engine 내부 구현. 계약 경계까지만 봅니다</li>
+            <li>고가용성 구성(복제 · 페일오버). 단일 인스턴스 전제입니다</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">전제 세 가지</p>
+        <b>1.</b> Kafka 는 이 스택이 띄우지 않습니다. Aspire(InterSysLink) 세션이 띄운 컨테이너를 네트워크에 붙여 씁니다 —
+        세션을 다시 띄웠으면 <span class="mono">scripts/up</span> 을 다시 돌려야 합니다.
+        <b>2.</b> 페이로드 규격은 필드 정의서의 <b>제안 규격</b>이며 ISL 벤더 합의 전입니다. 확정되면 컬럼과 빌더를 함께 고칩니다.
+        <b>3.</b> 발행 주기는 필드 인터페이스 정의서의 등급 주기 — <b>상태 1초 · 실적 10분 · 산출물 10분</b> — 으로 확정했습니다.
+        용량 산정(5.2)은 이미 이 주기로 했고, 지연 실측(5.1)은 발행기 기본값(스캔 1분)으로 잰 값입니다.
+        항목 하나가 지나는 경로는 주기와 무관하므로 지연은 그대로 유효하지만, <b>도착 패턴과 전송량은 달라집니다</b> — 3.2.2 와 5.4 에서 따로 답합니다.
+      </div>
+    </section>
+
+    <!-- ---------- 1. 시나리오 ---------- -->
+    <section class="sec" id="s1">
+      <h2><span class="n">01</span>검증 시나리오</h2>
+      <p class="why">"무엇이 되면 이 파이프라인을 믿을 수 있는가"를 문장으로 고정합니다. 아래 ID 는 06 · 08절에서 그대로 다시 참조됩니다.</p>
+
+      <h3>정상 흐름</h3>
+      <div class="gwt">
+        <p class="gwt__t">SC-01 · 레코드 하나가 채널에 맞는 표에 항목 수만큼 들어간다</p>
+        <dl>
+          <dt>Given</dt><dd><span class="mono">ot.lidar.status</span> 토픽에 항목 345개짜리 레코드가 하나 있다</dd>
+          <dt>When</dt><dd>소비자가 그 레코드를 읽어 한 트랜잭션으로 쓴다</dd>
+          <dt>Then</dt><dd><span class="mono">tsdb.lidar_status</span> 에 345행이 들어가고,
+            <span class="mono">rdb.lidar_status_message</span> 에 <span class="mono">status_count=345</span> 인 행 하나가 남는다</dd>
+        </dl>
+      </div>
+      <div class="gwt">
+        <p class="gwt__t">SC-02 · 재전달된 항목이 두 번 적재되지 않는다</p>
+        <dl>
+          <dt>Given</dt><dd><span class="mono">idempotency_key</span> 가 같은 항목이 이미 적재되어 있다</dd>
+          <dt>When</dt><dd>MQTT QoS 1 재전송 또는 소비자 재시작으로 같은 항목이 다시 온다</dd>
+          <dt>Then</dt><dd><span class="mono">(idempotency_key, time)</span> 유니크 인덱스가 걸러 내고
+            <span class="mono">lidar_ingest_rows_duplicate_total</span> 만 증가한다. 행 수는 그대로다</dd>
+        </dl>
+      </div>
+      <div class="gwt">
+        <p class="gwt__t">SC-03 · 장비 발생 시각에서 DB 커밋까지 p99 가 5초 안에 든다</p>
+        <dl>
+          <dt>Given</dt><dd>장비 350대가 정상 주기로 발행하고 소비 지연이 0 이다</dd>
+          <dt>When</dt><dd>5분간 적재된 행의 <span class="mono">received_at − time</span> 분포를 낸다</dd>
+          <dt>Then</dt><dd>p50 이 2초 아래, p99 가 5초 아래다</dd>
+        </dl>
+      </div>
+
+      <h3>예외 흐름</h3>
+      <div class="gwt">
+        <p class="gwt__t">SC-04 · 항목 하나가 깨져도 레코드 전체를 버리지 않는다</p>
+        <dl>
+          <dt>Given</dt><dd>레코드 안에 <span class="mono">value</span> 가 JSON 이 아닌 항목이 하나 섞여 있다</dd>
+          <dt>When</dt><dd>소비자가 그 레코드를 처리한다</dd>
+          <dt>Then</dt><dd>깨진 항목만 <span class="mono">rdb.lidar_ingest_reject</span> 에 원문과 사유로 남고, 나머지는 정상 적재된다.
+            <span class="mono">reject_count</span> 가 레코드 대장에 기록된다</dd>
+        </dl>
+      </div>
+      <div class="gwt">
+        <p class="gwt__t">SC-05 · DB 가 실패하면 Kafka 오프셋을 전진시키지 않는다</p>
+        <dl>
+          <dt>Given</dt><dd>DB 쓰기가 실패한다(연결 끊김 · 제약 위반 등)</dd>
+          <dt>When</dt><dd>소비자가 그 배치를 처리 중이다</dd>
+          <dt>Then</dt><dd>오프셋을 커밋하지 않고 같은 배치를 다시 시도한다<sup class="ref" data-ref="3">3</sup>. 소비자는 죽지 않고
+            <span class="mono">lidar_ingest_db_errors_total</span> 이 증가한다</dd>
+        </dl>
+      </div>
+      <div class="gwt">
+        <p class="gwt__t">SC-06 · 태그 등록부에 없는 숫자를 만나도 적재가 멈추지 않는다</p>
+        <dl>
+          <dt>Given</dt><dd>발행 측이 태그를 새로 등록해 <span class="mono">content.tid</span> 가 사본에 없는 번호로 온다</dd>
+          <dt>When</dt><dd>소비자가 그 항목을 푼다</dd>
+          <dt>Then</dt><dd>상태 채널은 <span class="mono">idempotency_key</span> 앞부분에서 장비 id 를 되찾고,
+            그마저 없으면 <span class="mono">#&lt;숫자&gt;</span> 를 장비 축에 둔다.
+            <span class="mono">lidar_ingest_tag_unresolved_total</span> 로 눈에 보이게 남는다</dd>
+        </dl>
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">SC-06 은 지금 판에서 부분적으로 실패합니다</p>
+        번호가 사본에 <b>없을</b> 때는 설계대로 동작하지만, 번호가 <b>다른 채널의 태그로 존재</b>할 때는
+        미해석으로 남기지 않고 그 태그를 붙입니다. 07절에서 다룹니다.
+      </div>
+    </section>
+
+    <!-- ---------- 2. 구조 ---------- -->
+    <section class="sec" id="s2">
+      <h2><span class="n">02</span>목표 구조</h2>
+      <p class="why">박스를 끌어 배치를 바꿀 수 있습니다. 바꾼 배치는 <span class="mono">JSON</span> 버튼으로 내보내 이 파일의 <span class="mono">dgm-data</span> 블록에 붙여넣으면 영구 반영됩니다.</p>
+
+      <h3>컴포넌트 구성</h3>
+      <div class="dgm" data-edit="on">
+        <script type="application/json" class="dgm-data">
+{
+  "groups": [
+    {"id":"gA","label":"InterSysLink — 손대지 않는 구간","x":20,"y":10,"w":560,"h":360},
+    {"id":"gB","label":"이번 검증 범위","x":620,"y":10,"w":740,"h":360}
+  ],
+  "nodes": [
+    {"id":"lidar","label":"LiDAR 350대","sub":"조립 210 · 선행의장 140 · site geoje","x":60,"y":60,"w":220,"h":62,"tone":"muted"},
+    {"id":"broker","label":"MQTT 브로커","sub":"토픽 22개 · QoS 1","x":330,"y":60,"w":210,"h":62,"tone":"muted","shape":"pill"},
+    {"id":"agent","label":"Mqtt.Agent","sub":"tagMode=raw · raw_payload 통째","x":60,"y":180,"w":220,"h":62,"tone":"muted"},
+    {"id":"engine","label":"Engine","sub":"EES_TAG 2,380 · ParameterId 발번","x":330,"y":180,"w":210,"h":62,"tone":"muted"},
+    {"id":"reg","label":"태그 등록부","sub":"isl-secondary.db","x":330,"y":290,"w":210,"h":52,"tone":"muted","shape":"store"},
+    {"id":"prov","label":"EES Kafka Provider","sub":"ChangedBatch 1s · Snapshot 60s","x":660,"y":60,"w":240,"h":62,"tone":"accent"},
+    {"id":"kafka","label":"Kafka 토픽 3개","sub":"ot.lidar.status / actual / artifact","x":660,"y":180,"w":240,"h":62,"tone":"primary","shape":"pill"},
+    {"id":"ingest","label":"lidar-ingest","sub":"Python · confluent-kafka · psycopg3","x":960,"y":180,"w":240,"h":62,"tone":"accent"},
+    {"id":"cat","label":"rdb.lidar_tag_catalog","sub":"등록부 사본 — 숫자를 장비로","x":960,"y":290,"w":240,"h":52,"tone":"warn","shape":"store"},
+    {"id":"tsdb","label":"TimescaleDB 2.29","sub":"tsdb 3 하이퍼테이블 · rdb 6 일반표","x":960,"y":60,"w":240,"h":62,"tone":"primary","shape":"store"}
+  ],
+  "edges": [
+    {"from":"lidar","to":"broker","label":"publish"},
+    {"from":"broker","to":"agent","label":"subscribe"},
+    {"from":"agent","to":"engine","label":"태그 값"},
+    {"from":"reg","to":"engine","label":"ParameterId"},
+    {"from":"engine","to":"prov","label":"파라미터 배열"},
+    {"from":"prov","to":"kafka","label":"produce","tone":"primary"},
+    {"from":"kafka","to":"ingest","label":"consume","tone":"primary"},
+    {"from":"cat","to":"ingest","label":"기동 시 전량 적재","style":"dash"},
+    {"from":"ingest","to":"tsdb","label":"COMMIT 뒤 오프셋 커밋","tone":"ok"},
+    {"from":"reg","to":"cat","label":"export-tag-catalog.py","tone":"warn","style":"dash"}
+  ]
+}
+        </script>
+      </div>
+      <div class="note note--info">
+        <p class="note__t">점선 두 개가 이 구조의 약한 고리입니다</p>
+        등록부에서 사본으로 가는 경로가 <b>수동</b>이고(스크립트 실행 + 볼륨 초기화), 사본에서 소비자로 가는 경로가
+        <b>기동 시 1회</b>입니다. 등록부가 바뀌면 둘 다 다시 돌려야 장비 축이 맞습니다.
+      </div>
+
+      <h3>항목 하나가 지나는 순서</h3>
+      <div class="dgm" data-edit="on" style="height:460px">
+        <script type="application/json" class="dgm-data">
+{
+  "nodes": [
+    {"id":"rec","label":"레코드 수신","sub":"topic + 헤더 + JSON 배열","x":40,"y":30,"w":200,"h":58,"tone":"primary"},
+    {"id":"ch","label":"채널 판정","sub":"토픽 마지막 마디가 셋 중 하나인가","x":40,"y":140,"w":200,"h":70,"shape":"diamond"},
+    {"id":"rj1","label":"레코드째 격리","sub":"unknown channel for topic","x":40,"y":270,"w":200,"h":58,"tone":"risk"},
+    {"id":"item","label":"항목 풀기","sub":"content.timestamp · tid · value","x":300,"y":140,"w":200,"h":58,"tone":"accent"},
+    {"id":"tag","label":"숫자를 장비로","sub":"(send_topic, param_id) 조회","x":300,"y":250,"w":200,"h":58,"tone":"warn"},
+    {"id":"fb","label":"미해석 처리","sub":"키 앞부분 또는 #숫자","x":300,"y":360,"w":200,"h":52,"tone":"muted"},
+    {"id":"val","label":"필수 필드 검사","sub":"occurred_at · 채널별 키","x":560,"y":140,"w":200,"h":58,"shape":"diamond"},
+    {"id":"rj2","label":"항목만 격리","sub":"사유와 원문 보존","x":560,"y":270,"w":200,"h":58,"tone":"risk"},
+    {"id":"ins","label":"하이퍼테이블 INSERT","sub":"ON CONFLICT DO NOTHING","x":820,"y":30,"w":220,"h":58,"tone":"accent"},
+    {"id":"st","label":"상태 표 UPSERT","sub":"장비 축 1 · 블록 축 2","x":820,"y":140,"w":220,"h":58,"tone":"accent"},
+    {"id":"msg","label":"레코드 대장 INSERT","sub":"헤더 · 오프셋 · 채널별 항목 수","x":820,"y":250,"w":220,"h":58,"tone":"accent"},
+    {"id":"ok","label":"COMMIT 후 오프셋 커밋","sub":"at-least-once","x":1100,"y":140,"w":220,"h":58,"tone":"ok"},
+    {"id":"retry","label":"같은 배치 재시도","sub":"오프셋 전진 없음","x":1100,"y":270,"w":220,"h":58,"tone":"risk"}
+  ],
+  "edges": [
+    {"from":"rec","to":"ch"},
+    {"from":"ch","to":"rj1","tone":"risk","style":"dash"},
+    {"from":"ch","to":"item","tone":"primary"},
+    {"from":"item","to":"tag"},
+    {"from":"tag","to":"fb","style":"dash"},
+    {"from":"item","to":"val","tone":"primary"},
+    {"from":"val","to":"rj2","tone":"risk","style":"dash"},
+    {"from":"val","to":"ins","tone":"primary"},
+    {"from":"ins","to":"st"},
+    {"from":"st","to":"msg"},
+    {"from":"msg","to":"ok","tone":"ok"},
+    {"from":"msg","to":"retry","tone":"risk","style":"dash"}
+  ]
+}
+        </script>
+      </div>
+      <div class="note">
+        <p class="note__t">한 배치 = 한 트랜잭션</p>
+        레코드 최대 50개 또는 1초 중 먼저 오는 쪽에서 배치를 닫습니다. 배치 안에서
+        채널별 INSERT → 상태 표 UPSERT → 레코드 대장 INSERT → 격리 INSERT 순으로 쓰고 한 번에 COMMIT 합니다.
+        Kafka 오프셋 커밋은 그 뒤입니다.
+      </div>
+    </section>
+
+    <!-- ---------- 3. 인터페이스 계약 ---------- -->
+    <section class="sec" id="s3">
+      <h2><span class="n">03</span>인터페이스 계약 — 토픽에서 컬럼까지</h2>
+      <p class="why">스키마만 적으면 나중에 누가 어느 값을 채우는지 알 수 없습니다. 필드마다 <b>발신 주체 · 실제 값 · 앉는 컬럼</b>을 같이 적습니다.</p>
+
+      <h3>3.1 토픽 매핑 — MQTT 22개가 Kafka 3개가 된다</h3>
+      <p>발행 토픽 이름은 InterSysLink 의 EES 메시지 설정(<span class="mono">msgHeaderFormat.topic.send_topic</span>)이 정합니다.
+        채널마다 EES 메시지를 따로 만들어 두었기 때문에 <b>토픽 하나에 채널 하나</b>가 실려 오고, 그래서 채널 판정은 토픽 이름의 마지막 마디로 합니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:12%">채널</th><th style="width:28%">MQTT 토픽 (개수)</th><th style="width:16%">Kafka 토픽</th><th style="width:14%">태그 수</th><th style="width:14%">ParameterId</th><th>적재 표</th></tr></thead>
+          <tbody>
+            <tr><td><span class="chip">status</span></td><td class="mono">ot/device/{zone}/lidar/status (2)</td><td class="mono">ot.lidar.status</td><td class="num">350</td><td class="mono">1 ~ 350</td><td class="mono">tsdb.lidar_status</td></tr>
+            <tr><td><span class="chip chip--neutral">actual</span></td><td class="mono">ot/sensor/{stage}/actual (6)</td><td class="mono">ot.lidar.actual</td><td class="num">980</td><td class="mono">351 ~ 1330</td><td class="mono">tsdb.lidar_scan_actual</td></tr>
+            <tr><td><span class="chip chip--neutral">artifact</span></td><td class="mono">ot/pipeline/{zone}/{shop}/{bay}/artifact (14)</td><td class="mono">ot.lidar.artifact</td><td class="num">1,050</td><td class="mono">1331 ~ 2380</td><td class="mono">tsdb.lidar_scan_artifact</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:8px">모든 태그가 <span class="mono">tagMode=raw</span> 입니다 — <span class="mono">raw_payload</span> 객체 통째가 태그 하나의 STRING 값이 됩니다.
+        TagId 는 <span class="mono">{장비}.{토픽을 _ 로 접은 것}.raw_payload</span> 형태이고, 산출물 채널만 장비 조각에
+        <span class="mono">-REGISTERED_PCD</span> 같은 접미사가 붙습니다.</p>
+      <div class="note note--warn">
+        <p class="note__t">TagId 100자 상한</p>
+        산출물 채널은 현재 최대 97자로 여유가 3자뿐입니다. shop · bay 이름을 늘리면 넘치고, 넘친 태그는 내보내기에서 제외됩니다.
+      </div>
+
+      <h3>3.2 Kafka 레코드 — 헤더 11개와 값 배열</h3>
+      <div class="g2">
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:32%">헤더</th><th style="width:30%">실제 값</th><th>적재 컬럼 · 용도</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">project_id</td><td class="mono">ot.lidar.status</td><td class="mono">project_id</td></tr>
+              <tr><td class="mono">data_type</td><td class="mono">value</td><td class="mono">data_type</td></tr>
+              <tr><td class="mono">method_id</td><td class="mono">TRACE</td><td class="mono">method_id</td></tr>
+              <tr><td class="mono">msg_timestamp</td><td class="mono">ns epoch</td><td class="mono">msg_ts</td></tr>
+              <tr><td class="mono">infra_proc_name</td><td class="mono">ot.lidar.status</td><td class="mono">infra_proc_name</td></tr>
+              <tr><td class="mono">task_area_code</td><td class="mono">ot.lidar.status</td><td class="mono">task_area_code</td></tr>
+              <tr><td class="mono">message_version</td><td class="mono">1.0</td><td class="mono">message_version</td></tr>
+              <tr><td class="mono">uniqueid</td><td class="mono">6c9fff99-…</td><td class="mono">uniqueid</td></tr>
+              <tr><td class="mono">request</td><td class="mono">ot.lidar.status</td><td class="mono">send_topic</td> </tr>
+              <tr><td class="mono">reply</td><td>빈 바이트</td><td>받지 않음</td></tr>
+              <tr><td class="mono">replycluster</td><td>빈 바이트</td><td>받지 않음</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="stack">
+          <div class="code">
+            <div class="code__bar"><span>Kafka Value · 항목 하나</span><button class="code__copy" type="button">복사</button></div>
+<pre>{"content": {
+  "timestamp": 1789030763360318900,  <span class="cm">// ns epoch</span>
+  <span class="hl">"tid": "9",</span>          <span class="cm">// EES ParameterId (숫자)</span>
+  "value": "{...}",   <span class="cm">// raw_payload 통째의 JSON 문자열</span>
+  "pm_mode": false
+}}</pre>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>content 필드</th><th>적재 컬럼</th><th>비고</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">timestamp</td><td class="mono">content_ts</td><td>실측상 <span class="mono">occurred_at</span> 과 같은 값</td></tr>
+                <tr><td class="mono">tid</td><td class="mono">param_id</td><td>장비 id 가 아니다</td></tr>
+                <tr><td class="mono">value</td><td>채널별로 분해</td><td>3.3~3.5절</td></tr>
+                <tr><td class="mono">pm_mode</td><td class="mono">pm_mode</td><td>예방정비 플래그</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">장비 id 는 Kafka 선로에 실리지 않습니다</p>
+        Provider 가 값을 실을 때 문자열 TagId 를 버리고 ParameterId 만 씁니다(<span class="mono">ValueMessageFormatterV1_0</span>)<sup class="ref" data-ref="4">4</sup>.
+        <span class="mono">raw_payload</span> 안에도 장비 필드가 없습니다. 즉 <b>Kafka 만 읽어서는 어느 장비인지 알 수 없고</b>,
+        그 숫자를 되돌리는 유일한 근거가 <span class="mono">rdb.lidar_tag_catalog</span> 입니다.
+      </div>
+
+      <h3>3.2.1 언제 발행되는가 — 실제 설정값</h3>
+      <p>발행 시점은 <span class="mono">EES_CONNECTION.ConfigJson</span> 의 <span class="mono">sendPolicy</span> 가 정합니다.
+        워크플로우 <span class="mono">ot.lidar.all</span> 에 실제로 들어 있는 값입니다<sup class="ref" data-ref="12">12</sup>
+        — 세 엣지 그룹(<span class="mono">edge.ees.kafka.p3.wwt</span> · <span class="mono">a1</span> · <span class="mono">a2</span>)이 모두 같은 정책을 씁니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">항목</th><th style="width:20%">설정값</th><th>효과</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">mode</td><td class="mono">OnChange</td><td>값이 바뀐 태그만 주기마다 내보낸다 (ChangedBatch)</td></tr>
+            <tr><td class="mono">intervalMs</td><td><b>설정 없음</b></td><td><span class="mono">BatchTriggerEvaluator</span> 의 기본값 <span class="mono">1,000ms</span> 가 적용된다<sup class="ref" data-ref="5">5</sup></td></tr>
+            <tr><td class="mono">snapshotIntervalMs</td><td class="mono">60000</td><td>60초마다 변화 여부와 무관하게 전량을 한 번 더 내보낸다 (FullBatch)</td></tr>
+            <tr><td class="mono">dropIfPmInvalid</td><td class="mono">true</td><td>PM 값이 유효하지 않은 태그는 발행에서 제외한다</td></tr>
+            <tr><td class="mono">kafka.bootstrapServer</td><td class="mono">localhost:9092</td><td><span class="mono">clientId = isl-engine</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:8px">스케줄러는 <span class="mono">250ms</span> 마다 틱을 돌며 위 두 주기가 지났는지 봅니다<sup class="ref" data-ref="5">5</sup>.
+        즉 <b>관측된 1.4초 지연 중 최대 1초가 ChangedBatch 대기</b>이고, 나머지가 MQTT 홉 · Agent · 소비자 배치 대기입니다.</p>
+      <div class="note note--warn">
+        <p class="note__t">확인 필요 — 60초 스냅샷이 재전송을 만드는가</p>
+        FullBatch 는 변화 여부와 무관하게 태그 전량을 다시 싣습니다. 이론상 직전 ChangedBatch 가 이미 보낸 값과 겹쳐
+        멱등 인덱스가 걸러 낼 재전송이 60초마다 350건씩 생겨야 하지만, 관측 15분 동안 중복 스킵은 <b>1건</b>뿐이었습니다.
+        스냅샷이 실제로 재전송을 만드는지, 아니면 상태가 1초마다 바뀌어 늘 새 값으로 나가는지는 이번 관측으로 가르지 못했습니다.
+        <span class="mono">lidar_ingest_rows_duplicate_total</span> 을 60초 주기와 겹쳐 보면 판정됩니다.
+      </div>
+
+
+      <h3>3.2.2 주기를 10분으로 늘리면 sendPolicy 와 부딪힙니다</h3>
+      <p>3.2.1 의 <span class="mono">sendPolicy</span> 는 <b>실적 · 산출물이 1분 주기이던 판에서 정해진 값</b>입니다.
+        <span class="mono">snapshotIntervalMs=60000</span> 은 변화 여부와 무관하게 태그 전량을 60초마다 다시 싣는 설정이고,
+        발행 주기가 60초일 때는 새 값과 스냅샷이 거의 겹쳐 손해가 눈에 띄지 않았습니다.
+        실적 · 산출물이 <b>10분 주기</b>로 확정되면 그 전제가 깨집니다 — 값은 600초에 한 번 바뀌는데 스냅샷은 그대로 60초마다 돕니다.</p>
+      <figure class="cht">
+        <figcaption class="cht__t">발행 주기별 같은 값의 반복 전송 배수 (snapshotIntervalMs=60000)</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="발행 주기별 같은 값의 반복 전송 배수 (snapshotIntervalMs=60000)">
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">3</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">6</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">9</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">12</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">배</text>
+          <text x="173.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">1분 주기</text>
+          <text x="368.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">2분 주기</text>
+          <text x="563.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">5분 주기</text>
+          <text x="758.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">10분 주기</text>
+          <rect x="144.2" y="227.8" width="55.5" height="18.2" fill="var(--hw)" rx="1.5"><title>1분 주기 · 한 값이 Kafka 로 나가는 횟수 1배</title></rect>
+          <text x="172.0" y="223.8" text-anchor="middle" font-size="12" fill="var(--ink2)">1</text>
+          <rect x="339.2" y="209.7" width="55.5" height="36.3" fill="var(--hw)" rx="1.5"><title>2분 주기 · 한 값이 Kafka 로 나가는 횟수 2배</title></rect>
+          <text x="367.0" y="205.7" text-anchor="middle" font-size="12" fill="var(--ink2)">2</text>
+          <rect x="534.2" y="155.2" width="55.5" height="90.8" fill="var(--hw)" rx="1.5"><title>5분 주기 · 한 값이 Kafka 로 나가는 횟수 5배</title></rect>
+          <text x="562.0" y="151.2" text-anchor="middle" font-size="12" fill="var(--ink2)">5</text>
+          <rect x="729.2" y="64.3" width="55.5" height="181.7" fill="var(--hw)" rx="1.5"><title>10분 주기 · 한 값이 Kafka 로 나가는 횟수 10배</title></rect>
+          <text x="757.0" y="60.3" text-anchor="middle" font-size="12" fill="var(--ink2)">10</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="671.6" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="699.6" y="11" font-size="12.5" fill="var(--ink2)">한 값이 Kafka 로 나가는 횟수</text>
+        </svg>
+        <p class="cht__c">snapshot 주기가 60초로 고정된 채 발행 주기만 10분으로 늘면, 값 하나가 바뀌지 않은 채 10번 실려 나간다. 멱등 인덱스가 DB 행은 막지만 Kafka 대역과 파싱 비용은 그대로 든다.</p>
+      </figure>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:16%">채널</th><th style="width:17%">10분당 새 값</th><th style="width:17%">10분당 전송 항목</th><th style="width:17%">중복</th><th style="width:17%">일 전송 항목</th><th>DB 적재 행</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">actual</td><td class="num">350</td><td class="num">3,500</td><td class="num">3,150 (90%)</td><td class="num">504,000</td><td class="num">50,400</td></tr>
+            <tr><td class="mono">artifact</td><td class="num">4,200</td><td class="num">42,000</td><td class="num">37,800 (90%)</td><td class="num">6,048,000</td><td class="num">604,800</td></tr>
+            <tr><td><b>합계</b></td><td class="num"><b>4,550</b></td><td class="num"><b>45,500</b></td><td class="num"><b>40,950 (90%)</b></td><td class="num"><b>6,552,000</b></td><td class="num"><b>655,200</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">DB 에 65만 행을 넣으려고 655만 항목을 파싱합니다</p>
+        멱등 인덱스가 DB 행은 막아 주므로 <b>데이터는 틀리지 않습니다</b>. 대신 Kafka 대역 · 소비자 파싱 · 인덱스 조회가
+        열 배로 듭니다. status 채널은 1초 주기가 스냅샷 주기(60초)보다 짧아 <span class="mono">OnChange</span> 가 지배하므로
+        이 문제가 없습니다 — 관측 15분 동안 중복 스킵이 1건뿐이었던 것이 그 근거입니다(5.1).
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:8%">안</th><th style="width:30%">방법</th><th style="width:30%">효과</th><th>대가</th></tr></thead>
+          <tbody>
+            <tr><td><b>A</b> <span class="chip chip--ok">권고</span></td><td>채널별 <span class="mono">sendPolicy</span> 분리 — actual · artifact 의 <span class="mono">snapshotIntervalMs</span> 를 <span class="mono">600000</span> 으로</td><td>중복 90% → 0%. 일 전송 항목 655만 → 65만</td><td>ISL 측 설정 변경. EES 메시지가 이미 채널별로 나뉘어 있어 구조 변경은 없다<sup class="ref" data-ref="12">12</sup></td></tr>
+            <tr><td>B</td><td>스냅샷을 그대로 두고 소비자에서 걸러 낸다</td><td>DB 행은 이미 멱등 인덱스가 막고 있다 — 추가 작업 없음</td><td>Kafka 대역과 파싱 비용은 그대로. 일 590만 항목이 낭비된다</td></tr>
+            <tr><td>C</td><td>스냅샷을 끈다(<span class="mono">0</span>)</td><td>전송량 최소</td><td>값이 한 번 유실되면 다음 변화까지 복구되지 않는다. 10분 주기에서는 최대 10분 공백</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">확인 필요 — 스냅샷이 채널별로 갈라지는가</p>
+        <span class="mono">sendPolicy</span> 는 <span class="mono">EES_CONNECTION.ConfigJson</span> 단위이고, 지금은 세 엣지 그룹이
+        <b>같은 정책</b>을 씁니다<sup class="ref" data-ref="12">12</sup>. A안이 성립하려면 채널별 EES 메시지가 서로 다른 connection 에 묶여 있거나
+        메시지 단위로 정책을 덮어쓸 수 있어야 합니다. 8.6 의 <b>Q1</b> 에서 확정합니다.
+      </div>
+
+      <h3>3.3 status 채널 — 장비 상태 (실시간)</h3>
+      <p>발신 주체는 LiDAR Edge Service 입니다. 장비당 1건이 발행 주기마다 나갑니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">raw_payload 필드</th><th style="width:26%">실제 값</th><th style="width:24%">적재 컬럼</th><th>계약</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">occurred_at</td><td class="mono">2026-09-11T11:37:37.55+09:00</td><td class="mono">time<sup class="ref" data-ref="6">6</sup></td><td><span class="chip chip--risk">필수</span> 파티션 키. Kafka 도착 시각이 아니다</td></tr>
+            <tr><td class="mono">status</td><td class="mono">ONLINE</td><td class="mono">status</td><td><span class="chip chip--risk">필수</span> ONLINE · CALIBRATING · ERROR · OFFLINE</td></tr>
+            <tr><td class="mono">idempotency_key</td><td class="mono">LDR-GJ-A1B1-09:20260911T113737</td><td class="mono">idempotency_key</td><td><span class="chip chip--risk">필수</span> 발신 측이 만든다. 하이퍼테이블 유니크 인덱스는 파티션 컬럼을 포함해야 한다<sup class="ref" data-ref="11">11</sup></td></tr>
+            <tr><td class="mono">device_role</td><td class="mono">LIDAR</td><td class="mono">device_role</td><td>고정값</td></tr>
+            <tr><td class="mono">site</td><td class="mono">geoje</td><td class="mono">site</td><td>사업장</td></tr>
+            <tr><td class="mono">zone</td><td class="mono">ASSEMBLY</td><td class="mono">zone</td><td>ASSEMBLY · OUTFITTING</td></tr>
+            <tr><td class="mono">shop</td><td class="mono">assembly1</td><td class="mono">shop</td><td>assembly1 · outfitting1</td></tr>
+            <tr><td class="mono">bay</td><td class="mono">bay1</td><td class="mono">bay</td><td>bay1 ~ bay7</td></tr>
+            <tr><td class="mono">error_code</td><td class="mono">null</td><td class="mono">error_code</td><td>ERROR 일 때만. E-NET-0007 · E-LDR-0101/0203/0311/0402. 빈 문자열은 NULL 로 넣는다</td></tr>
+            <tr><td class="mono">scan_rate_pts_per_sec</td><td class="mono">255062</td><td class="mono">scan_rate_pts_per_sec</td><td>OFFLINE 이면 0 — 죽은 장비의 신호</td></tr>
+            <tr><td class="mono">temperature_c</td><td class="mono">41.1</td><td class="mono">temperature_c</td><td>상태에 따라 함께 움직인다</td></tr>
+            <tr><td class="mono">connectivity_rssi</td><td class="mono">-38</td><td class="mono">connectivity_rssi</td><td>dBm</td></tr>
+            <tr><td class="mono">fov_mode</td><td class="mono">narrow</td><td class="mono">fov_mode</td><td>wide · narrow</td></tr>
+            <tr><td class="mono">last_heartbeat_at</td><td class="mono">2026-09-11T11:37:37.55+09:00</td><td class="mono">last_heartbeat_at</td><td>OFFLINE 이면 멈춘다</td></tr>
+            <tr><td class="mono">ingested_at</td><td class="mono">2026-09-11T11:37:38.03+09:00</td><td class="mono">ingested_at</td><td>발신 측이 찍은 값. DB 적재 시각이 아니다</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>3.4 actual 채널 — 스캔 실적 (주기)</h3>
+      <p>발신 주체는 AI Inference Service 또는 LiDAR Edge Service 입니다(<span class="mono">source_system</span> 이 말해 줍니다).
+        스캔 한 번이 실적 1건과 산출물 12건을 만들고, <span class="mono">scan_id</span> 가 둘을 잇는 유일한 조인 키입니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">raw_payload 필드</th><th style="width:26%">실제 값</th><th style="width:22%">적재 컬럼</th><th>계약</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">occurred_at</td><td class="mono">2026-09-11T11:37:37.81+09:00</td><td class="mono">time</td><td><span class="chip chip--risk">필수</span> 파티션 키</td></tr>
+            <tr><td class="mono">scan_id</td><td class="mono">3818398d-6140-…-75f2b8463e48</td><td class="mono">scan_id</td><td><span class="chip chip--risk">필수</span> 이벤트마다 새 uuid — 블록 키가 아니다</td></tr>
+            <tr><td class="mono">idempotency_key</td><td class="mono">3818398d:PIPING:START</td><td class="mono">idempotency_key</td><td><span class="chip chip--risk">필수</span> {scan_id 앞 8자}:{stage}:{event_type}</td></tr>
+            <tr><td class="mono">hull_no</td><td class="mono">H1237</td><td class="mono">hull_no</td><td>호선. 장비 index 로 고정되어 늘지 않는다</td></tr>
+            <tr><td class="mono">block_id</td><td class="mono">B157S</td><td class="mono">block_id</td><td>블록. 350대 = 349블록</td></tr>
+            <tr><td class="mono">stage</td><td class="mono">PIPING</td><td class="mono">stage</td><td>조립 ARRANGEMENT · FITTING · WELDING · INSPECTION / 의장 WIRING · PIPING</td></tr>
+            <tr><td class="mono">event_type</td><td class="mono">START</td><td class="mono">event_type</td><td>START · PROGRESS · COMPLETE</td></tr>
+            <tr><td class="mono">block_progress_rate</td><td class="mono">8.6</td><td class="mono">block_progress_rate</td><td>되돌아가지 않는다. COMPLETE 뒤 다음 블록에서 0부터</td></tr>
+            <tr><td class="mono">match_confidence</td><td class="mono">0.98</td><td class="mono">match_confidence</td><td>정합 신뢰도 0~1. 상태 채널에는 없는 품질 축</td></tr>
+            <tr><td class="mono">reference_cad_id</td><td class="mono">CAD-H1237-B157S</td><td class="mono">reference_cad_id</td><td>대조 CAD</td></tr>
+            <tr><td class="mono">record_type</td><td class="mono">ACTUAL</td><td class="mono">record_type</td><td>고정값</td></tr>
+            <tr><td class="mono">input_method</td><td class="mono">AUTO</td><td class="mono">input_method</td><td>고정값</td></tr>
+            <tr><td class="mono">source_system</td><td class="mono">LiDAR Edge Service</td><td class="mono">source_system</td><td>AI Inference Service 와 둘 중 하나</td></tr>
+            <tr><td class="mono">pan_tilt</td><td class="mono">PTZ-GJ-O1B2-08</td><td class="mono">pan_tilt</td><td>장비 구성 — 정의서의 중첩 객체를 평탄화한 것</td></tr>
+            <tr><td class="mono">edge_pc</td><td class="mono">EDG-GJ-O1-02</td><td class="mono">edge_pc</td><td>엣지 PC</td></tr>
+            <tr><td class="mono">inference_ws</td><td class="mono">INF-GJ-O1-01</td><td class="mono">inference_ws</td><td>추론 워크스테이션</td></tr>
+            <tr><td class="mono">vision_ocr</td><td class="mono">null</td><td class="mono">vision_ocr</td><td>OCR 이 개입한 스캔에만 채워진다</td></tr>
+            <tr><td class="mono">scanned_at</td><td class="mono">2026-09-11T11:37:37.81+09:00</td><td class="mono">scanned_at</td><td>스캔 시각</td></tr>
+            <tr><td class="mono">model_version</td><td class="mono">seg-v1.4.2</td><td class="mono">model_version</td><td>추론 모델</td></tr>
+            <tr><td class="mono">site · zone · shop · bay</td><td class="mono">geoje · OUTFITTING · …</td><td>동명 컬럼</td><td>status 와 같은 뜻</td></tr>
+            <tr><td class="mono">ingested_at</td><td class="mono">2026-09-11T11:37:39.20+09:00</td><td class="mono">ingested_at</td><td>발신 측 값</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>3.5 artifact 채널 — 산출물 메타 (주기 · 스캔당 12건)</h3>
+      <p>점군 파일 본체는 오지 않습니다. 경로와 크기와 체크섬만 옵니다. 변환행렬만 숫자 16개뿐이라 예외적으로 메시지에 직접 실립니다.
+        <b>이 채널만 발신 측 멱등 키가 없어</b> 소비자가 만듭니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">raw_payload 필드</th><th style="width:30%">실제 값</th><th style="width:20%">적재 컬럼</th><th>계약</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">occurred_at</td><td class="mono">2026-09-11T11:37:36.09+09:00</td><td class="mono">time</td><td><span class="chip chip--risk">필수</span> 파티션 키</td></tr>
+            <tr><td class="mono">scan_id</td><td class="mono">5be90914-c692-…-71fcf8f031e8</td><td class="mono">scan_id</td><td><span class="chip chip--risk">필수</span> actual 과 잇는 키</td></tr>
+            <tr><td class="mono">artifact_type</td><td class="mono">SEGMENTED_PCD</td><td class="mono">artifact_type</td><td><span class="chip chip--risk">필수</span> REGISTERED_PCD 1 · TRANSFORMATION_MATRIX 1 · SEGMENTED_PCD 10</td></tr>
+            <tr><td class="mono">segment_id</td><td class="mono">SEG-006</td><td class="mono">segment_id</td><td>SEGMENTED_PCD 에만 값이 있다</td></tr>
+            <tr><td class="mono">storage_uri</td><td class="mono">file://ot-a/pcd/2026/09/11/5be90914/seg-006.pcd</td><td class="mono">storage_uri</td><td>본체는 DB 밖. TRANSFORMATION_MATRIX 는 null</td></tr>
+            <tr><td class="mono">file_size_bytes</td><td class="mono">25876053</td><td class="mono">file_size_bytes</td><td>정합 PCD 150~240MB · 세그먼트 12~32MB</td></tr>
+            <tr><td class="mono">checksum</td><td class="mono">sha256:19196e8a5001b47b</td><td class="mono">checksum</td><td>무결성 확인용</td></tr>
+            <tr><td class="mono">transformation_matrix</td><td class="mono">[1.0, 0.02, …] 16개</td><td class="mono">transformation_matrix</td><td>jsonb. TRANSFORMATION_MATRIX 에만 값이 있다</td></tr>
+            <tr><td class="mono">produced_by_device_id</td><td class="mono">INF-GJ-O1-01</td><td class="mono">produced_by_device_id</td><td>산출물을 만든 추론 서버</td></tr>
+            <tr><td class="mono">hull_no · block_id</td><td class="mono">H1236 · B156P</td><td>동명 컬럼</td><td>블록 축 — 페이로드에서 바로 온다</td></tr>
+            <tr><td class="mono">model_version · ingested_at</td><td class="mono">seg-v1.4.2 · …</td><td>동명 컬럼</td><td>actual 과 같은 뜻</td></tr>
+            <tr><td>—</td><td class="mono">5be90914-…:SEGMENTED_PCD:SEG-006</td><td class="mono">idempotency_key</td><td><b>소비자가 생성</b> — {scan_id}:{artifact_type}:{segment_id}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>3.6 소비자가 덧붙이는 컬럼</h3>
+      <p>아래 여섯은 페이로드에 없고 소비자가 채웁니다. 원문과 구분하기 위해 따로 적습니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:22%">컬럼</th><th style="width:30%">값의 출처</th><th>없으면 무엇이 안 되나</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">tid</td><td>태그 등록부 사본으로 푼 장비 id</td><td>장비 축 대시보드 · <span class="mono">$tid</span> 변수 · 압축 세그먼트</td></tr>
+            <tr><td class="mono">tag_id</td><td>같은 사본의 문자열 TagId</td><td>등록부와의 대조</td></tr>
+            <tr><td class="mono">param_id</td><td><span class="mono">content.tid</span> 숫자 그대로</td><td>미해석 추적</td></tr>
+            <tr><td class="mono">mqtt_topic</td><td>사본의 토픽 조각</td><td>원래 어느 MQTT 토픽에서 왔는지</td></tr>
+            <tr><td class="mono">kafka_offset</td><td>레코드 오프셋</td><td>행에서 레코드 대장으로 되짚기</td></tr>
+            <tr><td class="mono">received_at</td><td><span class="mono">now()</span></td><td>end-to-end 지연 계산</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---------- 4. 저장 설계 ---------- -->
+    <section class="sec" id="s4">
+      <h2><span class="n">04</span>저장 설계와 TimescaleDB 선택</h2>
+      <p class="why">요구는 "최대 1개월 보존"입니다. 그 한 줄이 설계의 거의 전부를 결정합니다.</p>
+
+      <h3>4.1 표 아홉 개와 스키마 둘</h3>
+      <p>이 DB 의 진짜 경계는 "행 단위 CDC 가 성립하는가" 입니다. 그것을 주석이 아니라 <b>스키마</b>로 두었습니다 —
+        publication 에 하이퍼테이블이 실수로 끼어드는 것을 구조가 막습니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:26%">표</th><th style="width:14%">성격</th><th style="width:14%">행 수 성질</th><th>역할</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">tsdb.lidar_status<sup class="ref" data-ref="2">2</sup></td><td>하이퍼테이블 · 청크 6h</td><td>시간 비례</td><td>상태 항목 하나 = 행 하나</td></tr>
+            <tr><td class="mono">tsdb.lidar_scan_actual</td><td>하이퍼테이블 · 청크 1일</td><td>시간 비례</td><td>실적 항목 하나 = 행 하나</td></tr>
+            <tr><td class="mono">tsdb.lidar_scan_artifact</td><td>하이퍼테이블 · 청크 6h</td><td>시간 비례</td><td>산출물 메타 하나 = 행 하나</td></tr>
+            <tr><td class="mono">tsdb.lidar_status_1m · error_1m · scan_1m · artifact_1m</td><td>연속 집계</td><td>시간 비례 (1/60)</td><td>대시보드가 읽는 1분 집계. 보존 1년</td></tr>
+            <tr><td class="mono">rdb.lidar_device_state</td><td>일반 표</td><td class="num">350 고정</td><td>장비별 최신 상태. status 채널의 요약</td></tr>
+            <tr><td class="mono">rdb.lidar_block_progress</td><td>일반 표</td><td class="num">349 고정</td><td>블록별 공정 마일스톤. actual 채널의 요약</td></tr>
+            <tr><td class="mono">rdb.lidar_block_artifact</td><td>일반 표</td><td class="num">349 고정</td><td>블록별 산출물 대장. artifact 채널의 요약</td></tr>
+            <tr><td class="mono">rdb.lidar_status_message</td><td>일반 표</td><td>레코드 비례</td><td>레코드 대장 — 헤더 · 오프셋 · 채널별 항목 수</td></tr>
+            <tr><td class="mono">rdb.lidar_tag_catalog</td><td>일반 표</td><td class="num">2,310</td><td>등록부 사본</td></tr>
+            <tr><td class="mono">rdb.lidar_ingest_reject</td><td>일반 표</td><td>사고 비례</td><td>파싱 실패 항목의 원문과 사유</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--info">
+        <p class="note__t">상태 표 셋이 설계의 핵심입니다</p>
+        원문이 쌓이는 하이퍼테이블은 CDC 로 옮길 수 없지만, 그것을 <b>유계 축</b>으로 접은 상태 표는 일반 표라 옮길 수 있습니다.
+        축이 장비(350) 하나와 블록(349) 둘인 것은 그래서입니다 —
+        <span class="mono">scan_id</span> 를 축으로 잡으면 이벤트마다 새 uuid 라 하이퍼테이블의 사본이 될 뿐 아무것도 줄이지 못합니다.
+      </div>
+
+      <h3>4.2 저장 방식 비교</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:20%">방식</th><th style="width:28%">장점</th><th style="width:28%">단점</th><th>1개월 보존 적합도</th></tr></thead>
+          <tbody>
+            <tr><td>일반 PostgreSQL</td><td>추가 확장 없음. 운영 인력이 이미 안다</td><td>31일치 349GB. 매일 3,000만 행 DELETE + VACUUM</td><td><span class="chip chip--risk">부적합</span> 삭제 비용이 적재를 방해한다</td></tr>
+            <tr><td>PostgreSQL + 선언적 파티셔닝</td><td>DROP PARTITION 으로 삭제 비용 해결</td><td>압축이 없어 용량 그대로. 파티션 생성 · 집계를 직접 만들어야 한다</td><td><span class="chip chip--warn">부분</span> 삭제만 풀린다</td></tr>
+            <tr><td><b>TimescaleDB</b></td><td>청크 자동 생성 · 컬럼스토어 12.6배 · 청크 DROP 보존 · 연속 집계</td><td>확장 의존. 하이퍼테이블은 CDC 원천이 될 수 없다</td><td><span class="chip chip--ok">적합</span> 네 가지가 한 번에 풀린다</td></tr>
+            <tr><td>전용 TSDB (InfluxDB 등)</td><td>시계열 전용 최적화</td><td>SQL 조인 불가에 가깝다. CDC · 기존 PostgreSQL 자산과 단절</td><td><span class="chip chip--risk">부적합</span> 블록 · 호선 조인이 핵심 요구다</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="adr">
+        <p class="adr__t">ADR-01 · 센서 원문은 TimescaleDB 하이퍼테이블에 담고, CDC 대상에서 제외한다</p>
+        <dl>
+          <dt>배경</dt><dd>1개월 보존에서 용량 · 삭제 비용 · 집계 조회가 동시에 문제가 됩니다. 셋을 한 엔진에서 푸는 것이 TimescaleDB 이고,
+            그 대가로 청크 · 압축 · 보존이 행 단위 DML 로 보이지 않아 논리 복제가 성립하지 않습니다.</dd>
+          <dt>결정</dt><dd>원문 셋은 <span class="mono">tsdb</span> 스키마의 하이퍼테이블에 담고 publication 에 넣지 않습니다.
+            수신 측이 필요로 하는 것은 <span class="mono">rdb</span> 스키마의 유계 상태 표 셋으로 대신합니다.</dd>
+          <dt>대가</dt><dd>수신 측은 원문 시계열을 볼 수 없습니다. 원문이 필요하면 TimescaleDB 에 직접 조회하거나 적재 API 에서 분기해야 합니다.</dd>
+          <dt>재검토</dt><dd>수신 측이 원문 시계열을 요구하면 재검토합니다. 그때는 CDC 가 아니라 소비자에서 두 곳으로 쓰는(dual write) 쪽이 싼지 먼저 비교합니다.</dd>
+        </dl>
+      </div>
+
+      <div class="adr">
+        <p class="adr__t">ADR-02 · 채널마다 표를 나누고 청크 간격을 따로 준다</p>
+        <dl>
+          <dt>배경</dt><dd>status 는 초당 350행, actual 은 10분당 350행입니다. 1,700배 차이입니다.
+            한 표에 담으면 청크 간격을 어느 쪽에 맞춰도 다른 쪽이 망가집니다.</dd>
+          <dt>결정</dt><dd>채널당 표 하나, 청크 간격은 status 6시간 · actual 1일 · artifact 6시간.
+            압축은 세 표 모두 3일 후, 보존은 31일로 같게 둡니다 — 셋 다 INSERT 만 있고 정정이 없기 때문입니다.</dd>
+          <dt>대가</dt><dd>채널을 가로지르는 조회는 조인이 필요합니다. <span class="mono">scan_id</span> 가 actual 과 artifact 를 잇습니다.</dd>
+          <dt>재검토</dt><dd>정정(UPDATE)이 들어오는 채널이 생기면 그 표에는 압축을 걸지 않습니다 — 정정마다 세그먼트를 풀었다 담아야 합니다.</dd>
+        </dl>
+      </div>
+
+      <div class="adr">
+        <p class="adr__t">ADR-03 · 멱등은 발신 키로, 전달은 at-least-once 로 한다</p>
+        <dl>
+          <dt>배경</dt><dd>MQTT 가 QoS 1 이고 Kafka 소비도 at-least-once 라 재전달은 예외가 아니라 정상 동작입니다.</dd>
+          <dt>결정</dt><dd><span class="mono">(idempotency_key, time)</span> 유니크 인덱스 + <span class="mono">ON CONFLICT DO NOTHING</span>.
+            DB 커밋이 끝난 뒤에만 Kafka 오프셋을 커밋합니다.</dd>
+          <dt>대가</dt><dd>인덱스가 하나 더 늘고, 하이퍼테이블 제약상 파티션 컬럼(<span class="mono">time</span>)을 키에 포함해야 합니다.
+            같은 키가 다른 <span class="mono">occurred_at</span> 으로 오면 걸러지지 않습니다.</dd>
+          <dt>재검토</dt><dd>발신 측이 멱등 키 형식을 바꾸면 세 채널의 빌더를 함께 고칩니다. artifact 는 지금도 소비자가 만들고 있습니다.</dd>
+        </dl>
+      </div>
+
+      <h3>4.3 10분 주기 두 채널에도 TimescaleDB 가 합리적인가</h3>
+      <p class="why">4.2 의 판정은 <b>status 채널 하나가 전체 행의 98%</b> 라는 사실 위에 서 있습니다.
+        주기가 확정되면서 실적 · 산출물이 1분에서 10분으로 열 배 성기어졌으므로, 그 두 채널만 따로 놓고 같은 질문을 다시 던져야 합니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:15%">채널</th><th style="width:11%">주기</th><th style="width:11%">청크</th><th style="width:16%">청크당 행</th><th style="width:17%">세그먼트(tid)당 행</th><th>압축 기대</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">status</td><td>1초</td><td class="mono">6시간</td><td class="num">7,560,000</td><td class="num">21,600</td><td><span class="chip chip--ok">높음</span> 실측 12.6배</td></tr>
+            <tr><td class="mono">artifact</td><td>1분 <span class="chip">구</span></td><td class="mono">6시간</td><td class="num">1,512,000</td><td class="num">4,320</td><td><span class="chip chip--neutral">중간</span></td></tr>
+            <tr><td class="mono">artifact</td><td><b>10분</b> <span class="chip chip--warn">신</span></td><td class="mono">6시간</td><td class="num">151,200</td><td class="num">432</td><td><span class="chip chip--warn">낮음</span> <span class="chip chip--warn">추정</span></td></tr>
+            <tr><td class="mono">actual</td><td>1분 <span class="chip">구</span></td><td class="mono">1일</td><td class="num">504,000</td><td class="num">1,440</td><td><span class="chip chip--neutral">중간</span></td></tr>
+            <tr><td class="mono">actual</td><td><b>10분</b> <span class="chip chip--warn">신</span></td><td class="mono">1일</td><td class="num">50,400</td><td class="num">144</td><td><span class="chip chip--warn">낮음</span> <span class="chip chip--warn">추정</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">주기가 열 배 길어지면 세그먼트당 행도 열 배 줄어듭니다</p>
+        압축이 듣고 안 듣고를 가르는 것은 표의 크기가 아니라 <b>세그먼트당 행 수</b>입니다. 5.3 의 실측이 그 경계를 보여 줍니다 —
+        세그먼트당 917행이면 12.6배, 6.5행이면 0.7배로 오히려 커졌습니다. 10분 주기의 432행 · 144행은 그 사이에 있어
+        <b>지금 수치로는 판정할 수 없습니다.</b> 확실한 것은 1분 주기보다 나빠진다는 방향뿐입니다.
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:16%">질문</th><th style="width:26%">status (1초)</th><th style="width:26%">artifact (10분)</th><th>actual (10분)</th></tr></thead>
+          <tbody>
+            <tr><td>31일 원본</td><td class="num">57.2 GB</td><td class="num">3.3 GB</td><td class="num">0.5 GB</td></tr>
+            <tr><td>일 삭제 행</td><td class="num">30,240,000</td><td class="num">604,800</td><td class="num">50,400</td></tr>
+            <tr><td>DELETE 로 감당되나</td><td><span class="chip chip--risk">안 된다</span> autovacuum 이 못 따라간다</td><td><span class="chip chip--warn">된다</span> 일 60만 행은 흔한 규모다</td><td><span class="chip chip--ok">된다</span> 일 5만 행뿐이다</td></tr>
+            <tr><td>압축 이득</td><td><span class="chip chip--ok">12.6배</span> 실측</td><td><span class="chip chip--warn">미정</span> 축 재선정 필요</td><td><span class="chip chip--warn">미정</span> 0.5GB 를 줄여 봐야</td></tr>
+            <tr><td>연속 집계 필요</td><td><span class="chip chip--ok">필수</span> 원본 조회가 불가능하다</td><td><span class="chip chip--neutral">유용</span> 종류별 누계</td><td><span class="chip chip--neutral">선택</span> 원본을 직접 읽어도 된다</td></tr>
+            <tr><td><b>단독 판정</b></td><td><b><span class="chip chip--ok">TimescaleDB 필수</span></b></td><td><b><span class="chip chip--neutral">있으면 좋음</span></b></td><td><b><span class="chip chip--neutral">일반 표로 충분</span></b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--ok">
+        <p class="note__t">그래도 셋을 같은 엔진에 두는 것이 맞습니다</p>
+        actual 단독으로는 TimescaleDB 가 과합니다. 그러나 <b>이미 status 때문에 확장을 깔아야 하고</b>,
+        같은 DB 안에서 <span class="mono">scan_id</span> 로 actual 과 artifact 를 잇고 호선 · 블록 마스터와 조인해야 합니다.
+        전용 TSDB 를 따로 두면 조인이 끊기고 인스턴스가 하나 늘 뿐입니다 — 4.2 의 판정이 채널별로 갈라지지 않는 이유는
+        <b>기술적 필요</b>가 아니라 <b>운영 단순성</b>입니다. 이 구분을 적어 두지 않으면 반년 뒤 "actual 은 왜 하이퍼테이블인가"에 답을 못 합니다.
+      </div>
+
+      <div class="adr">
+        <p class="adr__t">ADR-04 · 10분 주기 두 채널은 하이퍼테이블로 두되, 압축 축과 압축 여부는 1일치 실측 뒤에 정한다</p>
+        <dl>
+          <dt>배경</dt><dd>주기가 1분에서 10분으로 바뀌면서 artifact 는 세그먼트당 4,320행에서 432행으로, actual 은 1,440행에서 144행으로 줄었습니다.
+            5.3 의 실측(917행 → 12.6배, 6.5행 → 0.7배)은 이 구간을 덮지 못합니다.</dd>
+          <dt>결정</dt><dd>표 구조와 청크 간격은 바꾸지 않습니다. <b>압축 정책만 두 채널에서 일단 떼고</b>, 1일치를 쌓은 뒤
+            <span class="mono">scratch</span> 사본으로 <span class="mono">tid</span> · <span class="mono">artifact_type</span> · <span class="mono">stage</span> 세 축을 재측정해 결정합니다.</dd>
+          <dt>대가</dt><dd>그동안 두 채널은 비압축으로 쌓입니다. 31일 전량 비압축이어도 3.8GB 이므로 감당 가능한 금액입니다 —
+            <b>잘못된 축으로 압축을 걸어 표를 키우는 것보다 안전합니다.</b></dd>
+          <dt>재검토</dt><dd>실측에서 어느 축이든 3배를 넘으면 그 축으로 압축을 겁니다. 셋 다 2배 아래면 두 채널은 비압축으로 확정하고
+            보존 정책(청크 DROP)만 남깁니다.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <!-- ---------- 5. 실측 ---------- -->
+    <section class="sec" id="s5">
+      <h2><span class="n">05</span>실측 결과</h2>
+      <p class="why">2026-09-11 11:16~11:37, 실제로 돌고 있는 스택에서 뽑았습니다. 막대와 점에 커서를 올리면 값이 뜹니다.</p>
+
+      <h3>5.1 처리량과 지연</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:26%">지표</th><th style="width:20%">관측값</th><th style="width:26%">판정 기준</th><th>출처</th></tr></thead>
+          <tbody>
+            <tr><td>수신 레코드</td><td class="num">1,491건 / 15분 36초</td><td>—</td><td class="mono">rdb.lidar_status_message</td></tr>
+            <tr><td>파싱 항목</td><td class="num">297,495</td><td>—</td><td>같은 표의 채널별 카운트</td></tr>
+            <tr><td>&nbsp;&nbsp;· status</td><td class="num">296,427</td><td>—</td><td class="mono">status_count</td></tr>
+            <tr><td>&nbsp;&nbsp;· actual</td><td class="num">407</td><td>—</td><td class="mono">actual_count</td></tr>
+            <tr><td>&nbsp;&nbsp;· artifact</td><td class="num">661</td><td>—</td><td class="mono">artifact_count</td></tr>
+            <tr><td>occurred_at → COMMIT p50</td><td class="num">1.379 s<sup class="ref" data-ref="1">1</sup></td><td>2초 미만 (SC-03)</td><td class="mono">received_at − time, 최근 5분 94,535행</td></tr>
+            <tr><td>&nbsp;&nbsp;· p95 / p99 / 최대</td><td class="num">2.831 / 3.172 / 3.677 s</td><td>p99 5초 미만 (SC-03)</td><td>같은 쿼리</td></tr>
+            <tr><td>배치 쓰기 시간 평균</td><td class="num">17.8 ms</td><td>—</td><td class="mono">lidar_ingest_batch_seconds</td></tr>
+            <tr><td>배치당 행 수 평균</td><td class="num">162행 / 1,873회</td><td>—</td><td class="mono">lidar_ingest_batch_rows</td></tr>
+            <tr><td>중복 스킵</td><td class="num">1건</td><td>정상 방어 (SC-02)</td><td class="mono">lidar_ingest_rows_duplicate_total</td></tr>
+            <tr><td>격리 · DB 오류 · 소비 지연</td><td class="num">0 / 0 / 0</td><td>0 이어야 한다 (SC-04 · SC-05)</td><td>각 카운터</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--ok">
+        <p class="note__t">병목은 DB 가 아닙니다</p>
+        1.4초 안에 MQTT 홉 · Agent · Engine · Provider · Kafka · 소비자가 전부 들어 있고, DB 쓰기는 그중 17.8ms 입니다.
+        나머지는 대부분 Provider 의 ChangedBatch 주기(기본 1초)<sup class="ref" data-ref="5">5</sup>와 배치 대기 시간입니다.
+      </div>
+
+      <h3>5.2 1개월 보존 용량</h3>
+      <p>운영 전제(상태 1초 · 실적/산출물 10분)로 계산했습니다. 행 크기는 실측, 압축비는 실측 12.6배를 적용했습니다.</p>
+      <figure class="cht">
+        <figcaption class="cht__t">31일 보존 창의 디스크 누계 — 일반 PostgreSQL vs TimescaleDB</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="31일 보존 창의 디스크 누계 — 일반 PostgreSQL vs TimescaleDB">
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">90</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">180</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">270</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">360</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">GB</text>
+          <text x="76.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">1일</text>
+          <text x="206.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">5일</text>
+          <text x="336.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">10일</text>
+          <text x="466.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">15일</text>
+          <text x="596.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">20일</text>
+          <text x="726.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">25일</text>
+          <text x="856.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">31일</text>
+          <polyline points="76.0,239.2 206.0,211.8 336.0,177.8 466.0,143.6 596.0,109.5 726.0,75.4 856.0,34.4 " fill="none" stroke="var(--info)" stroke-width="2.4"/>
+          <polygon points="76.0,246.0 76.0,239.2 206.0,211.8 336.0,177.8 466.0,143.6 596.0,109.5 726.0,75.4 856.0,34.4 856.0,246.0" fill="var(--info)" opacity=".12"/>
+          <circle cx="76.0" cy="239.2" r="3.4" fill="var(--info)"><title>1일 · 일반 PostgreSQL 11.3GB</title></circle>
+          <circle cx="206.0" cy="211.8" r="3.4" fill="var(--info)"><title>5일 · 일반 PostgreSQL 56.4GB</title></circle>
+          <circle cx="336.0" cy="177.8" r="3.4" fill="var(--info)"><title>10일 · 일반 PostgreSQL 112GB</title></circle>
+          <circle cx="466.0" cy="143.6" r="3.4" fill="var(--info)"><title>15일 · 일반 PostgreSQL 169GB</title></circle>
+          <circle cx="596.0" cy="109.5" r="3.4" fill="var(--info)"><title>20일 · 일반 PostgreSQL 225GB</title></circle>
+          <circle cx="726.0" cy="75.4" r="3.4" fill="var(--info)"><title>25일 · 일반 PostgreSQL 281GB</title></circle>
+          <circle cx="856.0" cy="34.4" r="3.4" fill="var(--info)"><title>31일 · 일반 PostgreSQL 349GB</title></circle>
+          <text x="856.0" y="25.4" text-anchor="middle" font-size="12" font-weight="700" fill="var(--info)">349</text>
+          <polyline points="76.0,239.2 206.0,224.4 336.0,221.4 466.0,218.5 596.0,215.5 726.0,212.6 856.0,209.1 " fill="none" stroke="var(--hw)" stroke-width="2.4"/>
+          <polygon points="76.0,246.0 76.0,239.2 206.0,224.4 336.0,221.4 466.0,218.5 596.0,215.5 726.0,212.6 856.0,209.1 856.0,246.0" fill="var(--hw)" opacity=".12"/>
+          <circle cx="76.0" cy="239.2" r="3.4" fill="var(--hw)"><title>1일 · TimescaleDB (3일 후 압축) 11.3GB</title></circle>
+          <circle cx="206.0" cy="224.4" r="3.4" fill="var(--hw)"><title>5일 · TimescaleDB (3일 후 압축) 35.7GB</title></circle>
+          <circle cx="336.0" cy="221.4" r="3.4" fill="var(--hw)"><title>10일 · TimescaleDB (3일 후 압축) 40.6GB</title></circle>
+          <circle cx="466.0" cy="218.5" r="3.4" fill="var(--hw)"><title>15일 · TimescaleDB (3일 후 압축) 45.4GB</title></circle>
+          <circle cx="596.0" cy="215.5" r="3.4" fill="var(--hw)"><title>20일 · TimescaleDB (3일 후 압축) 50.3GB</title></circle>
+          <circle cx="726.0" cy="212.6" r="3.4" fill="var(--hw)"><title>25일 · TimescaleDB (3일 후 압축) 55.1GB</title></circle>
+          <circle cx="856.0" cy="209.1" r="3.4" fill="var(--hw)"><title>31일 · TimescaleDB (3일 후 압축) 60.9GB</title></circle>
+          <text x="856.0" y="200.1" text-anchor="middle" font-size="12" font-weight="700" fill="var(--hw)">60.9</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="656.4" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="684.4" y="11" font-size="12.5" fill="var(--ink2)">TimescaleDB (3일 후 압축)</text>
+          <rect x="517.6" y="6" width="22" height="4" rx="2" fill="var(--info)"/>
+          <text x="545.6" y="11" font-size="12.5" fill="var(--ink2)">일반 PostgreSQL</text>
+        </svg>
+        <p class="cht__c">두 선은 3일째까지 붙어 있다가 압축 정책이 도는 순간 갈라진다. 일반 PostgreSQL 은 하루 11.3GB 씩 직선으로 오르고, TimescaleDB 는 압축 구간에 들어간 뒤로 하루 0.97GB 만 는다. 31일 시점에 349GB 대 61GB 로 5.7배 차이다.</p>
+      </figure>
+
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:16%">채널</th><th style="width:16%">하루 행 수</th><th style="width:14%">행 크기</th><th style="width:18%">하루 (비압축)</th><th style="width:18%">하루 (압축)</th><th>31일 합계</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">status</td><td class="num">30,240,000</td><td class="num">362 B</td><td class="num">10.95 GB</td><td class="num">0.87 GB</td><td class="num">57.2 GB</td></tr>
+            <tr><td class="mono">artifact</td><td class="num">604,800</td><td class="num">516 B</td><td class="num">0.29 GB</td><td class="num">0.09 GB</td><td class="num">3.3 GB</td></tr>
+            <tr><td class="mono">actual</td><td class="num">50,400</td><td class="num">736 B</td><td class="num">0.03 GB</td><td class="num">0.02 GB</td><td class="num">0.5 GB</td></tr>
+            <tr><td><b>TimescaleDB 합계</b></td><td class="num">30,895,200</td><td>—</td><td class="num">11.27 GB</td><td class="num">0.97 GB</td><td class="num"><b>60.9 GB</b></td></tr>
+            <tr><td><b>일반 PostgreSQL</b></td><td class="num">30,895,200</td><td>—</td><td class="num">11.27 GB</td><td>압축 없음</td><td class="num"><b>349.4 GB</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--info">
+        <p class="note__t">인덱스는 뺀 값입니다</p>
+        압축비는 인덱스 없는 사본에서 쟀으므로 위 표는 heap 기준입니다. 실제 운영 표는 보조 인덱스를 더 답니다 —
+        관측 시점의 <span class="mono">tsdb.lidar_status</span> 는 heap 94MB 에 인덱스 62MB 였습니다.
+        컬럼스토어 청크는 그 인덱스를 같은 형태로 유지하지 않으므로 <b>실제 절감은 위 표보다 큽니다</b>
+        <span class="chip chip--warn">추정</span>.
+      </div>
+
+      <h3>5.3 압축 실측과 세그먼트 축</h3>
+      <p>운영 표를 건드리지 않고 <span class="mono">scratch</span> 스키마에 사본을 떠서 컬럼스토어로 전환해 측정했습니다.</p>
+      <figure class="cht">
+        <figcaption class="cht__t">채널·세그먼트 축별 컬럼스토어 압축비 (실측)</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="채널·세그먼트 축별 컬럼스토어 압축비 (실측)">
+          <rect x="76" y="230.4" width="780.0" height="15.6" fill="var(--hw-pale)" stroke="var(--hw-tint)" stroke-dasharray="4 3"/>
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">3</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">7</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">10</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">14</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">배</text>
+          <text x="154.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">status·tid</text>
+          <text x="310.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">actual·tid</text>
+          <text x="466.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">actual·stage</text>
+          <text x="622.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">artifact·tid</text>
+          <text x="778.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">artifact·type</text>
+          <rect x="130.6" y="49.8" width="43.8" height="196.2" fill="var(--hw)" rx="1.5"><title>status·tid · 압축 전 / 압축 후 12.6배</title></rect>
+          <text x="152.5" y="45.8" text-anchor="middle" font-size="12" fill="var(--ink2)">12.6</text>
+          <rect x="286.6" y="241.3" width="43.8" height="4.7" fill="var(--hw)" rx="1.5"><title>actual·tid · 압축 전 / 압축 후 0.3배</title></rect>
+          <text x="308.5" y="237.3" text-anchor="middle" font-size="12" fill="var(--ink2)">0.3</text>
+          <rect x="442.6" y="210.2" width="43.8" height="35.8" fill="var(--hw)" rx="1.5"><title>actual·stage · 압축 전 / 압축 후 2.3배</title></rect>
+          <text x="464.5" y="206.2" text-anchor="middle" font-size="12" fill="var(--ink2)">2.3</text>
+          <rect x="598.6" y="235.1" width="43.8" height="10.9" fill="var(--hw)" rx="1.5"><title>artifact·tid · 압축 전 / 압축 후 0.7배</title></rect>
+          <text x="620.5" y="231.1" text-anchor="middle" font-size="12" fill="var(--ink2)">0.7</text>
+          <rect x="754.6" y="193.1" width="43.8" height="52.9" fill="var(--hw)" rx="1.5"><title>artifact·type · 압축 전 / 압축 후 3.4배</title></rect>
+          <text x="776.5" y="189.1" text-anchor="middle" font-size="12" fill="var(--ink2)">3.4</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="732.4" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="760.4" y="11" font-size="12.5" fill="var(--ink2)">압축 전 / 압축 후</text>
+          <text x="82" y="218.4" font-size="12" fill="var(--hw-dk)" paint-order="stroke" stroke="var(--bg2)" stroke-width="3.5" stroke-linejoin="round">1배 아래는 역효과</text>
+        </svg>
+        <p class="cht__c">status 는 장비 축으로 묶어 12.6배 줄었지만, actual·artifact 를 같은 장비 축으로 묶으면 오히려 커진다. 세그먼트당 행이 1.6개·6.5개뿐이라 압축 헤더가 데이터보다 크기 때문이다. 축을 stage·artifact_type 으로 바꾸면 2.3배·3.4배로 돌아선다.</p>
+      </figure>
+
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:18%">대상</th><th style="width:12%">행 수</th><th style="width:14%">세그먼트 수</th><th style="width:16%">세그먼트당 행</th><th style="width:14%">압축 전</th><th style="width:14%">압축 후</th><th>비</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">status · tid</td><td class="num">321,061</td><td class="num">350</td><td class="num">917</td><td class="num">111 MB</td><td class="num">8,984 kB</td><td class="num"><b>12.6배</b><sup class="ref" data-ref="8">8</sup></td></tr>
+            <tr><td class="mono">artifact · tid</td><td class="num">2,739</td><td class="num">420</td><td class="num">6.5</td><td class="num">1,352 kB</td><td class="num">1,832 kB</td><td class="num">0.7배</td></tr>
+            <tr><td class="mono">artifact · artifact_type</td><td class="num">2,739</td><td class="num">3</td><td class="num">913</td><td class="num">1,424 kB</td><td class="num">424 kB</td><td class="num">3.4배</td></tr>
+            <tr><td class="mono">actual · tid</td><td class="num">475</td><td class="num">299</td><td class="num">1.6</td><td class="num">320 kB</td><td class="num">1,112 kB</td><td class="num">0.3배</td></tr>
+            <tr><td class="mono">actual · stage</td><td class="num">475</td><td class="num">6</td><td class="num">79</td><td class="num">336 kB</td><td class="num">144 kB</td><td class="num">2.3배</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">이 표본은 15분치입니다</p>
+        31일 규모에서는 <span class="mono">tid</span> 축도 세그먼트당 행이 크게 늘어 결과가 달라집니다.
+        <b>1일치를 쌓은 뒤 같은 측정을 다시 하고 축을 확정하십시오.</b> 지금 수치로 축을 바꾸면 시기상조입니다.
+      </div>
+
+      <h3>5.4 도착 패턴 — 1초 연속과 10분 버스트를 같은 소비자가 받는다</h3>
+      <p class="why">주기가 확정되면서 이 스택은 <b>성격이 정반대인 두 흐름</b>을 한 소비자로 받게 됐습니다.
+        status 는 초당 350행이 끊이지 않고, 실적 · 산출물은 10분에 한 번 4,550행이 몰려 옵니다.
+        평균만 보면 후자가 전자의 2%지만, <b>순간값으로 보면 13초치가 한 번에 들어오는 것</b>입니다.</p>
+      <figure class="cht">
+        <figcaption class="cht__t">시나리오별 순간 적재 요구와 현 스택의 실측 처리량</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="시나리오별 순간 적재 요구와 현 스택의 실측 처리량">
+          <rect x="76" y="47.6" width="780.0" height="198.4" fill="var(--hw-pale)" stroke="var(--hw-tint)" stroke-dasharray="4 3"/>
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">2,500</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">5,000</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">7,500</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">10,000</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">행/초</text>
+          <text x="173.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">발행기 기본값 1초·1분</text>
+          <text x="368.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">운영 전제 평균 1초·10분</text>
+          <text x="563.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">status 피크 4배 가정</text>
+          <text x="758.5" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">10분 채널 동시 발행</text>
+          <rect x="144.2" y="236.7" width="55.5" height="9.3" fill="var(--hw)" rx="1.5"><title>발행기 기본값 1초·1분 · 순간 적재 요구 426행/초</title></rect>
+          <text x="172.0" y="232.7" text-anchor="middle" font-size="12" fill="var(--ink2)">426</text>
+          <rect x="339.2" y="238.2" width="55.5" height="7.8" fill="var(--hw)" rx="1.5"><title>운영 전제 평균 1초·10분 · 순간 적재 요구 358행/초</title></rect>
+          <text x="367.0" y="234.2" text-anchor="middle" font-size="12" fill="var(--ink2)">358</text>
+          <rect x="534.2" y="215.5" width="55.5" height="30.5" fill="var(--hw)" rx="1.5"><title>status 피크 4배 가정 · 순간 적재 요구 1,400행/초</title></rect>
+          <text x="562.0" y="211.5" text-anchor="middle" font-size="12" fill="var(--ink2)">1,400</text>
+          <rect x="729.2" y="146.8" width="55.5" height="99.2" fill="var(--hw)" rx="1.5"><title>10분 채널 동시 발행 · 순간 적재 요구 4,550행/초</title></rect>
+          <text x="757.0" y="142.8" text-anchor="middle" font-size="12" fill="var(--ink2)">4,550</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="755.2" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="783.2" y="11" font-size="12.5" fill="var(--ink2)">순간 적재 요구</text>
+          <text x="82" y="35.6" font-size="12" fill="var(--hw-dk)" paint-order="stroke" stroke="var(--bg2)" stroke-width="3.5" stroke-linejoin="round">여유 구간 9101/s</text>
+        </svg>
+        <p class="cht__c">주기를 10분으로 늘리면 평균 적재율은 426에서 358행/초로 오히려 16% 줄어든다. 문제는 평균이 아니라 10분에 한 번 4,550행이 한꺼번에 도착하는 경우이고, 그마저 실측 처리량 9,101행/초의 절반이다.</p>
+      </figure>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:22%">시나리오</th><th style="width:16%">순간 적재 요구</th><th style="width:16%">실측 처리량 대비</th><th style="width:18%">배치 쓰기 시간</th><th>판정</th></tr></thead>
+          <tbody>
+            <tr><td>발행기 기본값 (1초 · 1분)</td><td class="num">426 행/초</td><td class="num">4.7%</td><td class="num">17.8 ms <span class="chip">실측</span></td><td><span class="chip chip--ok">여유</span></td></tr>
+            <tr><td>운영 전제 평균 (1초 · 10분)</td><td class="num">358 행/초</td><td class="num">3.9%</td><td class="num">~15 ms <span class="chip chip--warn">추정</span></td><td><span class="chip chip--ok">여유</span></td></tr>
+            <tr><td>status 피크 4배 가정</td><td class="num">1,400 행/초</td><td class="num">15.4%</td><td class="num">~70 ms <span class="chip chip--warn">추정</span></td><td><span class="chip chip--ok">여유</span></td></tr>
+            <tr><td>10분 채널 동시 발행</td><td class="num">4,550 행/초</td><td class="num">50.0%</td><td class="num">~500 ms <span class="chip chip--warn">추정</span></td><td><span class="chip chip--warn">주의</span> 그 0.5초 동안 status 가 밀린다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--info">
+        <p class="note__t">실측 처리량 9,101행/초의 근거</p>
+        5.1 의 배치 쓰기 평균 <span class="mono">17.8 ms</span> 에 배치당 평균 <span class="mono">162행</span> 을 나눈 값입니다.
+        같은 트랜잭션 안에서 채널별 INSERT · 상태 표 UPSERT · 레코드 대장 INSERT 가 전부 끝난 뒤의 수치이므로
+        <b>순수 INSERT 속도가 아니라 이 파이프라인의 실효 처리량</b>입니다. 배치가 커지면 행당 비용이 내려가므로
+        4,550행을 한 배치로 받으면 이보다 빨라집니다 <span class="chip chip--warn">추정</span>.
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">도착 형태</th><th style="width:26%">언제 이렇게 되는가</th><th>적재 쪽에서 보이는 모습</th></tr></thead>
+          <tbody>
+            <tr><td><b>시차 발행</b> <span class="chip chip--ok">현 발행기</span></td><td>장비마다 시작을 밀어 둔다 — <span class="mono">offset = interval × index / 350</span></td><td>10분 창에 고르게 퍼져 초당 7.6행. 버스트가 아예 없다</td></tr>
+            <tr><td><b>동시 발행</b> <span class="chip chip--warn">현장 가능성</span></td><td>실적 판별 서비스가 10분마다 배치로 돌면 350대분이 같은 순간에 나온다</td><td>10분에 한 번 4,550행. <span class="mono">--burst</span> 로 재현할 수 있다</td></tr>
+            <tr><td><b>스냅샷 겹침</b> <span class="chip chip--risk">현 설정</span></td><td>3.2.2 의 60초 스냅샷이 그 위에 겹친다</td><td>60초마다 4,550항목이 추가로 온다 — 그중 90%가 중복이라 멱등 인덱스 조회만 늘린다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">이 표에서 아직 측정하지 않은 칸이 셋입니다</p>
+        <b>동시 발행</b>은 현 발행기가 시차를 두므로 한 번도 관측되지 않았고, <b>status 피크 4배</b>는 가정이며,
+        <b>스냅샷 겹침</b>은 실적 · 산출물이 1분 주기일 때 재어 판정하지 못했습니다(3.2.1 각주).
+        셋 다 <span class="mono">--burst</span> 옵션과 <span class="mono">--interval 600000</span> 으로 재현할 수 있습니다 — 8.6 의 <b>Q2 · Q3</b> 입니다.
+      </div>
+    </section>
+
+    <!-- ---------- 6. CDC ---------- -->
+    <section class="sec" id="s6">
+      <h2><span class="n">06</span>CDC 연계 — 받는 쪽과 보내는 쪽</h2>
+      <p class="why">"target 이 TimescaleDB 인지 아닌지"가 질문이었지만, 실제로 갈리는 것은 source 쪽입니다.</p>
+
+      <h3>6.1 target 이 TimescaleDB 인 것은 차이가 없다</h3>
+      <p>같은 원천 · 같은 publication 을 두 스택이 읽습니다. 슬롯과 커넥터 정체성만 갈라 두었습니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">항목</th><th style="width:30%">embedded-cdc (target PG 16)</th><th>embedded-cdc-tsdb (target TSDB 2.29/PG 17)</th></tr></thead>
+          <tbody>
+            <tr><td>수신 표 구성</td><td>일반 표</td><td>일반 표 — 한 줄씩 같다<sup class="ref" data-ref="10">10</sup></td></tr>
+            <tr><td>하이퍼테이블</td><td>해당 없음</td><td><b>만들지 않는다</b> — 받는 것이 전부 일반 표이므로</td></tr>
+            <tr><td>핸들러 · 매퍼</td><td>동일</td><td>동일</td></tr>
+            <tr><td>publication</td><td class="mono">embedded_cdc_pub</td><td class="mono">embedded_cdc_pub</td></tr>
+            <tr><td>슬롯</td><td class="mono">embedded_cdc_slot</td><td class="mono">embedded_cdc_tsdb_slot</td></tr>
+            <tr><td>포트</td><td class="mono">56433 / Grafana 56300</td><td class="mono">60433 / Grafana 60300</td></tr>
+            <tr><td>실제 차이</td><td>없음</td><td>확장이 켜져 있어 <b>수신 측에서</b> 청크 · 압축을 붙여 보는 실험을 바로 할 수 있다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <p class="note__t">한 문장으로</p>
+        수신 측 엔진을 TimescaleDB 로 바꾸는 것은 이미지 교체 수준입니다. 파이프라인 코드는 한 줄도 다르지 않습니다.
+      </div>
+
+      <h3>6.2 source 가 TimescaleDB 면 8곳이 깨진다</h3>
+      <p>아래 여덟 건은 별도 영향 분석에서 나온 목록입니다<sup class="ref" data-ref="9">9</sup>. 지금 원천이 바로 그 TimescaleDB 입니다. 그래서 <b>하이퍼테이블을 캡처 대상에서 빼는 것</b>이 설계 전제입니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:10%">번호</th><th style="width:34%">깨지는 지점</th><th style="width:14%">등급</th><th>이 스택에서의 대응</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">B1</td><td>논리 디코딩이 부모가 아니라 <span class="mono">_hyper_1_1_chunk</span> 이름으로 나온다</td><td><span class="chip chip--risk">치명</span></td><td>하이퍼테이블을 publication 에 넣지 않아 회피</td></tr>
+            <tr><td class="mono">B2</td><td>컬럼스토어 전환이 청크 한 개 분량의 DELETE 로 보인다</td><td><span class="chip chip--risk">치명</span></td><td>같음 — 캡처 대상이 아니므로 발생하지 않음</td></tr>
+            <tr><td class="mono">B3</td><td><span class="mono">drop_chunks</span> 는 DDL 이라 CDC 에 아예 보이지 않는다</td><td><span class="chip chip--risk">치명</span></td><td>같음</td></tr>
+            <tr><td class="mono">B4</td><td>연속 집계 갱신이 또 하나의 쓰기 소스가 된다</td><td><span class="chip chip--warn">주의</span></td><td>같음</td></tr>
+            <tr><td class="mono">B5</td><td>유니크 제약이 파티션 컬럼을 포함해야 해 PK 전제가 깨진다</td><td><span class="chip chip--warn">주의</span></td><td>상태 표 셋은 일반 표라 단순 PK 유지</td></tr>
+            <tr><td class="mono">B6</td><td>초기 스냅샷이 수억 행을 훑어 현실적으로 불가능하다</td><td><span class="chip chip--warn">주의</span></td><td>상태 표 셋은 350 · 349 · 349 행이라 스냅샷이 순식간</td></tr>
+            <tr><td class="mono">B7</td><td>처리량 미달 — 실측 2,467 events/s 대 피크 요구</td><td><span class="chip chip--warn">주의</span></td><td>상태 표는 배치마다 UPSERT 라 변경량이 행 수에 유계</td></tr>
+            <tr><td class="mono">B8</td><td>하이퍼테이블 전환 작업 자체가 DELETE + INSERT 를 만든다</td><td><span class="chip chip--warn">주의</span></td><td>전환하지 않음 — 처음부터 하이퍼테이블로 만든다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--info">
+        <p class="note__t">모니터링도 같이 갈라야 합니다</p>
+        원천이 lidar DB 가 되면서 "원천 커밋 속도"를 DB 전체로 재면 하이퍼테이블 적재가 섞여 CDC 가 늘 뒤처지는 것처럼 보입니다.
+        publication 에 든 표의 변경만 세는 지표를 따로 두고, DB 전체 값은 참고선으로만 겹칩니다.
+        REPLICA IDENTITY · TOAST 지표도 publication 에 든 표만 봅니다 — 그러지 않으면 캡처하지 않는 하이퍼테이블 뿌리가 "설정이 빠진 표"로 잡힙니다.
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">replication slot 은 만료되지 않습니다</p>
+        수신 서비스가 오래 죽어 있으면 슬롯이 붙잡은 WAL 이 계속 쌓여 <b>원천 DB 디스크가 고갈됩니다.</b>
+        CDC 를 쓰지 않는 구간에는 슬롯을 지우십시오 — <span class="mono">SELECT pg_drop_replication_slot('embedded_cdc_slot');</span>
+      </div>
+    </section>
+
+    <!-- ---------- 7. 결함과 경계 ---------- -->
+    <section class="sec" id="s7">
+      <h2><span class="n">07</span>발견된 결함과 경계 조건</h2>
+      <p class="why">이번 관측에서 실제로 깨진 것이 한 건 있습니다. 적재는 멈추지 않았고 경보는 이미 울리고 있었습니다.</p>
+
+      <h3>7.1 DEF-01 · 태그 등록부 사본이 낡아 장비 축이 어긋났다<sup class="ref" data-ref="7">7</sup></h3>
+      <figure class="cht">
+        <figcaption class="cht__t">채널별 장비 축(tid) 해석 정확도 — 15분 관측</figcaption>
+        <svg viewBox="0 0 880 316" role="img" aria-label="채널별 장비 축(tid) 해석 정확도 — 15분 관측">
+          <line x1="76" y1="246.0" x2="856" y2="246.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="250.0" text-anchor="end" font-size="12" fill="var(--ink4)">0</text>
+          <line x1="76" y1="191.5" x2="856" y2="191.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="195.5" text-anchor="end" font-size="12" fill="var(--ink4)">25</text>
+          <line x1="76" y1="137.0" x2="856" y2="137.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="141.0" text-anchor="end" font-size="12" fill="var(--ink4)">50</text>
+          <line x1="76" y1="82.5" x2="856" y2="82.5" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="86.5" text-anchor="end" font-size="12" fill="var(--ink4)">75</text>
+          <line x1="76" y1="28.0" x2="856" y2="28.0" stroke="var(--line)" stroke-width="1"/>
+          <text x="68" y="32.0" text-anchor="end" font-size="12" fill="var(--ink4)">100</text>
+          <text x="14" y="18" font-size="12" fill="var(--ink3)">%</text>
+          <text x="206.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">status</text>
+          <text x="466.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">actual</text>
+          <text x="726.0" y="270" text-anchor="middle" font-size="12" fill="var(--ink3)">artifact</text>
+          <rect x="167.0" y="28.0" width="75.0" height="218.0" fill="var(--hw)" rx="1.5"><title>status · 올바른 장비로 해석된 비율 100%</title></rect>
+          <text x="204.5" y="24.0" text-anchor="middle" font-size="12" fill="var(--ink2)">100</text>
+          <rect x="427.0" y="246.0" width="75.0" height="0.0" fill="var(--hw)" rx="1.5"><title>actual · 올바른 장비로 해석된 비율 0%</title></rect>
+          <text x="464.5" y="242.0" text-anchor="middle" font-size="12" fill="var(--ink2)">0</text>
+          <rect x="687.0" y="232.0" width="75.0" height="14.0" fill="var(--hw)" rx="1.5"><title>artifact · 올바른 장비로 해석된 비율 6.4%</title></rect>
+          <text x="724.5" y="228.0" text-anchor="middle" font-size="12" fill="var(--ink2)">6.4</text>
+          <line x1="76" y1="246" x2="856" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <line x1="76" y1="28" x2="76" y2="246" stroke="var(--line2)" stroke-width="1.5"/>
+          <rect x="709.6" y="6" width="22" height="4" rx="2" fill="var(--hw)"/>
+          <text x="737.6" y="11" font-size="12.5" fill="var(--ink2)">올바른 장비로 해석된 비율</text>
+        </svg>
+        <p class="cht__c">status 401,154건은 전부 맞았고 actual 601건은 한 건도 맞지 않았다. 태그 등록부 사본이 지금의 등록부보다 오래돼 채널별 번호 구간이 어긋난 탓이며, 페이로드 자체는 멀쩡하다.</p>
+      </figure>
+
+      <div class="g2">
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>채널</th><th>지금 등록부</th><th>적재된 사본</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">status</td><td class="mono">350개 · 1~350</td><td class="mono">350개 · 1~350</td></tr>
+              <tr><td class="mono">actual</td><td class="mono">980개 · 351~1330</td><td class="mono">910개 · 1401~2310</td></tr>
+              <tr><td class="mono">artifact</td><td class="mono">1,050개 · 1331~2380</td><td class="mono">1,050개 · 351~1400</td></tr>
+              <tr><td><b>합계</b></td><td class="num"><b>2,380</b></td><td class="num"><b>2,310</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>채널</th><th>정상</th><th>오해석</th><th>미해석</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">status</td><td class="num">401,154</td><td class="num">0</td><td class="num">0</td></tr>
+              <tr><td class="mono">actual</td><td class="num">0</td><td class="num">601</td><td class="num">0</td></tr>
+              <tr><td class="mono">artifact</td><td class="num">211</td><td class="num">2,890</td><td class="num">208</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">왜 미해석이 아니라 오해석이 되었나</p>
+        소비자는 <span class="mono">(send_topic, param_id)</span> 로 먼저 찾고, 빗나가면 <b>숫자만으로 한 번 더</b> 찾습니다.
+        토픽 이름이 바뀐 경우를 위한 뒷문인데, 사본 안에서 모든 번호가 유일하다 보니 이 뒷문이 항상 적중해
+        <b>다른 채널의 태그를 물어 왔습니다.</b> 그 결과 미해석(<span class="mono">#숫자</span>)으로 눈에 띄는 대신 틀린 장비 id 가 조용히 들어갔습니다.
+        <span class="mono">lidar_ingest_tag_channel_mismatch_total</span> 은 3,491 로 정확히 세고 있었고 경보도 정의되어 있습니다.
+      </div>
+      <div class="g2">
+        <div class="card card--accent">
+          <p class="card__t">영향 범위</p>
+          <ul style="margin:6px 0 0">
+            <li>틀린 것은 <span class="mono">tid</span> · <span class="mono">tag_id</span> · <span class="mono">mqtt_topic</span> 세 컬럼뿐입니다</li>
+            <li>페이로드의 <span class="mono">hull_no</span> · <span class="mono">block_id</span> · <span class="mono">zone</span> 은 멀쩡하므로 블록 축 집계와 상태 표 둘은 영향이 없습니다</li>
+            <li>유실은 없습니다. 적재도 멈추지 않았습니다</li>
+          </ul>
+        </div>
+        <div class="card">
+          <p class="card__t">조치</p>
+          <ul style="margin:6px 0 0">
+            <li><span class="mono">python scripts/export-tag-catalog.py</span> 로 사본을 다시 뽑습니다</li>
+            <li><span class="mono">scripts/down.sh -v &amp;&amp; scripts/up.sh</span> — init SQL 은 볼륨이 새로 만들어질 때만 돕니다</li>
+            <li>코드 변경 제안 — 채널이 어긋나면 숫자 단독 뒷문을 <b>쓰지 않고</b> <span class="mono">#숫자</span> 로 남깁니다.
+              미해석은 대시보드에서 바로 보이지만 틀린 <span class="mono">tid</span> 는 보이지 않습니다</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>7.2 경계 조건</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">상황</th><th style="width:36%">그대로 두면 생기는 일</th><th>대응</th></tr></thead>
+          <tbody>
+            <tr><td>Aspire 세션 재기동</td><td>Kafka 컨테이너 이름이 바뀌어 소비자가 브로커를 못 찾는다. 소비가 조용히 0 이 된다</td><td><span class="mono">scripts/up</span> 재실행. <span class="mono">LidarIngestStalled</span> 경보가 3분 뒤 뜬다</td></tr>
+            <tr><td>같은 멱등 키 · 다른 occurred_at</td><td>유니크 인덱스가 파티션 컬럼을 포함하므로 걸러지지 않고 두 행이 된다</td><td>발신 측 키 생성 규칙을 고정한다. 지금은 초 단위라 같은 초에 두 번 발행하면 하나만 남는다</td></tr>
+            <tr><td>늦게 도착한 재전달</td><td>오래된 이벤트가 상태 표의 최신 값을 덮는다</td><td>상태 표 UPSERT 에 <span class="mono">last_event_at</span> 비교를 건다. 누계 컬럼은 순서 무관이라 조건 없이 더한다</td></tr>
+            <tr><td>한 배치에 같은 블록이 여러 번</td><td><span class="mono">ON CONFLICT</span> 가 "cannot affect row a second time" 으로 배치를 통째로 죽인다</td><td>배치 안에서 블록 축으로 먼저 합친 뒤 SQL 로 한 번만 보낸다</td></tr>
+            <tr><td>압축된 청크에 늦은 항목이 꽂힘</td><td>세그먼트를 풀었다 담는 비용이 든다</td><td>자동 압축 정책을 걷어내고 3일로 다시 걸어 둔다</td></tr>
+            <tr><td>보존 31일 경과 후 산출물 행 삭제</td><td>DB 행은 사라지지만 <span class="mono">storage_uri</span> 가 가리키는 파일은 남는다</td><td>파일 정리 잡이 생기기 전까지 이 표만 보존 기간을 따로 본다</td></tr>
+            <tr><td>연속 집계 갱신 실패</td><td>대시보드의 1분 집계가 조용히 멈춘다. 원본은 계속 쌓인다</td><td><span class="mono">TimescaleJobFailed</span> 경보. 잡 실행 표를 대시보드에 둔다</td></tr>
+            <tr><td>시간대</td><td>모든 시각이 <span class="mono">TIMESTAMPTZ</span> 이고 페이로드는 <span class="mono">+09:00</span> 오프셋을 포함한다</td><td>파싱을 PostgreSQL 에 맡기고 파이썬에서 날짜를 다루지 않는다</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>7.3 착수 전 체크리스트</h3>
+      <ul class="chk">
+        <li><input type="checkbox" id="c1"><span><span class="t">태그 사본 재추출 주기를 정한다</span><span class="d">지금은 수동 · 기동 시 1회. 등록부가 바뀌는 빈도와 자동화 여부를 합의한다 (DEF-01)</span></span></li>
+        <li><input type="checkbox" id="c2"><span><span class="t">숫자 단독 뒷문을 없앨지 결정한다</span><span class="d">없애면 미해석이 늘지만 조용히 틀리지 않는다. 대시보드에 미해석 패널이 이미 있다</span></span></li>
+        <li><input type="checkbox" id="c3"><span><span class="t">운영 발행 주기를 확정한다</span><span class="d">상태 1초인가 10분인가에 따라 용량이 10배 이상 갈린다. 지금 문서는 1초 전제다</span></span></li>
+        <li><input type="checkbox" id="c4"><span><span class="t">1일치 적재 후 압축 축을 재측정한다</span><span class="d">actual · artifact 의 segmentby 를 tid 로 둘지 stage · artifact_type 으로 바꿀지</span></span></li>
+        <li><input type="checkbox" id="c5"><span><span class="t">페이로드 규격 벤더 합의 일정을 확인한다</span><span class="d">확정되면 01-schema.sql 의 컬럼과 ingest.py 의 채널별 빌더를 함께 고친다</span></span></li>
+        <li><input type="checkbox" id="c6"><span><span class="t">PCD 파일 수명 관리 주체를 정한다</span><span class="d">DB 보존 31일과 파일 보존이 따로 논다. 지금은 파일 정리 잡이 없다</span></span></li>
+        <li><input type="checkbox" id="c7"><span><span class="t">replication slot 운영 절차를 문서화한다</span><span class="d">CDC 미사용 구간에 슬롯을 지우지 않으면 원천 디스크가 고갈된다</span></span></li>
+        <li><input type="checkbox" id="c8"><span><span class="t">페이로드에 개인정보가 없는지 확인한다</span><span class="d">현재 필드는 전부 설비 · 공정 값이다. 작업자 id 가 추가되면 마스킹 범위를 정한다</span></span></li>
+      </ul>
+    </section>
+
+    <!-- ---------- 8. 테스트와 모니터링 ---------- -->
+    <section class="sec" id="s8">
+      <h2><span class="n">08</span>테스트 · 모니터링 · PoC</h2>
+      <p class="why">01절의 시나리오 ID 가 여기서 실제 확인 수단과 짝지어집니다.</p>
+
+      <h3>8.1 레벨별 범위</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:12%">레벨</th><th style="width:22%">대상</th><th style="width:18%">도구</th><th style="width:16%">실행 시점</th><th>통과 기준</th></tr></thead>
+          <tbody>
+            <tr><td>단위</td><td>채널별 행 빌더 · 멱등 키 생성 · 배치 합치기</td><td>pytest</td><td>커밋마다</td><td>세 채널 빌더의 필수 필드 누락이 전부 Reject 로 떨어진다</td></tr>
+            <tr><td>통합</td><td>Kafka → 소비자 → TimescaleDB</td><td>컨테이너 스택 + <span class="mono">scripts/verify</span></td><td>기동 후</td><td>SC-01 · SC-02 · SC-04 통과. 오프셋 · 행 수 · 채널 분포 일치</td></tr>
+            <tr><td>계약</td><td>페이로드 필드와 컬럼의 대응</td><td>발행기 <span class="mono">--dry-run</span> 출력 대조</td><td>규격 변경 시</td><td>03절 표의 모든 필드가 컬럼에 앉는다. 격리 0건</td></tr>
+            <tr><td>부하</td><td>발행 426 msg/s 지속</td><td>발행기 기본값</td><td>구조 변경 시</td><td>SC-03 — p99 5초 미만, Kafka 지연 200레코드 미만</td></tr>
+            <tr><td>장애주입</td><td>DB 정지 · Kafka 컨테이너 교체 · 소비자 재시작</td><td>수동</td><td>릴리스 전</td><td>SC-05 — 유실 0건. 중복은 멱등 인덱스가 흡수</td></tr>
+            <tr><td>CDC</td><td>캡처 신뢰성 V1~V6</td><td><span class="mono">embedded-cdc-tsdb/scripts/verify</span></td><td>원천 스키마 변경 시</td><td>V1~V6 전부 통과. 운영 표와 슬롯은 건드리지 않는다</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>8.2 반드시 넣어야 하는 확인</h3>
+      <ul class="chk">
+        <li><input type="checkbox" id="t1"><span><span class="t">SC-01 · 레코드 항목 수와 표 행 수가 같다</span><span class="d">item_count 합 = 세 표의 행 수 합 + 중복 + 격리</span></span></li>
+        <li><input type="checkbox" id="t2"><span><span class="t">SC-02 · 같은 배치를 두 번 넣어도 행 수가 안 는다</span><span class="d">오프셋을 되돌리고 재소비시켜 확인</span></span></li>
+        <li><input type="checkbox" id="t3"><span><span class="t">SC-04 · 깨진 항목 하나가 나머지를 막지 않는다</span><span class="d">value 를 JSON 이 아닌 값으로 바꾼 레코드를 주입</span></span></li>
+        <li><input type="checkbox" id="t4"><span><span class="t">SC-06 · 카탈로그를 비워도 적재가 계속된다</span><span class="d">tid 가 전부 #숫자 로 남고 경보가 뜬다</span></span></li>
+        <li><input type="checkbox" id="t5"><span><span class="t">DEF-01 회귀 · 채널이 어긋난 번호가 오해석되지 않는다</span><span class="d">사본에 일부러 어긋난 구간을 넣고 tid 가 #숫자 로 남는지 본다</span></span></li>
+        <li><input type="checkbox" id="t6"><span><span class="t">상태 표가 오래된 이벤트로 덮이지 않는다</span><span class="d">last_event_at 이 더 이른 항목을 나중에 주입</span></span></li>
+      </ul>
+
+      <h3>8.3 대사 쿼리 예시</h3>
+      <div class="code">
+        <div class="code__bar"><span>reconcile — 레코드 대장과 표를 맞춘다</span><button class="code__copy" type="button">복사</button></div>
+<pre><span class="cm">-- 레코드에 실려 온 항목 수와 실제 적재된 행 수가 맞는가.</span>
+<span class="cm">-- 차이는 중복 스킵(정상) 또는 격리(이상) 둘 중 하나여야 한다.</span>
+SELECT
+  (SELECT sum(status_count)   FROM rdb.lidar_status_message) AS msg_status,
+  (SELECT count(*)            FROM tsdb.lidar_status)        AS row_status,
+  (SELECT sum(actual_count)   FROM rdb.lidar_status_message) AS msg_actual,
+  (SELECT count(*)            FROM tsdb.lidar_scan_actual)   AS row_actual,
+  (SELECT sum(artifact_count) FROM rdb.lidar_status_message) AS msg_artifact,
+  (SELECT count(*)            FROM tsdb.lidar_scan_artifact) AS row_artifact,
+  (SELECT sum(reject_count)   FROM rdb.lidar_status_message) AS rejected;
+
+<span class="cm">-- 장비 축이 제대로 풀렸는가. 세 값이 모두 0 이어야 한다.</span>
+SELECT count(*) FILTER (WHERE tag_id IS NULL)      AS 태그_미해석,
+       count(*) FILTER (WHERE tid LIKE '#%')       AS 장비_미해석,
+       <span class="hl">count(*) FILTER (WHERE mqtt_topic NOT LIKE '%actual') AS 채널_오해석</span>
+FROM tsdb.lidar_scan_actual;</pre>
+      </div>
+
+      <h3>8.4 테스트가 새는 지점</h3>
+      <div class="note note--warn">
+        <p class="note__t">시간 · 난수 · 공유 상태</p>
+        <b>시간</b> — <span class="mono">received_at</span> 의 기본값이 <span class="mono">now()</span> 라 지연 계산 테스트가 실행 시각에 의존합니다.
+        지연을 검증할 때는 <span class="mono">received_at</span> 을 명시적으로 넣으십시오.
+        <b>난수</b> — <span class="mono">scan_id</span> 가 이벤트마다 새 uuid 라 고정 기대값을 쓸 수 없습니다. 멱등 키로 비교하십시오.
+        <b>공유 상태</b> — 검증 테스트가 원천에 <span class="mono">verify_*</span> 표와 슬롯을 만듭니다.
+        두 CDC 스택이 그 이름을 공유하므로 <b>두 스택의 verify 를 동시에 돌리지 마십시오.</b>
+      </div>
+
+      <h3>8.5 모니터링 — 대시보드 둘</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:30%">대시보드</th><th style="width:20%">데이터소스</th><th>무엇을 본다</th></tr></thead>
+          <tbody>
+            <tr><td>OT LiDAR 적재 (Kafka → TimescaleDB)</td><td>Prometheus + TSDB 직결</td><td>적재 행/초 · Kafka 지연 · end-to-end 지연 · 배치 시간 · 중복/격리 · 채널별 항목/초 · 상태별 장비 수 · 장비별 온도 · 스캔속도 · 정합 신뢰도 · 태그 해석 상태</td></tr>
+            <tr><td>TimescaleDB 상태 (lidar)</td><td>Prometheus</td><td>DB · 하이퍼테이블 크기 · 청크 · 압축률 · TPS · 캐시 적중률 · WAL · 락 · dead tuple · 체크포인트 · 정책 잡 실행 표 · 스키마별 캡처/비캡처 표 수</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--info">
+        <p class="note__t">데이터소스를 둘로 나눈 이유</p>
+        장비 350대 × 필드를 Prometheus 레이블로 올리면 시계열이 터집니다.
+        Prometheus 는 집계(상태별 대수 등)만 들고, 장비 단위 추이는 TimescaleDB 직결로 연속 집계를 SQL 로 읽습니다.
+        exporter 는 5초 스크랩이라 하이퍼테이블 전체를 훑는 쿼리를 두지 않습니다.
+      </div>
+
+      <h3>8.6 10분 주기에서 깨지는 패널과 경보</h3>
+      <p class="why">대시보드와 경보는 전부 <b>1초 주기 흐름을 전제로</b> 창 길이와 임계를 잡아 두었습니다.
+        실적 · 산출물이 10분 주기가 되면 <b>관측 창보다 발행 주기가 길어져</b> 그래프가 거짓말을 시작합니다.
+        아래는 지금 설정을 그대로 둘 때 무엇이 어떻게 보이는지와, 무엇으로 바꿔야 하는지입니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:20%">패널 · 경보</th><th style="width:25%">현재 식</th><th style="width:27%">10분 주기에서 보이는 모습</th><th>고칠 값</th></tr></thead>
+          <tbody>
+            <tr><td>채널별 수신 항목/초</td><td class="mono">rate(lidar_ingest_items_total[1m])</td><td><span class="chip chip--risk">깨짐</span> actual · artifact 가 열 칸 중 아홉 칸에서 빈칸. 10분에 한 번 뾰족한 스파이크만 선다</td><td class="mono">rate(...[15m])</td></tr>
+            <tr><td>적재 행/초</td><td class="mono">rate(lidar_ingest_rows_inserted_total[1m])</td><td><span class="chip chip--risk">깨짐</span> 같은 이유. 채널 레이블로 쪼개 보면 더 심하다</td><td class="mono">rate(...[15m])</td></tr>
+            <tr><td>배치당 행 수 · 배치 시간</td><td class="mono">rate(batch_rows_sum[1m]) / rate(batch_rows_count[1m])</td><td><span class="chip chip--warn">주의</span> 버스트가 온 1분만 평균이 튀고 나머지는 status 평균으로 눌린다</td><td>평균 대신 <span class="mono">max_over_time</span> 패널을 함께 둔다</td></tr>
+            <tr><td class="mono">LidarIngestStalled</td><td class="mono">sum(rate(messages_total[3m])) == 0 · for 3m</td><td><span class="chip chip--risk">못 잡음</span> status 하나만 살아 있어도 합이 0이 아니다 — <b>10분 채널만 죽으면 영원히 안 뜬다</b></td><td>채널별로 쪼갠다. <span class="mono">by (channel)</span> + 채널마다 다른 <span class="mono">for</span></td></tr>
+            <tr><td class="mono">LidarKafkaLagHigh</td><td class="mono">sum(kafka_lag) &gt; 200 · for 5m</td><td><span class="chip chip--risk">못 잡음</span> artifact 버스트는 4,200항목이지만 레코드로는 9개뿐이라 임계 근처에도 못 간다</td><td>레코드 수가 아니라 <b>지연 시간</b> 기준으로 바꾼다</td></tr>
+            <tr><td class="mono">LidarDataStale</td><td class="mono">fleet_freshness_seconds &gt; 120 · for 1m</td><td><span class="chip chip--warn">부분</span> status 채널만 본다. 실적 · 산출물이 끊겨도 이 경보는 조용하다</td><td>채널별 신선도 지표를 새로 낸다(8.7)</td></tr>
+            <tr><td class="mono">LidarIngestRejects</td><td class="mono">increase(rejects_total[10m]) &gt; 0</td><td><span class="chip chip--warn">경계</span> 관측 창 10분과 발행 주기 10분이 정확히 겹쳐 버스트가 창을 걸치면 두 번 세거나 놓친다</td><td class="mono">increase(...[15m])</td></tr>
+            <tr><td>중복 스킵</td><td class="mono">lidar_ingest_rows_duplicate_total</td><td><span class="chip chip--risk">급증</span> 3.2.2 의 스냅샷 중복이 그대로 여기 찍힌다 — 하루 590만 건</td><td>경보를 새로 건다. A안 적용 여부의 <b>판정 지표</b>가 된다</td></tr>
+            <tr><td>연속 집계 1분 버킷 <span class="mono">lidar_scan_1m</span></td><td class="mono">time_bucket(INTERVAL '1 minute', time)</td><td><span class="chip chip--risk">톱니</span> 10분에 한 번만 값이 있어 버킷 열 개 중 아홉이 빈다. 선 그래프가 끊긴다</td><td>10분 주기 두 채널은 <span class="mono">10 minutes</span> 버킷 집계를 따로 만든다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">관측 창은 발행 주기보다 길어야 합니다</p>
+        <span class="mono">rate()</span> 는 창 안에 <b>점이 최소 둘</b> 있어야 값을 냅니다. 10분 주기 채널에 1분 창을 걸면
+        점이 하나도 없는 창이 대부분이라 Prometheus 가 값을 내지 않고, 그래프는 <b>장애와 구분되지 않는 빈칸</b>이 됩니다.
+        경험칙은 <b>창 = 발행 주기 × 1.5 이상</b> 입니다 — 10분 주기면 15분입니다.
+        같은 이유로 <span class="mono">increase()</span> 창이 발행 주기와 <b>정확히 같은 값</b>인 것도 피해야 합니다.
+      </div>
+
+      <h3>8.7 새로 넣어야 하는 패널 여섯</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:20%">패널</th><th style="width:12%">형태</th><th style="width:30%">식</th><th>이 패널이 답하는 질문</th></tr></thead>
+          <tbody>
+            <tr><td>채널별 마지막 수신 경과</td><td>스탯 3개</td><td class="mono">time() - lidar_ingest_last_item_ts{channel=}</td><td>10분 주기 채널이 <b>살아 있는가</b>. status 60초 · 나머지 900초를 넘으면 빨강</td></tr>
+            <tr><td>10분 창 버스트 크기</td><td>시계열</td><td class="mono">max_over_time(rate(items_total[1m])[15m:])</td><td>현장이 <b>시차 발행인가 동시 발행인가</b>. 5.4 의 두 시나리오를 이 한 패널로 가른다</td></tr>
+            <tr><td>스냅샷 중복 비율</td><td>게이지</td><td class="mono">rate(rows_duplicate_total[15m]) / rate(items_total[15m])</td><td>3.2.2 의 90%가 실제로 나타나는가. A안 적용 뒤 0 으로 떨어져야 한다</td></tr>
+            <tr><td>배치당 행 수 최대</td><td>시계열</td><td class="mono">max_over_time(lidar_ingest_batch_rows_max[15m])</td><td>버스트가 배치를 얼마나 키우는가. 4,550 근처면 동시 발행이 확정된다</td></tr>
+            <tr><td>채널별 적재 지연 p95</td><td>시계열</td><td class="mono">histogram_quantile(0.95, ... end_to_end_seconds_bucket[15m])</td><td>버스트가 <b>status 의 지연을 밀어내는가</b>. 5.4 의 0.5초 추정을 여기서 검증한다</td></tr>
+            <tr><td>10분 버킷 집계 추이</td><td>시계열 · TSDB 직결</td><td class="mono">SELECT ... FROM tsdb.lidar_scan_10m</td><td>실적 · 산출물의 진짜 추이. 1분 버킷의 톱니를 대체한다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">지표 둘은 소비자에 없어 새로 내야 합니다</p>
+        <span class="mono">lidar_ingest_last_item_ts{channel}</span> 와 <span class="mono">lidar_ingest_batch_rows_max</span> 는
+        현재 <span class="mono">dev/ingest/ingest.py</span> 가 내지 않습니다. 둘 다 배치 처리 끝에서 한 줄씩이면 되고,
+        <b>이 둘이 없으면 위 여섯 패널 중 셋을 만들 수 없습니다.</b>
+      </div>
+      <p style="margin-top:10px">경보는 크게 셋입니다 — <b>적재</b>(소비 정지 · Kafka 지연 · end-to-end 지연 · 격리 발생 · DB 오류 · 태그 미해석 · 채널 어긋남),
+        <b>설비</b>(ERROR 장비 수 · 무응답 장비 · 데이터 신선도), <b>DB</b>(down · 정책 잡 실패 · 디스크 · 연결 수 · 캐시 적중률).
+        위 8.6 의 네 건(<span class="mono">LidarIngestStalled</span> · <span class="mono">LidarKafkaLagHigh</span> ·
+        <span class="mono">LidarDataStale</span> · <span class="mono">LidarIngestRejects</span>)은 <b>채널 축으로 다시 써야 합니다.</b></p>
+
+      <h3>8.8 PoC 에서 확정할 것 다섯</h3>
+      <p class="why">아래 다섯은 문서로 단정할 수 없고 <b>재현해서 답해야 하는</b> 것들입니다. 결과에 따라 3.2.2 의 안 선택과 ADR-04 가 바뀝니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:7%">ID</th><th style="width:25%">질문</th><th style="width:34%">방법</th><th>결과에 따른 변화</th></tr></thead>
+          <tbody>
+            <tr><td><b>Q1</b></td><td>채널별로 <span class="mono">snapshotIntervalMs</span> 를 다르게 줄 수 있는가</td><td><span class="mono">EES_CONNECTION.ConfigJson</span> 을 채널별 connection 으로 갈라 보고, 메시지 단위 덮어쓰기가 되는지 확인<sup class="ref" data-ref="12">12</sup></td><td>되면 3.2.2 <b>A안</b> 확정. 안 되면 B안으로 가되 Kafka 대역 열 배를 수용 근거와 함께 기록한다</td></tr>
+            <tr><td><b>Q2</b></td><td>현장 실적 판별 서비스는 시차 발행인가 동시 발행인가</td><td>발행기를 <span class="mono">--interval 600000 --burst</span> 로 돌려 8.7 의 <b>버스트 크기 패널</b>이 어떻게 찍히는지 본 뒤, 같은 패널을 현장 데이터로 대조</td><td>동시 발행이면 배치 상한과 커넥션 풀을 다시 잡는다. 시차면 5.4 의 주의 칸이 사라진다</td></tr>
+            <tr><td><b>Q3</b></td><td>4,550행 버스트가 status 의 p99 지연을 밀어내는가</td><td>status 를 정상 주기로 흘리면서 10분 버스트를 얹고, 채널별 p95 를 따로 잰다 (SC-03 기준 5초)</td><td>밀어내면 버스트 전용 저속 경로를 분리한다. 안 밀어내면 단일 소비자를 유지한다</td></tr>
+            <tr><td><b>Q4</b></td><td>10분 주기에서 <span class="mono">tid</span> 축 압축이 몇 배인가</td><td>1일치를 쌓고 <span class="mono">scratch</span> 사본으로 <span class="mono">tid</span> · <span class="mono">artifact_type</span> · <span class="mono">stage</span> 세 축을 각각 전환해 측정 (5.3 과 같은 절차)</td><td>ADR-04 의 결정을 확정한다. 3배를 넘는 축이 있으면 그 축으로 압축을 건다</td></tr>
+            <tr><td><b>Q5</b></td><td>스냅샷 중복이 실제로 90% 인가</td><td><span class="mono">rows_duplicate_total / items_total</span> 을 15분 창으로 보며 <span class="mono">--interval</span> 을 60000 · 600000 으로 바꿔 대조</td><td>3.2.2 의 계산을 검증한다. 90% 가 아니면 <span class="mono">OnChange</span> 판정 로직을 다시 읽어야 한다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--ok">
+        <p class="note__t">Q1 · Q2 · Q5 는 현재 스택에서 오늘 잴 수 있습니다</p>
+        발행기에 <span class="mono">--burst</span> 옵션이 이미 들어가 있고 <span class="mono">--interval</span> 은 원래 있었습니다.
+        Q3 는 8.7 의 채널별 p95 패널이 먼저 필요하고, Q4 는 1일치를 쌓아야 하므로 하루 뒤입니다.
+      </div>
+    </section>
+
+    <!-- ---------- 9. 재현 ---------- -->
+    <section class="sec" id="s9">
+      <h2><span class="n">09</span>재현 환경과 절차</h2>
+      <p class="why">이 문서의 모든 수치는 아래 절차로 다시 만들 수 있습니다.</p>
+
+      <h3>9.1 기동</h3>
+      <div class="code">
+        <div class="code__bar"><span>기동 · 확인 · 정지</span><button class="code__copy" type="button">복사</button></div>
+<pre><span class="cm"># 0) 발행기 — LiDAR 350대 × 22토픽, 약 426 msg/s (EMQX 1884)</span>
+dotnet run util/mqtt-lidar-sim/lidar-sim.cs
+
+<span class="cm"># 1) 태그 사본을 등록부에서 다시 뽑는다 (DEF-01 조치)</span>
+python src/timescaledb/scripts/export-tag-catalog.py
+
+<span class="cm"># 2) DB + 소비자 + 모니터링. Kafka 컨테이너를 tsdb-net 에 붙인다</span>
+<span class="cm">#    Aspire 세션을 다시 띄웠으면 이것도 다시 돌린다</span>
+src/timescaledb/scripts/up.sh
+
+<span class="cm"># 3) 오프셋 · 표별 행 수 · 채널 분포 · 장비 상태 · 정책 잡 · 소비자 지표</span>
+src/timescaledb/scripts/verify.sh
+
+<span class="cm"># 4) 정지. -v 를 주면 볼륨까지 지워 init SQL 이 다시 돈다</span>
+src/timescaledb/scripts/down.sh <span class="hl">-v</span></pre>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:34%">서비스</th><th style="width:30%">주소</th><th>계정</th></tr></thead>
+          <tbody>
+            <tr><td>TimescaleDB (lidar)</td><td class="mono">localhost:59432</td><td class="mono">postgres / postgres</td></tr>
+            <tr><td>lidar-ingest 지표</td><td class="mono">http://localhost:59080/metrics</td><td>—</td></tr>
+            <tr><td>Prometheus</td><td class="mono">http://localhost:59090</td><td>—</td></tr>
+            <tr><td>Grafana</td><td class="mono">http://localhost:59380</td><td class="mono">admin / admin</td></tr>
+            <tr><td>CDC target DB</td><td class="mono">localhost:60433</td><td class="mono">postgres / postgres</td></tr>
+            <tr><td>CDC Grafana</td><td class="mono">http://localhost:60300</td><td class="mono">admin / admin</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">자주 나는 오류 셋</p>
+        <b>브라우저만 안 열린다</b> — Windows 예약 포트 구간(<span class="mono">59248~59347</span>)은 호스트가 열 수 없습니다. 컨테이너는 멀쩡한데 접속이 안 되면 이것부터 확인하십시오.<br>
+        <b>소비가 0 이다</b> — Aspire 세션이 새로 떠서 Kafka 컨테이너가 바뀌었습니다. <span class="mono">scripts/up</span> 을 다시 돌립니다.<br>
+        <b>스키마를 고쳤는데 반영이 안 된다</b> — init SQL 은 볼륨이 처음 만들어질 때만 돕니다. <span class="mono">down.sh -v</span> 가 필요합니다.
+      </div>
+
+      <h3>9.2 이 문서의 수치를 다시 만드는 쿼리</h3>
+      <div class="code">
+        <div class="code__bar"><span>지연 분포와 압축비 측정</span><button class="code__copy" type="button">복사</button></div>
+<pre><span class="cm">-- 5.1 지연 분포 (최근 5분)</span>
+SELECT count(*) AS n,
+       round(avg(extract(epoch FROM received_at - time))::numeric, 3) AS avg_s,
+       round(percentile_cont(0.50) WITHIN GROUP (
+             ORDER BY extract(epoch FROM received_at - time))::numeric, 3) AS p50,
+       round(percentile_cont(0.99) WITHIN GROUP (
+             ORDER BY extract(epoch FROM received_at - time))::numeric, 3) AS p99
+FROM tsdb.lidar_status
+WHERE received_at &gt; now() - interval '5 minutes';
+
+<span class="cm">-- 5.3 압축비. 운영 표를 건드리지 않도록 사본에서 잰다.</span>
+<span class="cm">-- 측정이 끝나면 DROP SCHEMA scratch CASCADE 로 지운다.</span>
+CREATE SCHEMA IF NOT EXISTS scratch;
+CREATE TABLE scratch.t (LIKE tsdb.lidar_status INCLUDING DEFAULTS)
+  WITH (tsdb.hypertable, tsdb.partition_column = 'time',
+        <span class="hl">tsdb.segmentby = 'tid'</span>, tsdb.orderby = 'time DESC');
+INSERT INTO scratch.t SELECT * FROM tsdb.lidar_status;
+SELECT compress_chunk(c) FROM show_chunks('scratch.t') c;
+
+SELECT pg_size_pretty(sum(before_compression_total_bytes)) AS before,
+       pg_size_pretty(sum(after_compression_total_bytes))  AS after,
+       round(sum(before_compression_total_bytes)::numeric
+           / sum(after_compression_total_bytes), 1)        AS ratio
+FROM chunk_compression_stats('scratch.t');</pre>
+      </div>
+      <div class="note note--ok">
+        <p class="note__t">성공 판정</p>
+        <span class="mono">verify</span> 가 채널 셋의 행 수를 모두 0 이 아닌 값으로 내고, 격리가 0 이며,
+        <span class="mono">unresolved devices</span> 가 0 이면 정상입니다. 압축 측정은 <span class="mono">ratio</span> 가 1 보다 커야 의미가 있습니다.
+      </div>
+    </section>
+
+    <!-- ---------- 10. 도구 ---------- -->
+    <section class="sec" id="s10">
+      <h2><span class="n">10</span>구성 요소와 버전</h2>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:22%">용도</th><th style="width:26%">선택</th><th style="width:14%">버전</th><th>비고 · 대안</th></tr></thead>
+          <tbody>
+            <tr><td>시계열 저장</td><td>TimescaleDB / PostgreSQL</td><td class="mono">2.29 / 17</td><td>확장 에디션(TSL)이어야 압축 · 연속 집계를 쓴다. <span class="mono">-oss</span> 태그는 안 된다</td></tr>
+            <tr><td>소비자</td><td>Python · confluent-kafka · psycopg3</td><td class="mono">3.12</td><td>Java 로 짜면 CDC 스택과 언어가 같아지지만, 적재 로직이 SQL 중심이라 이득이 적었다</td></tr>
+            <tr><td>메시지 버스</td><td>Kafka (Aspire 세션)</td><td class="mono">—</td><td>이 스택이 띄우지 않는다. 세션 컨테이너를 네트워크에 붙여 쓴다</td></tr>
+            <tr><td>지표 수집</td><td>Prometheus + postgres_exporter</td><td class="mono">—</td><td>5초 스크랩. 커스텀 쿼리로 하이퍼테이블 · 청크 · 압축 · 정책 잡을 낸다</td></tr>
+            <tr><td>대시보드</td><td>Grafana</td><td class="mono">—</td><td>데이터소스 둘 — Prometheus(집계) · TimescaleDB 직결(장비 축)</td></tr>
+            <tr><td>CDC 엔진</td><td>Debezium Embedded (Spring Boot)</td><td class="mono">Java 21</td><td>수신 측 엔진만 다른 두 스택이 같은 코드를 쓴다</td></tr>
+            <tr><td>발행기</td><td>mqtt-lidar-sim</td><td class="mono">.NET 10</td><td>태그 정의 CSV 도 같은 소스에서 내보낸다 — 따로 관리하면 반드시 어긋난다</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---------- 11. 참고 ---------- -->
+    <section class="sec" id="s11">
+      <h2><span class="n">11</span>참고 자료</h2>
+      <ol class="refs">
+        <li id="ref-1"><span class="refs__n">1</span><span>
+          <span class="refs__src">적재 처리량 · 지연 · 배치 실측 (15분 36초)</span>
+          <span class="refs__meta">data · lidar-ingest /metrics 와 rdb.lidar_status_message, 2026-09-11 11:16~11:37</span></span></li>
+        <li id="ref-2"><span class="refs__n">2</span><span>
+          <span class="refs__src">적재 스키마 · 청크 · 압축 · 보존 정책과 그 근거 주석</span>
+          <span class="refs__meta">code · src/timescaledb/infra/db/init/01-schema.sql, 02-policies.sql (389beac 이후 작업본)</span></span></li>
+        <li id="ref-3"><span class="refs__n">3</span><span>
+          <span class="refs__src">소비자 로직 — 채널 판정 · 태그 해석 · 배치 · 멱등</span>
+          <span class="refs__meta">code · src/timescaledb/dev/ingest/ingest.py</span></span></li>
+        <li id="ref-4"><span class="refs__n">4</span><span>
+          <span class="refs__src">EES V1.0 헤더 11개 계약과 값 페이로드 형식</span>
+          <span class="refs__meta">code · intersyslink-v4/src/Edge/Providers/EES/Kafka/EES.Kafka.Provider/Infrastructure/Transmission/Formats/V1_0/</span></span></li>
+        <li id="ref-5"><span class="refs__n">5</span><span>
+          <span class="refs__src">발행 주기 기본값 — SchedulerTick 250ms · ChangedBatch 1s · Snapshot 60s</span>
+          <span class="refs__meta">code · .../Core/Application/Scheduling/{Models/ProviderTransmissionOptions.cs, Services/BatchTriggerEvaluator.cs}</span></span></li>
+        <li id="ref-6"><span class="refs__n">6</span><span>
+          <span class="refs__src">세 채널 페이로드 빌더와 발행 규모 · 상태 전이</span>
+          <span class="refs__meta">code · util/mqtt-lidar-sim/lidar-sim.cs, README.md</span></span></li>
+        <li id="ref-7"><span class="refs__n">7</span><span>
+          <span class="refs__src">태그 등록부 ParameterId 구간 (등록부 원본과 사본 대조)</span>
+          <span class="refs__meta">data · isl-secondary.db 의 EES_MESSAGE × EES_TAG 와 rdb.lidar_tag_catalog, 조회 2026-09-11</span></span></li>
+        <li id="ref-8"><span class="refs__n">8</span><span>
+          <span class="refs__src">컬럼스토어 압축비 실측 (사본 321,061행 · 축 5종)</span>
+          <span class="refs__meta">data · chunk_compression_stats(), scratch 스키마 사본, 2026-09-11</span></span></li>
+        <li id="ref-9"><span class="refs__n">9</span><span>
+          <span class="refs__src">원천이 TimescaleDB 일 때 깨지는 지점 8건과 ADR</span>
+          <span class="refs__meta">doc · docs/cdc/timescaledb-cdc-impact.html, 2026-09-07</span></span></li>
+        <li id="ref-10"><span class="refs__n">10</span><span>
+          <span class="refs__src">CDC 수신 측 표 정의와 두 스택의 정체성 분리</span>
+          <span class="refs__meta">code · src/embedded-cdc-tsdb/{README.md, infra/db/target/init/02-lidar.sql}</span></span></li>
+        <li id="ref-11"><span class="refs__n">11</span><span>
+          <span class="refs__src">하이퍼테이블 유니크 인덱스는 파티셔닝 컬럼을 포함해야 한다</span>
+          <span class="refs__meta">web · https://docs.timescale.com/use-timescale/latest/hypertables/hypertables-and-unique-indexes/ (확인 2026-09-07)</span></span></li>
+              <li id="ref-12"><span class="refs__n">12</span><span>
+          <span class="refs__src">워크플로우 ot.lidar.all 의 실제 sendPolicy 설정값</span>
+          <span class="refs__meta">data · isl-secondary.db 의 EES_CONNECTION.ConfigJson, 조회 2026-09-11</span></span></li>
+</ol>
+      <div class="note">
+        <p class="note__t">함께 보는 문서</p>
+        발표용 요약본은 <span class="mono">docs/cdc/lidar-tsdb-deck.html</span> 입니다.
+        이 문서의 수치는 그 덱과 같은 관측에서 나왔습니다.
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   HW Doc Kit - diagram engine (의존성 없음, 단일 파일 내장용)
+   drawio 느낌의 조작: 드래그 이동 / 연결 / 라벨 인라인 편집 /
+   팬·줌 / 톤 변경 / 삭제 / Ctrl+Z / JSON 내보내기(붙여넣기로 영구 반영)
+
+   마크업 (자세한 내용은 references/diagram.md):
+     div.dgm[data-edit=on] 안에
+     script[type=application/json][class=dgm-data] 로 노드·엣지 JSON 을 넣습니다.
+   ============================================================ */
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var GRID = 10;
+  var TONES = ['neutral', 'primary', 'accent', 'muted', 'ok', 'warn', 'risk', 'info'];
+
+  function s(n, a) {
+    var e = document.createElementNS(NS, n);
+    for (var k in (a || {})) e.setAttribute(k, a[k]);
+    return e;
+  }
+  function h(t, c, txt) {
+    var e = document.createElement(t);
+    if (c) e.className = c;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+  function btn(label, title) {
+    var b = h('button', 'dgm__btn', label);
+    b.type = 'button';
+    if (title) b.title = title;
+    return b;
+  }
+  function snap(v) { return Math.round(v / GRID) * GRID; }
+
+  function boxShape(n) {
+    var sh = n.shape || 'rect', w = n.w, ht = n.h;
+    if (sh === 'diamond')
+      return s('path', { 'class': 'box', d: 'M' + w / 2 + ',0 L' + w + ',' + ht / 2 + ' L' + w / 2 + ',' + ht + ' L0,' + ht / 2 + ' Z' });
+    if (sh === 'store') {
+      var r = Math.min(14, ht / 4);
+      var d = 'M0,' + r +
+        ' C0,' + (r * .45) + ' ' + (w * .22) + ',0 ' + (w / 2) + ',0' +
+        ' C' + (w * .78) + ',0 ' + w + ',' + (r * .45) + ' ' + w + ',' + r +
+        ' L' + w + ',' + (ht - r) +
+        ' C' + w + ',' + (ht - r * .45) + ' ' + (w * .78) + ',' + ht + ' ' + (w / 2) + ',' + ht +
+        ' C' + (w * .22) + ',' + ht + ' 0,' + (ht - r * .45) + ' 0,' + (ht - r) + ' Z';
+      return s('path', { 'class': 'box', d: d });
+    }
+    if (sh === 'note') {
+      var f = 14;
+      return s('path', { 'class': 'box', d: 'M0,0 L' + (w - f) + ',0 L' + w + ',' + f + ' L' + w + ',' + ht + ' L0,' + ht + ' Z' });
+    }
+    var rx = sh === 'pill' ? ht / 2 : (sh === 'round' ? 12 : 4);
+    return s('rect', { 'class': 'box', x: 0, y: 0, width: w, height: ht, rx: rx });
+  }
+
+  /* 노드 두 개 사이의 직교(엘보) 경로 */
+  function route(a, b) {
+    var ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    var dx = bc.x - ac.x, dy = bc.y - ac.y, p1, p2, dir;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      dir = 'h';
+      p1 = { x: dx > 0 ? a.x + a.w : a.x, y: ac.y };
+      p2 = { x: dx > 0 ? b.x : b.x + b.w, y: bc.y };
+    } else {
+      dir = 'v';
+      p1 = { x: ac.x, y: dy > 0 ? a.y + a.h : a.y };
+      p2 = { x: bc.x, y: dy > 0 ? b.y : b.y + b.h };
+    }
+    var d, mid;
+    if (dir === 'h') {
+      var mx = (p1.x + p2.x) / 2;
+      d = 'M' + p1.x + ',' + p1.y + ' L' + mx + ',' + p1.y + ' L' + mx + ',' + p2.y + ' L' + p2.x + ',' + p2.y;
+      mid = { x: mx, y: (p1.y + p2.y) / 2 };
+    } else {
+      var my = (p1.y + p2.y) / 2;
+      d = 'M' + p1.x + ',' + p1.y + ' L' + p1.x + ',' + my + ' L' + p2.x + ',' + my + ' L' + p2.x + ',' + p2.y;
+      mid = { x: (p1.x + p2.x) / 2, y: my };
+    }
+    return { d: d, mid: mid };
+  }
+
+  /* 원본 JSON 이 바뀌었는지 보는 값. 문서를 고쳐 다시 배포하면 해시가 달라져
+     예전 편집본을 버린다 — 안 그러면 저자가 고친 그림이 영원히 안 보인다. */
+  function srcHash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) + h + s.charCodeAt(i)) | 0; }
+    return String(h);
+  }
+
+  function Diagram(root) {
+    this.root = root;
+    this.editable = root.getAttribute('data-edit') !== 'off';
+
+    /* 저장 키 — data-key 가 있으면 그것을, 없으면 문서 안에서의 순번을 쓴다.
+       순번은 그림을 추가·삭제하면 밀리지만, 그때는 해시도 함께 달라져 저장본이 버려진다. */
+    var all = document.querySelectorAll('.dgm');
+    this.key = 'hwdgm:' + (location.pathname.split('/').pop() || 'doc') + ':'
+      + (root.getAttribute('data-key') || Array.prototype.indexOf.call(all, root));
+
+    var tag = root.querySelector('script.dgm-data');
+    this.srcHash = srcHash(tag ? tag.textContent : '');
+
+    this.data = this.read();
+    var saved = this.loadSaved();
+    if (saved) this.data = saved;
+    this.view = { tx: 0, ty: 0, k: 1 };
+    this.sel = null;          /* {type:'node'|'edge'|'group', id} */
+    this.linkMode = false;
+    this.linkFrom = null;
+    this.undo = [];
+    this.build();
+    this.render();
+    this.fit();
+    this.ready = true;
+    this.markSaved(!!this._restored);
+  }
+
+  Diagram.prototype.read = function () {
+    var tag = this.root.querySelector('script.dgm-data');
+    var d = { nodes: [], edges: [], groups: [] };
+    if (tag) { try { d = JSON.parse(tag.textContent); } catch (e) { console.warn('[dgm] JSON 파싱 실패', e); } }
+    d.nodes = d.nodes || []; d.edges = d.edges || []; d.groups = d.groups || [];
+    d.nodes.forEach(function (n) {
+      n.w = n.w || 170; n.h = n.h || 62;
+      n.shape = n.shape || 'rect'; n.tone = n.tone || 'neutral';
+      n.x = n.x || 0; n.y = n.y || 0;
+    });
+    return d;
+  };
+
+  Diagram.prototype.build = function () {
+    var self = this;
+    var bar = h('div', 'dgm__bar no-print');
+    var mk = function (label, title, fn) { var b = btn(label, title); b.addEventListener('click', fn); bar.appendChild(b); return b; };
+
+    mk('박스', '새 박스 추가', function () { self.addNode(); });
+    this.bLink = mk('연결', '두 박스를 차례로 클릭해 화살표 연결', function () { self.toggleLink(); });
+    mk('색', '선택 항목의 톤 변경', function () { self.cycleTone(); });
+    mk('모양', '선택 박스의 모양 변경', function () { self.cycleShape(); });
+    mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
+    bar.appendChild(h('span', 'sp'));
+    mk('−', '축소', function () { self.zoom(1 / 1.2); });
+    mk('+', '확대', function () { self.zoom(1.2); });
+    mk('맞춤', '화면에 맞추기', function () { self.fit(); });
+    this.bMax = mk('넓게', '화면 가득 펼치기 (Esc 로 닫기)', function () { self.toggleMax(); });
+    mk('JSON', '수정 결과를 JSON으로 복사해 원본 파일에 붙여넣기', function () { self.openJson(); });
+    this.bReset = mk('원래대로', '이 브라우저에 저장된 편집 내용을 지운다', function () { self.resetSaved(); });
+    bar.appendChild(h('span', 'dgm__hint', '드래그 이동 · 더블클릭 라벨수정 · 휠 줌 · 빈 곳 드래그 팬'));
+
+    var svg = s('svg', { 'class': 'dgm__svg' });
+    var defs = s('defs');
+    [['ar-default', 'var(--ink3)'], ['ar-primary', 'var(--hw)'], ['ar-risk', 'var(--risk)'], ['ar-ok', 'var(--ok)']]
+      .forEach(function (m) {
+        var mk2 = s('marker', {
+          id: m[0] + '-' + Math.random().toString(36).slice(2, 7),
+          viewBox: '0 0 10 10', refX: 9, refY: 5,
+          markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'
+        });
+        var p = s('path', { d: 'M0,1 L10,5 L0,9 z' });
+        p.setAttribute('style', 'fill:' + m[1]);
+        mk2.appendChild(p); defs.appendChild(mk2);
+        self['mk_' + m[0].slice(3)] = mk2.getAttribute('id');
+      });
+    svg.appendChild(defs);
+
+    this.gRoot = s('g');
+    this.gGroups = s('g'); this.gEdges = s('g'); this.gNodes = s('g');
+    this.gRoot.appendChild(this.gGroups);
+    this.gRoot.appendChild(this.gEdges);
+    this.gRoot.appendChild(this.gNodes);
+    svg.appendChild(this.gRoot);
+
+    this.svg = svg;
+    this.root.insertBefore(svg, this.root.firstChild);
+    if (this.editable) this.root.insertBefore(bar, svg);
+
+    /* JSON 모달 */
+    var modal = h('div', 'dgm__modal no-print');
+    var pane = h('div', 'pane');
+    var head = h('div', 'head'); head.appendChild(h('b', null, '다이어그램 JSON'));
+    head.appendChild(h('span', 'sp'));
+    var closeB = btn('닫기'); head.appendChild(closeB);
+    var ta = h('textarea'); ta.spellcheck = false;
+    var foot = h('div', 'foot');
+    var copyB = btn('전체 복사'); var applyB = btn('붙여넣은 JSON 적용');
+    foot.appendChild(h('span', 'dgm__hint', '원본 HTML의 dgm-data 블록에 붙여넣으면 수정이 영구 반영됩니다'));
+    foot.appendChild(h('span', 'sp')); foot.appendChild(applyB); foot.appendChild(copyB);
+    pane.appendChild(head); pane.appendChild(ta); pane.appendChild(foot);
+    modal.appendChild(pane); this.root.appendChild(modal);
+    this.modal = modal; this.ta = ta;
+    closeB.addEventListener('click', function () { modal.classList.remove('is-open'); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('is-open'); });
+    copyB.addEventListener('click', function () {
+      ta.select(); ta.setSelectionRange(0, ta.value.length);
+      try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); }
+      copyB.textContent = '복사됨'; setTimeout(function () { copyB.textContent = '전체 복사'; }, 1200);
+    });
+    applyB.addEventListener('click', function () {
+      try {
+        var d = JSON.parse(ta.value);
+        self.push(); self.data = d; self.data.nodes = d.nodes || []; self.data.edges = d.edges || []; self.data.groups = d.groups || [];
+        self.render(); self.fit(); modal.classList.remove('is-open');
+      } catch (e) { alert('JSON 형식이 올바르지 않습니다: ' + e.message); }
+    });
+
+    this.bind();
+  };
+
+  /* ---------- 렌더 ---------- */
+  Diagram.prototype.render = function () {
+    var self = this;
+    this.gGroups.textContent = ''; this.gEdges.textContent = ''; this.gNodes.textContent = '';
+    this.index = {};
+    this.data.nodes.forEach(function (n) { self.index[n.id] = n; });
+
+    this.data.groups.forEach(function (g) {
+      var el = s('g', { 'class': 'dgm-grp', 'data-id': g.id, transform: 'translate(' + g.x + ',' + g.y + ')' });
+      el.appendChild(s('rect', { 'class': 'box', x: 0, y: 0, width: g.w, height: g.h, rx: 10 }));
+      var t = s('text', { 'class': 'gl', x: 12, y: 20 }); t.textContent = g.label || '';
+      el.appendChild(t);
+      self.gGroups.appendChild(el);
+    });
+
+    this.data.edges.forEach(function (e, i) {
+      var a = self.index[e.from], b = self.index[e.to];
+      if (!a || !b) return;
+      var r = route(a, b);
+      var g = s('g', { 'class': 'dgm-edge', 'data-i': i });
+      if (e.tone) g.setAttribute('data-tone', e.tone);
+      if (e.style) g.setAttribute('data-style', e.style);
+      var wire = s('path', { 'class': 'wire', d: r.d });
+      var mid = e.tone === 'primary' ? self.mk_primary : e.tone === 'risk' ? self.mk_risk : e.tone === 'ok' ? self.mk_ok : self.mk_default;
+      if (e.arrow !== false) wire.setAttribute('marker-end', 'url(#' + mid + ')');
+      g.appendChild(s('path', { 'class': 'hit', d: r.d }));
+      g.appendChild(wire);
+      if (e.label) {
+        var txt = String(e.label), wpx = 0;
+        for (var ci = 0; ci < txt.length; ci++) wpx += txt.charCodeAt(ci) > 0x2E80 ? 12.5 : 7;
+        var w = Math.max(34, Math.ceil(wpx) + 22);
+        var fo = s('foreignObject', { x: r.mid.x - w / 2, y: r.mid.y - 11, width: w, height: 22 });
+        var div = h('div', 'elbl'); div.appendChild(h('span', null, e.label));
+        fo.appendChild(div); g.appendChild(fo);
+      }
+      self.gEdges.appendChild(g);
+    });
+
+    this.data.nodes.forEach(function (n) {
+      var g = s('g', { 'class': 'dgm-node', 'data-id': n.id, 'data-tone': n.tone, transform: 'translate(' + n.x + ',' + n.y + ')' });
+      g.appendChild(boxShape(n));
+      var pad = n.shape === 'diamond' ? Math.round(n.w * .18) : 0;
+      var fo = s('foreignObject', { x: pad, y: 0, width: n.w - pad * 2, height: n.h });
+      var lbl = h('div', 'lbl');
+      lbl.appendChild(h('span', 't', n.label || ''));
+      if (n.sub) lbl.appendChild(h('span', 'sub', n.sub));
+      fo.appendChild(lbl); g.appendChild(fo);
+      self.gNodes.appendChild(g);
+    });
+
+    this.paint();
+  };
+
+  /* render 는 모든 변경 뒤에 불린다 — 여기 한 곳만 잡으면 끌기·라벨 편집·추가·삭제가
+     모두 저장된다. 첫 그리기와 되돌리기 때는 건너뛴다. */
+  (function (orig) {
+    Diagram.prototype.render = function () {
+      orig.call(this);
+      if (this.ready && !this._skipSave) this.save();
+    };
+  })(Diagram.prototype.render);
+
+  Diagram.prototype.paint = function () {
+    var self = this;
+    this.gRoot.setAttribute('transform', 'translate(' + this.view.tx + ',' + this.view.ty + ') scale(' + this.view.k + ')');
+    Array.prototype.forEach.call(this.root.querySelectorAll('.is-sel'), function (e) { e.classList.remove('is-sel'); });
+    if (!this.sel) return;
+    var q = this.sel.type === 'edge' ? '.dgm-edge[data-i="' + this.sel.id + '"]'
+      : this.sel.type === 'group' ? '.dgm-grp[data-id="' + this.sel.id + '"]'
+        : '.dgm-node[data-id="' + this.sel.id + '"]';
+    var el = this.root.querySelector(q);
+    if (el) el.classList.add('is-sel');
+  };
+
+  /* ---------- 좌표 ---------- */
+  Diagram.prototype.world = function (ev) {
+    var r = this.svg.getBoundingClientRect();
+    return { x: (ev.clientX - r.left - this.view.tx) / this.view.k, y: (ev.clientY - r.top - this.view.ty) / this.view.k };
+  };
+
+  /* 화면 가득 펼치기. 다른 다이어그램이 펼쳐져 있으면 먼저 닫는다. */
+  Diagram.prototype.toggleMax = function (force) {
+    var self = this;
+    var on = (force == null) ? !this.root.classList.contains('is-max') : !!force;
+    if (on) {
+      var cur = document.querySelector('.dgm.is-max');
+      if (cur && cur !== this.root && cur.__dgm) cur.__dgm.toggleMax(false);
+    }
+    this.root.classList.toggle('is-max', on);
+    document.documentElement.classList.toggle('dgm-locked', on);
+    if (this.bMax) {
+      this.bMax.classList.toggle('is-on', on);
+      this.bMax.textContent = on ? '닫기' : '넓게';
+      this.bMax.title = on ? '원래 크기로 (Esc)' : '화면 가득 펼치기 (Esc 로 닫기)';
+    }
+    (window.requestAnimationFrame || setTimeout)(function () { self.fit(); });
+  };
+
+  Diagram.prototype.fit = function () {
+    var items = this.data.nodes.concat(this.data.groups);
+    var r = this.svg.getBoundingClientRect();
+    // CSS transform:scale() 이 걸린 무대(발표용 .stage) 안에서는 getBoundingClientRect 가
+    // "화면에 보이는" 크기를 돌려준다. 그 값으로 배율을 잡으면 큰 화면에서 상한(1.6배)까지
+    // 확대돼 그림이 잘리고, 작은 화면에서는 필요 이상 줄어든다.
+    // clientWidth/Height 는 변환 전 레이아웃 크기라 무대 배율과 무관하다.
+    var W = this.svg.clientWidth || r.width || 800;
+    var H = this.svg.clientHeight || r.height || 420;
+    if (!items.length) { this.view = { tx: 20, ty: 20, k: 1 }; return this.paint(); }
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    items.forEach(function (n) {
+      x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+      x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h);
+    });
+    var pad = 24, bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
+    var k = Math.min(W / bw, H / bh, 1.6);
+    this.view.k = k;
+    this.view.tx = (W - bw * k) / 2 - (x0 - pad) * k;
+    this.view.ty = (H - bh * k) / 2 - (y0 - pad) * k;
+    this.paint();
+  };
+
+  Diagram.prototype.zoom = function (f, cx, cy) {
+    var r = this.svg.getBoundingClientRect();
+    cx = cx == null ? r.width / 2 : cx; cy = cy == null ? r.height / 2 : cy;
+    var k0 = this.view.k, k1 = Math.max(.25, Math.min(3, k0 * f));
+    this.view.tx = cx - (cx - this.view.tx) * (k1 / k0);
+    this.view.ty = cy - (cy - this.view.ty) * (k1 / k0);
+    this.view.k = k1; this.paint();
+  };
+
+  /* ---------- 편집 내용 보관 (브라우저 안에만) ----------
+     끌어 옮기고 라벨을 고친 결과가 새로고침에도 남는다. 저장 위치는 이 브라우저의
+     localStorage 라 다른 사람에게는 전달되지 않는다 — 문서 자체에 반영하려면
+     JSON 버튼으로 내보내 원본 파일에 붙여넣어야 한다. */
+  Diagram.prototype.save = function () {
+    if (!this.editable || !this.key) return;
+    var self = this;
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(function () {
+      try {
+        localStorage.setItem(self.key, JSON.stringify({ v: self.srcHash, d: self.data }));
+        self.markSaved(true);
+      } catch (e) { /* 사생활 보호 모드 등 — 저장만 안 될 뿐 편집은 된다 */ }
+    }, 250);
+  };
+
+  Diagram.prototype.loadSaved = function () {
+    try {
+      var raw = localStorage.getItem(this.key);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || o.v !== this.srcHash || !o.d) { localStorage.removeItem(this.key); return null; }
+      this._restored = true;
+      return o.d;
+    } catch (e) { return null; }
+  };
+
+  Diagram.prototype.resetSaved = function () {
+    try { localStorage.removeItem(this.key); } catch (e) { }
+    this.data = this.read();
+    this.sel = null;
+    this._skipSave = true;
+    this.render();
+    this._skipSave = false;
+    this.fit();
+    this.markSaved(false);
+  };
+
+  /* 저장됨 표시. 버튼 라벨만 잠깐 바꾼다 — 별도 알림창은 발표 중에 방해가 된다. */
+  Diagram.prototype.markSaved = function (on) {
+    if (!this.bReset) return;
+    this.bReset.classList.toggle('is-on', !!on);
+    this.bReset.title = on ? '이 브라우저에 저장된 편집 내용을 지우고 원래대로' : '원래대로 (저장된 편집 없음)';
+  };
+
+  /* ---------- 편집 ---------- */
+  Diagram.prototype.push = function () {
+    this.undo.push(JSON.stringify(this.data));
+    if (this.undo.length > 40) this.undo.shift();
+  };
+  Diagram.prototype.popUndo = function () {
+    if (!this.undo.length) return;
+    this.data = JSON.parse(this.undo.pop());
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.addNode = function () {
+    this.push();
+    var id = 'n' + Date.now().toString(36).slice(-5);
+    var r = this.svg.getBoundingClientRect();
+    var wx = snap((r.width / 2 - this.view.tx) / this.view.k - 85);
+    var wy = snap((r.height / 2 - this.view.ty) / this.view.k - 31);
+    this.data.nodes.push({ id: id, label: '새 단계', x: wx, y: wy, w: 170, h: 62, shape: 'rect', tone: 'neutral' });
+    this.sel = { type: 'node', id: id };
+    this.render();
+  };
+  Diagram.prototype.toggleLink = function () {
+    this.linkMode = !this.linkMode; this.linkFrom = null;
+    this.bLink.classList.toggle('is-on', this.linkMode);
+  };
+  Diagram.prototype.cycleTone = function () {
+    if (!this.sel) return;
+    this.push();
+    if (this.sel.type === 'node') {
+      var n = this.index[this.sel.id];
+      n.tone = TONES[(TONES.indexOf(n.tone) + 1) % TONES.length];
+    } else if (this.sel.type === 'edge') {
+      var order = [undefined, 'primary', 'ok', 'risk'];
+      var e = this.data.edges[this.sel.id];
+      e.tone = order[(order.indexOf(e.tone) + 1) % order.length];
+    }
+    this.render();
+  };
+  Diagram.prototype.cycleShape = function () {
+    if (!this.sel || this.sel.type !== 'node') return;
+    var SH = ['rect', 'round', 'pill', 'diamond', 'store', 'note'];
+    this.push();
+    var n = this.index[this.sel.id];
+    n.shape = SH[(SH.indexOf(n.shape) + 1) % SH.length];
+    this.render();
+  };
+  Diagram.prototype.remove = function () {
+    if (!this.sel) return;
+    this.push();
+    var self = this;
+    if (this.sel.type === 'node') {
+      this.data.nodes = this.data.nodes.filter(function (n) { return n.id !== self.sel.id; });
+      this.data.edges = this.data.edges.filter(function (e) { return e.from !== self.sel.id && e.to !== self.sel.id; });
+    } else if (this.sel.type === 'edge') {
+      this.data.edges.splice(this.sel.id, 1);
+    } else {
+      this.data.groups = this.data.groups.filter(function (g) { return g.id !== self.sel.id; });
+    }
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.openJson = function () {
+    this.ta.value = JSON.stringify(this.data, null, 2);
+    this.modal.classList.add('is-open');
+  };
+
+  /* ---------- 이벤트 ---------- */
+  Diagram.prototype.bind = function () {
+    var self = this, drag = null, pan = null;
+
+    this.svg.addEventListener('pointerdown', function (ev) {
+      if (ev.target.closest('[contenteditable="true"]')) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      var edgeEl = ev.target.closest('.dgm-edge');
+      var grpEl = ev.target.closest('.dgm-grp');
+
+      if (self.linkMode && nodeEl) {
+        var id = nodeEl.getAttribute('data-id');
+        if (!self.linkFrom) { self.linkFrom = id; self.sel = { type: 'node', id: id }; self.paint(); }
+        else if (self.linkFrom !== id) {
+          self.push();
+          self.data.edges.push({ from: self.linkFrom, to: id, label: '' });
+          self.linkFrom = null; self.toggleLink(); self.render();
+        }
+        return;
+      }
+      if (nodeEl && self.editable) {
+        self.sel = { type: 'node', id: nodeEl.getAttribute('data-id') };
+        var n = self.index[self.sel.id];
+        var w = self.world(ev);
+        drag = { kind: 'node', obj: n, dx: w.x - n.x, dy: w.y - n.y, moved: false };
+        self.push();
+      } else if (grpEl && self.editable) {
+        self.sel = { type: 'group', id: grpEl.getAttribute('data-id') };
+        var g = self.data.groups.filter(function (q) { return q.id === self.sel.id; })[0];
+        var w2 = self.world(ev);
+        drag = { kind: 'group', obj: g, dx: w2.x - g.x, dy: w2.y - g.y, moved: false };
+        self.push();
+      } else if (edgeEl) {
+        self.sel = { type: 'edge', id: +edgeEl.getAttribute('data-i') };
+      } else {
+        self.sel = null;
+        pan = { x: ev.clientX, y: ev.clientY, tx: self.view.tx, ty: self.view.ty };
+        self.svg.classList.add('is-panning');
+      }
+      self.svg.setPointerCapture(ev.pointerId);
+      self.paint();
+    });
+
+    this.svg.addEventListener('pointermove', function (ev) {
+      if (drag) {
+        var w = self.world(ev);
+        drag.obj.x = snap(w.x - drag.dx); drag.obj.y = snap(w.y - drag.dy);
+        drag.moved = true;
+        self.render();
+      } else if (pan) {
+        self.view.tx = pan.tx + (ev.clientX - pan.x);
+        self.view.ty = pan.ty + (ev.clientY - pan.y);
+        self.paint();
+      }
+    });
+
+    var end = function (ev) {
+      if (drag && !drag.moved) self.undo.pop();
+      drag = null; pan = null;
+      self.svg.classList.remove('is-panning');
+      try { self.svg.releasePointerCapture(ev.pointerId); } catch (e) { }
+    };
+    this.svg.addEventListener('pointerup', end);
+    this.svg.addEventListener('pointercancel', end);
+
+    this.svg.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      var r = self.svg.getBoundingClientRect();
+      self.zoom(ev.deltaY < 0 ? 1.12 : 1 / 1.12, ev.clientX - r.left, ev.clientY - r.top);
+    }, { passive: false });
+
+    this.svg.addEventListener('dblclick', function (ev) {
+      if (!self.editable) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      if (nodeEl) return self.edit(nodeEl.querySelector('.lbl .t'), function (v) {
+        self.index[nodeEl.getAttribute('data-id')].label = v;
+      });
+      var edgeEl = ev.target.closest('.dgm-edge');
+      if (edgeEl) {
+        var i = +edgeEl.getAttribute('data-i');
+        var v = prompt('연결 라벨', self.data.edges[i].label || '');
+        if (v !== null) { self.push(); self.data.edges[i].label = v; self.render(); }
+      }
+    });
+
+    this.root.addEventListener('keydown', function (ev) {
+      if (ev.target.getAttribute && ev.target.getAttribute('contenteditable') === 'true') return;
+      if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); self.remove(); }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); self.popUndo(); }
+    });
+    this.root.tabIndex = 0;
+
+    // 폭이 바뀌면 다시 그리는 것만으로는 부족하다 — 좁아진 칸에 옛 배율로 그리면 넘쳐서 잘린다.
+    // fit() 으로 배율까지 다시 잡아야 항상 전체가 보인다.
+    var ro = window.ResizeObserver ? new ResizeObserver(function () { self.fit(); }) : null;
+    if (ro) ro.observe(this.svg);
+  };
+
+  Diagram.prototype.edit = function (el, done) {
+    if (!el) return;
+    var self = this;
+    this.push();
+    el.parentNode.setAttribute('contenteditable', 'true');
+    el.parentNode.focus();
+    var save = function () {
+      el.parentNode.removeAttribute('contenteditable');
+      done(el.textContent.trim());
+      self.render();
+    };
+    el.parentNode.addEventListener('blur', save, { once: true });
+    el.parentNode.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); el.parentNode.blur(); }
+      if (ev.key === 'Escape') { el.parentNode.removeAttribute('contenteditable'); self.popUndo(); }
+      ev.stopPropagation();
+    });
+    var rg = document.createRange(); rg.selectNodeContents(el);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+  };
+
+  function initAll(scope) {
+    var list = (scope || document).querySelectorAll('.dgm');
+    Array.prototype.forEach.call(list, function (el) {
+      if (el.__dgm) return;
+      el.__dgm = new Diagram(el);
+    });
+  }
+  /* Esc 는 펼쳐 놓은 다이어그램을 닫는다. 라벨 편집 중의 Esc 는
+     edit() 안에서 stopPropagation 되므로 여기까지 오지 않는다. */
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var el = document.querySelector('.dgm.is-max');
+    if (el && el.__dgm) { ev.preventDefault(); el.__dgm.toggleMax(false); }
+  });
+
+  window.HWDiagram = { initAll: initAll, Diagram: Diagram };
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', function () { initAll(); });
+  else initAll();
+})();
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 런타임 (TOC 스크롤스파이 / 체크 상태 / 복사)
+   ============================================================ */
+(function () {
+  'use strict';
+  var KEY = 'hwdoc:' + (document.title || location.pathname);
+
+  /* --- TOC 자동 생성 (비어 있을 때만) --- */
+  var toc = document.querySelector('.toc');
+  if (toc && !toc.children.length) {
+    document.querySelectorAll('.sec').forEach(function (sec) {
+      if (!sec.id) return;
+      var h = sec.querySelector('h2');
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + sec.id;
+      a.textContent = h
+        ? Array.prototype.map.call(h.childNodes, function (x) { return x.textContent.trim(); })
+          .filter(Boolean).join(' ')
+        : sec.id;
+      li.appendChild(a); toc.appendChild(li);
+    });
+  }
+
+  /* --- 스크롤스파이 --- */
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var secs = links.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  if (window.IntersectionObserver && secs.length) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (a) { a.classList.toggle('is-cur', a.getAttribute('href') === '#' + e.target.id); });
+      });
+    }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
+    secs.forEach(function (s) { io.observe(s); });
+  }
+
+  /* --- 체크리스트 상태 저장 --- */
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { }
+  document.querySelectorAll('.chk input[type="checkbox"]').forEach(function (cb, i) {
+    var id = cb.id || ('chk' + i); cb.id = id;
+    if (saved[id]) cb.checked = true;
+    var sync = function () {
+      cb.closest('li').classList.toggle('is-done', cb.checked);
+      saved[id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) { }
+      count();
+    };
+    cb.addEventListener('change', sync);
+    cb.closest('li').classList.toggle('is-done', cb.checked);
+  });
+  function count() {
+    document.querySelectorAll('.chk').forEach(function (ul) {
+      var all = ul.querySelectorAll('input[type="checkbox"]');
+      var done = ul.querySelectorAll('input[type="checkbox"]:checked');
+      var badge = ul.previousElementSibling && ul.previousElementSibling.querySelector('.chk-count');
+      if (badge) badge.textContent = done.length + ' / ' + all.length;
+    });
+  }
+  count();
+
+  /* --- 코드 복사 --- */
+  document.querySelectorAll('.code__copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var pre = b.closest('.code').querySelector('pre');
+      try { navigator.clipboard.writeText(pre.innerText); } catch (e) { }
+      var t = b.textContent; b.textContent = '복사됨';
+      setTimeout(function () { b.textContent = t; }, 1200);
+    });
+  });
+
+  /* --- 사이드 버튼 --- */
+  function bind(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+  bind('bTheme', function () {
+    var r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  bind('bPrint', function () { window.print(); });
+  bind('bReset', function () {
+    if (!confirm('체크 상태를 모두 초기화할까요?')) return;
+    try { localStorage.removeItem(KEY); } catch (e) { }
+    location.reload();
+  });
+})();
+</script>
+</body>
+</html>
