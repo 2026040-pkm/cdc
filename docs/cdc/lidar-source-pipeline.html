@@ -182,24 +182,28 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}
 
 /* ---------- 다이어그램 캔버스 ---------- */
 .dgm{
-  position:relative;border:1px solid var(--line);border-radius:var(--radius);
-  background:var(--bg);overflow:hidden;display:flex;flex-direction:column
+  position:relative;border:1px solid var(--line);border-radius:12px;
+  background:var(--bg);overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 1px 2px rgba(20,20,20,.04)
 }
 .dgm__bar{
-  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
-  padding:6px 8px;border-bottom:1px solid var(--line);background:var(--bg3);flex:0 0 auto
+  display:flex;align-items:center;gap:4px;flex-wrap:wrap;
+  padding:7px 10px;border-bottom:1px solid var(--line);background:var(--bg2);flex:0 0 auto
 }
 .dgm__bar .sp{flex:1}
+.dgm__sep{width:1px;height:15px;background:var(--line2);margin:0 5px;flex:0 0 auto}
 .dgm__btn{
-  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
-  border-radius:5px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;
-  font-family:var(--font)
+  border:1px solid transparent;background:transparent;color:var(--ink2);
+  border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--font);line-height:1.5;
+  transition:background .12s ease,color .12s ease,border-color .12s ease
 }
-.dgm__btn:hover{border-color:var(--hw);color:var(--hw-dk)}
+.dgm__btn:hover{background:var(--bg);border-color:var(--line2);color:var(--hw-dk)}
+.dgm__btn:focus-visible{outline:2px solid var(--hw);outline-offset:1px}
 .dgm__btn.is-on{background:var(--hw);border-color:var(--hw);color:#fff}
-.dgm__hint{font-size:11.5px;color:var(--ink4)}
+.dgm__hint{font-size:11px;color:var(--ink4);letter-spacing:-.01em}
 .dgm__svg{display:block;width:100%;flex:1 1 auto;min-height:0;touch-action:none;cursor:grab;
-  background:radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0/20px 20px}
+  background:radial-gradient(circle at 1px 1px, var(--line) .9px, transparent 0) 0 0/26px 26px, var(--bg)}
 .dgm__svg.is-panning{cursor:grabbing}
 .dgm[data-edit="off"] .dgm__bar{display:none}
 
@@ -212,20 +216,26 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}
 html.dgm-locked,html.dgm-locked body{overflow:hidden}
 
 .dgm-node{cursor:move}
-.dgm-node .box{fill:var(--bg);stroke:var(--line2);stroke-width:1.5}
+.dgm-node .box{
+  fill:var(--bg);stroke:var(--line2);stroke-width:1.25;
+  filter:drop-shadow(0 1px 1.5px rgba(20,20,20,.07))
+}
+.dgm-node:hover .box{stroke:var(--hw-lt)}
 .dgm-node .lbl{
   font-family:var(--font);font-size:13.5px;font-weight:700;color:var(--ink);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  height:100%;text-align:center;padding:4px 8px;line-height:1.3;overflow:hidden
+  height:100%;text-align:center;padding:6px 10px;line-height:1.32;overflow:hidden;
+  letter-spacing:-.01em
 }
-.dgm-node .lbl .sub{font-size:11px;font-weight:500;color:var(--ink3);margin-top:2px}
+.dgm-node .lbl .sub{font-size:11px;font-weight:500;color:var(--ink3);margin-top:3px;line-height:1.35}
 .dgm-node .lbl[contenteditable="true"]{outline:2px solid var(--hw);background:var(--bg);border-radius:4px}
 .dgm-node.is-sel .box{stroke:var(--hw);stroke-width:2.5}
 .dgm-node[data-tone="primary"] .box{fill:var(--hw);stroke:var(--hw-dk)}
 .dgm-node[data-tone="primary"] .lbl{color:#fff}
-.dgm-node[data-tone="primary"] .lbl .sub{color:rgba(255,255,255,.85)}
+.dgm-node[data-tone="primary"] .lbl .sub{color:rgba(255,255,255,.88)}
 .dgm-node[data-tone="accent"] .box{fill:var(--hw-pale);stroke:var(--hw)}
 .dgm-node[data-tone="accent"] .lbl{color:var(--hw-dp)}
+.dgm-node[data-tone="accent"] .lbl .sub{color:var(--hw-dk)}
 .dgm-node[data-tone="muted"] .box{fill:var(--bg3);stroke:var(--line2)}
 .dgm-node[data-tone="muted"] .lbl{color:var(--ink3)}
 .dgm-node[data-tone="ok"] .box{fill:var(--ok-bg);stroke:var(--ok)}
@@ -237,23 +247,25 @@ html.dgm-locked,html.dgm-locked body{overflow:hidden}
 .dgm-node[data-tone="info"] .box{fill:var(--info-bg);stroke:var(--info)}
 .dgm-node[data-tone="info"] .lbl{color:var(--info)}
 
-.dgm-grp .box{fill:var(--bg2);stroke:var(--line2);stroke-dasharray:6 4;stroke-width:1.5}
-.dgm-grp .gl{font-family:var(--font);font-size:11.5px;font-weight:800;letter-spacing:.08em;
+.dgm-grp .box{fill:none;stroke:var(--line2);stroke-dasharray:5 5;stroke-width:1.25}
+.dgm-grp .gl{font-family:var(--font);font-size:10.5px;font-weight:800;letter-spacing:.12em;
   text-transform:uppercase;fill:var(--ink4)}
 .dgm-grp{cursor:move}
 
-.dgm-edge .wire{fill:none;stroke:var(--ink3);stroke-width:1.8}
-.dgm-edge .hit{fill:none;stroke:transparent;stroke-width:14;cursor:pointer}
+.dgm-edge .wire{fill:none;stroke:var(--ink4);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.dgm-edge .hit{fill:none;stroke:transparent;stroke-width:16;cursor:pointer}
+.dgm-edge:hover .wire{stroke:var(--ink2)}
 .dgm-edge.is-sel .wire{stroke:var(--hw);stroke-width:2.6}
-.dgm-edge[data-style="dash"] .wire{stroke-dasharray:6 4}
-.dgm-edge[data-tone="primary"] .wire{stroke:var(--hw)}
+.dgm-edge[data-style="dash"] .wire{stroke-dasharray:5 5}
+.dgm-edge[data-tone="primary"] .wire{stroke:var(--hw);stroke-width:2.2}
 .dgm-edge[data-tone="risk"] .wire{stroke:var(--risk)}
 .dgm-edge[data-tone="ok"] .wire{stroke:var(--ok)}
 .dgm-edge .elbl{
-  font-family:var(--font);font-size:11.5px;font-weight:600;color:var(--ink2);
+  font-family:var(--font);font-size:10.5px;font-weight:600;color:var(--ink3);
   display:flex;align-items:center;justify-content:center;height:100%;text-align:center;
 }
-.dgm-edge .elbl span{background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--line)}
+.dgm-edge .elbl span{background:var(--bg);padding:2px 8px;border-radius:999px;
+  border:1px solid var(--line);white-space:nowrap;letter-spacing:-.01em}
 
 .dgm__modal{
   position:absolute;inset:0;background:rgba(0,0,0,.45);display:none;
@@ -390,7 +402,9 @@ body{ background:var(--bg2) }
 .adr dt{ color:var(--hw-dk); font-weight:700; font-size:12.5px }
 .adr dd{ margin:0; color:var(--ink2) }
 
-.dgm{ margin:0 0 14px; height:520px }
+/* 높이는 diagram.js 의 autoHeight 가 내용 비율에 맞춰 인라인으로 잡는다.
+   아래 값은 스크립트가 돌기 전의 자리 잡기용이다. */
+.dgm{ margin:0 0 16px; height:420px }
 /* 다이어그램은 본문 글줄 폭에 갇히지 않고 사이드바 오른쪽을 전부 쓴다.
    270px 사이드바 + 본문 좌우 패딩 88px + 스크롤바 여유 18px 를 뺀 값. */
 @media (min-width:1001px){
@@ -411,7 +425,7 @@ body{ background:var(--bg2) }
   .doc{ display:block }
   .main{ max-width:none; padding:0 }
   .sec{ page-break-inside:avoid }
-  .dgm{ height:320px; width:auto }
+  .dgm{ height:340px !important; width:auto }
 }
 </style>
 </head>
@@ -500,30 +514,26 @@ body{ background:var(--bg2) }
       <h2><span class="n">01</span>전체 워크플로우</h2>
       <p class="why">박스를 끌어 배치를 바꿀 수 있다. 확정된 배치는 JSON 버튼으로 내보내 이 파일의 dgm-data 블록에 되붙인다.</p>
 
-      <div class="dgm" data-edit="on" style="height:440px">
+      <div class="dgm" data-edit="on">
         <script type="application/json" class="dgm-data">
 {
-  "groups": [
-    {"id":"gI","label":"InterSysLink","x":530,"y":10,"w":510,"h":120},
-    {"id":"gT","label":"이 저장소 (src/timescaledb)","x":1050,"y":10,"w":510,"h":120}
-  ],
   "nodes": [
-    {"id":"dev","label":"LiDAR 350대","sub":"조립 210 · 선행의장 140","x":40,"y":40,"w":220,"h":64,"tone":"muted"},
-    {"id":"brk","label":"EMQX 브로커","sub":"토픽 22개 · 426 msg/s","x":300,"y":40,"w":220,"h":64,"shape":"pill"},
-    {"id":"agt","label":"Mqtt.Agent + EES Provider","sub":"태그 2,520 · tagMode=raw","x":560,"y":40,"w":220,"h":64,"tone":"primary"},
-    {"id":"kfk","label":"ot.lidar.status / actual / artifact","sub":"토픽 3개 · 1파티션 · 초당 레코드 1","x":820,"y":40,"w":220,"h":64,"shape":"pill","tone":"primary"},
-    {"id":"ing","label":"lidar-ingest","sub":"소비자 · 오프셋 수동 커밋","x":1080,"y":40,"w":220,"h":64,"tone":"accent"},
-    {"id":"db","label":"lidar (TimescaleDB)","sub":"tsdb 3표 + rdb 6표","x":1340,"y":40,"w":220,"h":64,"shape":"store","tone":"accent"},
-    {"id":"brg","label":"mqtt-ees-bridge","sub":"Aspire 없이 같은 레코드를 만든다","x":560,"y":220,"w":220,"h":64,"tone":"muted","shape":"note"},
-    {"id":"cat","label":"rdb.lidar_tag_catalog","sub":"숫자 tid 를 장비 id 로 되돌린다","x":1080,"y":220,"w":220,"h":64,"shape":"store","tone":"warn"},
-    {"id":"rej","label":"rdb.lidar_ingest_reject","sub":"못 푼 항목을 원문째 격리","x":1340,"y":220,"w":220,"h":64,"shape":"store","tone":"risk"}
+    {"id":"dev","label":"LiDAR 350대","sub":"조립 210 · 선행의장 140","x":20,"y":40,"w":156,"h":92,"tone":"muted"},
+    {"id":"brk","label":"EMQX 브로커","sub":"MQTT 토픽 22개","x":192,"y":40,"w":156,"h":92,"shape":"pill"},
+    {"id":"agt","label":"Agent + Provider","sub":"태그 2,520개","x":364,"y":40,"w":156,"h":92,"tone":"primary"},
+    {"id":"kfk","label":"Kafka 토픽 3개","sub":"레코드 = 항목 묶음","x":536,"y":40,"w":156,"h":92,"shape":"pill","tone":"primary"},
+    {"id":"ing","label":"lidar-ingest","sub":"항목 하나가 행 하나","x":708,"y":40,"w":156,"h":92,"tone":"accent"},
+    {"id":"db","label":"lidar DB","sub":"tsdb 3표 + rdb 6표","x":880,"y":40,"w":156,"h":92,"shape":"store","tone":"accent"},
+    {"id":"brg","label":"mqtt-ees-bridge","sub":"Aspire 없이 같은 레코드","x":192,"y":210,"w":156,"h":80,"shape":"note","tone":"muted"},
+    {"id":"cat","label":"lidar_tag_catalog","sub":"숫자 tid 를 장비로","x":708,"y":210,"w":156,"h":80,"shape":"store","tone":"warn"},
+    {"id":"rej","label":"lidar_ingest_reject","sub":"못 푼 항목 격리","x":880,"y":210,"w":156,"h":80,"shape":"store","tone":"risk"}
   ],
   "edges": [
-    {"from":"dev","to":"brk","label":"MQTT 3.1.1 · QoS 1","tone":"primary"},
-    {"from":"brk","to":"agt","label":"22토픽 구독","tone":"primary"},
-    {"from":"agt","to":"kfk","label":"produce","tone":"primary"},
-    {"from":"kfk","to":"ing","label":"consume","tone":"primary"},
-    {"from":"ing","to":"db","label":"INSERT + UPSERT","tone":"primary"},
+    {"from":"dev","to":"brk","tone":"primary"},
+    {"from":"brk","to":"agt","tone":"primary"},
+    {"from":"agt","to":"kfk","tone":"primary"},
+    {"from":"kfk","to":"ing","tone":"primary"},
+    {"from":"ing","to":"db","tone":"primary"},
     {"from":"brk","to":"brg","style":"dash"},
     {"from":"brg","to":"kfk","style":"dash"},
     {"from":"cat","to":"ing","style":"dash"},
@@ -800,19 +810,18 @@ ot/device/assembly/lidar/status,1,raw,LDR-GJ-A1B1-02,raw_payload,STRING,true
       <p class="why">여기서 알갱이가 바뀌고 장비 id 가 사라진다. 이 절이 이 문서에서 가장 중요한 구간이다.</p>
 
       <h3>태그 값 하나가 레코드에 실리기까지</h3>
-      <div class="dgm" data-edit="on" style="height:400px">
+      <div class="dgm" data-edit="on">
         <script type="application/json" class="dgm-data">
 {
   "nodes": [
-    {"id":"m1","label":"MQTT 메시지 1건","sub":"{id, raw_payload}","x":30,"y":40,"w":200,"h":62,"tone":"primary"},
-    {"id":"t1","label":"태그 값 갱신","sub":"TagId = {장비}.{토픽}.raw_payload","x":290,"y":40,"w":230,"h":62},
-    {"id":"d1","label":"등록부에 있나","sub":"EES_TAG · ParameterId 조회","x":580,"y":34,"w":200,"h":74,"shape":"diamond"},
-    {"id":"it","label":"EES 항목 1개","sub":"timestamp · tid · value · pm_mode","x":840,"y":40,"w":220,"h":62,"tone":"accent"},
-    {"id":"bt","label":"묶음 마감","sub":"항목 500개 또는 1초 · 먼저 오는 쪽","x":1120,"y":34,"w":200,"h":74,"shape":"diamond"},
-    {"id":"dr","label":"버린다","sub":"미등록 · ISL 의 현재 동작","x":580,"y":200,"w":200,"h":62,"tone":"risk"},
-    {"id":"au","label":"번호를 새로 매긴다","sub":"미등록 · 브리지 기본값 900000~","x":840,"y":200,"w":220,"h":62,"tone":"warn"},
-    {"id":"rc","label":"Kafka 레코드 1개","sub":"헤더 11개 + 항목 배열","x":1120,"y":200,"w":200,"h":62,"tone":"ok"},
-    {"id":"tp","label":"ot.lidar.status","sub":"Key = 토픽 이름 · 1파티션","x":1120,"y":330,"w":200,"h":58,"shape":"pill","tone":"primary"}
+    {"id":"m1","label":"MQTT 메시지 1건","sub":"{id, raw_payload}","x":20,"y":36,"w":170,"h":84,"tone":"primary"},
+    {"id":"t1","label":"태그 값 갱신","sub":"TagId 세 조각","x":210,"y":36,"w":170,"h":84},
+    {"id":"d1","label":"등록부에 있나","sub":"ParameterId 조회","x":400,"y":26,"w":180,"h":104,"shape":"diamond"},
+    {"id":"it","label":"EES 항목 1개","sub":"timestamp · tid · value","x":600,"y":36,"w":180,"h":84,"tone":"accent"},
+    {"id":"rc","label":"레코드로 묶기","sub":"500건 또는 1초","x":800,"y":36,"w":180,"h":84,"tone":"ok"},
+    {"id":"dr","label":"버린다","sub":"미등록 · ISL 의 현재 동작","x":400,"y":205,"w":180,"h":80,"tone":"risk"},
+    {"id":"au","label":"번호를 새로 매긴다","sub":"미등록 · 브리지 900000~","x":600,"y":205,"w":180,"h":80,"tone":"warn"},
+    {"id":"tp","label":"ot.lidar.status","sub":"Key = 토픽 이름 · 1파티션","x":800,"y":205,"w":180,"h":80,"shape":"pill","tone":"primary"}
   ],
   "edges": [
     {"from":"m1","to":"t1","tone":"primary"},
@@ -821,9 +830,8 @@ ot/device/assembly/lidar/status,1,raw,LDR-GJ-A1B1-02,raw_payload,STRING,true
     {"from":"d1","to":"dr","tone":"risk","style":"dash"},
     {"from":"d1","to":"au","style":"dash"},
     {"from":"au","to":"it","style":"dash"},
-    {"from":"it","to":"bt","tone":"primary"},
-    {"from":"bt","to":"rc","tone":"ok"},
-    {"from":"rc","to":"tp","label":"produce · acks=all","tone":"ok"}
+    {"from":"it","to":"rc","tone":"primary"},
+    {"from":"rc","to":"tp","tone":"ok"}
   ]
 }
         </script>
@@ -907,20 +915,20 @@ replycluster    =                        <span class="cm">// 빈 값</span>
       <p class="why">소비자가 하는 일은 다섯이다. 실패 경로까지 그려야 "안 들어온 데이터가 어디 있나"에 답할 수 있다.</p>
 
       <h3>처리 순서</h3>
-      <div class="dgm" data-edit="on" style="height:460px">
+      <div class="dgm" data-edit="on">
         <script type="application/json" class="dgm-data">
 {
   "nodes": [
-    {"id":"p1","label":"레코드 수신","sub":"50건 또는 1초마다 한 배치","x":30,"y":40,"w":200,"h":62,"tone":"primary"},
-    {"id":"p2","label":"채널 판정","sub":"토픽 이름의 마지막 마디","x":290,"y":34,"w":190,"h":74,"shape":"diamond"},
-    {"id":"p3","label":"배열 풀기","sub":"레코드 1개 → 항목 N개","x":540,"y":40,"w":200,"h":62},
-    {"id":"p4","label":"숫자 tid 해석","sub":"(토픽, 숫자) 조회표","x":800,"y":34,"w":190,"h":74,"shape":"diamond"},
-    {"id":"p5","label":"행 만들기","sub":"raw_payload 키 = 컬럼 이름","x":1050,"y":40,"w":200,"h":62,"tone":"accent"},
-    {"id":"x1","label":"reject 격리","sub":"모르는 토픽 · 깨진 JSON · 필수 필드 없음","x":290,"y":210,"w":200,"h":62,"tone":"risk"},
-    {"id":"fb","label":"폴백 장비 축","sub":"상태는 멱등 키에서, 나머지는 #숫자","x":800,"y":210,"w":200,"h":62,"tone":"warn"},
-    {"id":"in","label":"하이퍼테이블 INSERT","sub":"ON CONFLICT (멱등키, time) DO NOTHING","x":1050,"y":210,"w":200,"h":62,"tone":"ok"},
-    {"id":"up","label":"상태 표 UPSERT","sub":"device_state · block_progress · block_artifact","x":1050,"y":350,"w":200,"h":62,"tone":"ok"},
-    {"id":"cm","label":"DB 커밋 후 오프셋 커밋","sub":"순서가 뒤집히면 유실된다","x":790,"y":350,"w":210,"h":62,"tone":"ok"}
+    {"id":"p1","label":"레코드 수신","sub":"50건 또는 1초마다","x":20,"y":36,"w":170,"h":84,"tone":"primary"},
+    {"id":"p2","label":"채널 판정","sub":"토픽 이름의 끝 마디","x":210,"y":26,"w":180,"h":104,"shape":"diamond"},
+    {"id":"p3","label":"배열 풀기","sub":"레코드 하나 = 항목 N개","x":420,"y":36,"w":170,"h":84},
+    {"id":"p4","label":"숫자 tid 해석","sub":"(토픽, 숫자) 조회표","x":610,"y":26,"w":180,"h":104,"shape":"diamond"},
+    {"id":"p5","label":"행 만들기","sub":"키 이름이 곧 컬럼 이름","x":820,"y":36,"w":170,"h":84,"tone":"accent"},
+    {"id":"x1","label":"reject 격리","sub":"원문과 사유를 남긴다","x":210,"y":210,"w":180,"h":80,"tone":"risk"},
+    {"id":"fb","label":"폴백 장비 축","sub":"상태만 멱등 키에서 되찾는다","x":610,"y":210,"w":180,"h":80,"tone":"warn"},
+    {"id":"in","label":"표에 INSERT","sub":"멱등 키가 겹치면 건너뛴다","x":820,"y":210,"w":170,"h":80,"tone":"ok"},
+    {"id":"up","label":"상태 표 UPSERT","sub":"device_state · block 둘","x":820,"y":340,"w":170,"h":80,"tone":"ok"},
+    {"id":"cm","label":"DB 커밋 뒤 오프셋 커밋","sub":"순서가 뒤집히면 유실된다","x":600,"y":340,"w":190,"h":80,"tone":"ok"}
   ],
   "edges": [
     {"from":"p1","to":"p2","tone":"primary"},
@@ -1176,34 +1184,99 @@ src\timescaledb\scripts\verify.ps1             <span class="cm"># 표별 행 수
       var f = 14;
       return s('path', { 'class': 'box', d: 'M0,0 L' + (w - f) + ',0 L' + w + ',' + f + ' L' + w + ',' + ht + ' L0,' + ht + ' Z' });
     }
-    var rx = sh === 'pill' ? ht / 2 : (sh === 'round' ? 12 : 4);
+    var rx = sh === 'pill' ? Math.min(ht / 2, 26) : (sh === 'round' ? 16 : 9);
     return s('rect', { 'class': 'box', x: 0, y: 0, width: w, height: ht, rx: rx });
   }
 
-  /* 노드 두 개 사이의 직교(엘보) 경로 */
-  function route(a, b) {
+  /* ---------- 선 그리기 ----------
+     직교(엘보) 경로다. 모서리는 둥글게 깎고, 가운데 줄기(lane)는 다른 박스를 뚫지 않는
+     자리로 옮긴다 — 자동 레이아웃이 없는 대신 선이 박스를 가로지르지 않게 한다. */
+  var OBS_PAD = 8;      /* 박스 둘레 여유 */
+  var CORNER = 12;      /* 모서리 반지름 */
+
+  function obstaclesOf(nodes, a, b) {
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n === a || n === b) continue;
+      out.push({ x0: n.x - OBS_PAD, y0: n.y - OBS_PAD, x1: n.x + n.w + OBS_PAD, y1: n.y + n.h + OBS_PAD });
+    }
+    return out;
+  }
+  function blockedV(obs, x, ya, yb) {
+    var y0 = Math.min(ya, yb), y1 = Math.max(ya, yb);
+    for (var i = 0; i < obs.length; i++) {
+      var o = obs[i];
+      if (x > o.x0 && x < o.x1 && y1 > o.y0 && y0 < o.y1) return true;
+    }
+    return false;
+  }
+  function blockedH(obs, y, xa, xb) {
+    var x0 = Math.min(xa, xb), x1 = Math.max(xa, xb);
+    for (var i = 0; i < obs.length; i++) {
+      var o = obs[i];
+      if (y > o.y0 && y < o.y1 && x1 > o.x0 && x0 < o.x1) return true;
+    }
+    return false;
+  }
+  /* 가운데 줄기를 놓을 자리. 한가운데가 막히면 좌우(위아래)로 10px 씩 벌려 본다. */
+  function pickLane(mid, ok) {
+    if (ok(mid)) return mid;
+    for (var d = 10; d <= 400; d += 10) {
+      if (ok(mid + d)) return mid + d;
+      if (ok(mid - d)) return mid - d;
+    }
+    return mid;
+  }
+  function dist(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
+  function toward(c, t, r) {
+    var dx = t.x - c.x, dy = t.y - c.y, L = Math.sqrt(dx * dx + dy * dy) || 1;
+    return { x: c.x + dx / L * r, y: c.y + dy / L * r };
+  }
+  /* 꺾이는 점마다 2차 베지어로 모서리를 깎은 폴리라인 */
+  function polyline(pts) {
+    var p = [pts[0]];
+    for (var i = 1; i < pts.length; i++) {
+      var q = p[p.length - 1];
+      if (Math.abs(pts[i].x - q.x) > 0.5 || Math.abs(pts[i].y - q.y) > 0.5) p.push(pts[i]);
+    }
+    if (p.length < 3) return 'M' + p[0].x + ',' + p[0].y + ' L' + p[p.length - 1].x + ',' + p[p.length - 1].y;
+    var d = 'M' + p[0].x + ',' + p[0].y;
+    for (var j = 1; j < p.length - 1; j++) {
+      var a = p[j - 1], c = p[j], b = p[j + 1];
+      var r = Math.min(CORNER, dist(a, c) / 2, dist(c, b) / 2);
+      var s1 = toward(c, a, r), s2 = toward(c, b, r);
+      d += ' L' + s1.x.toFixed(1) + ',' + s1.y.toFixed(1) +
+           ' Q' + c.x + ',' + c.y + ' ' + s2.x.toFixed(1) + ',' + s2.y.toFixed(1);
+    }
+    d += ' L' + p[p.length - 1].x + ',' + p[p.length - 1].y;
+    return d;
+  }
+
+  function route(a, b, obs) {
+    obs = obs || [];
     var ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
-    var dx = bc.x - ac.x, dy = bc.y - ac.y, p1, p2, dir;
+    var dx = bc.x - ac.x, dy = bc.y - ac.y, pts, mid;
     if (Math.abs(dx) >= Math.abs(dy)) {
-      dir = 'h';
-      p1 = { x: dx > 0 ? a.x + a.w : a.x, y: ac.y };
-      p2 = { x: dx > 0 ? b.x : b.x + b.w, y: bc.y };
+      var p1 = { x: dx > 0 ? a.x + a.w : a.x, y: ac.y };
+      var p2 = { x: dx > 0 ? b.x : b.x + b.w, y: bc.y };
+      var lane = pickLane((p1.x + p2.x) / 2, function (v) {
+        return !blockedV(obs, v, p1.y, p2.y) &&
+               !blockedH(obs, p1.y, p1.x, v) && !blockedH(obs, p2.y, v, p2.x);
+      });
+      pts = [p1, { x: lane, y: p1.y }, { x: lane, y: p2.y }, p2];
+      mid = { x: lane, y: (p1.y + p2.y) / 2 };
     } else {
-      dir = 'v';
-      p1 = { x: ac.x, y: dy > 0 ? a.y + a.h : a.y };
-      p2 = { x: bc.x, y: dy > 0 ? b.y : b.y + b.h };
+      var q1 = { x: ac.x, y: dy > 0 ? a.y + a.h : a.y };
+      var q2 = { x: bc.x, y: dy > 0 ? b.y : b.y + b.h };
+      var laneY = pickLane((q1.y + q2.y) / 2, function (v) {
+        return !blockedH(obs, v, q1.x, q2.x) &&
+               !blockedV(obs, q1.x, q1.y, v) && !blockedV(obs, q2.x, v, q2.y);
+      });
+      pts = [q1, { x: q1.x, y: laneY }, { x: q2.x, y: laneY }, q2];
+      mid = { x: (q1.x + q2.x) / 2, y: laneY };
     }
-    var d, mid;
-    if (dir === 'h') {
-      var mx = (p1.x + p2.x) / 2;
-      d = 'M' + p1.x + ',' + p1.y + ' L' + mx + ',' + p1.y + ' L' + mx + ',' + p2.y + ' L' + p2.x + ',' + p2.y;
-      mid = { x: mx, y: (p1.y + p2.y) / 2 };
-    } else {
-      var my = (p1.y + p2.y) / 2;
-      d = 'M' + p1.x + ',' + p1.y + ' L' + p1.x + ',' + my + ' L' + p2.x + ',' + my + ' L' + p2.x + ',' + p2.y;
-      mid = { x: (p1.x + p2.x) / 2, y: my };
-    }
-    return { d: d, mid: mid };
+    return { d: polyline(pts), mid: mid };
   }
 
   /* 원본 JSON 이 바뀌었는지 보는 값. 문서를 고쳐 다시 배포하면 해시가 달라져
@@ -1237,6 +1310,7 @@ src\timescaledb\scripts\verify.ps1             <span class="cm"># 표별 행 수
     this.undo = [];
     this.build();
     this.render();
+    this.autoHeight();
     this.fit();
     this.ready = true;
     this.markSaved(!!this._restored);
@@ -1265,14 +1339,16 @@ src\timescaledb\scripts\verify.ps1             <span class="cm"># 표별 행 수
     mk('색', '선택 항목의 톤 변경', function () { self.cycleTone(); });
     mk('모양', '선택 박스의 모양 변경', function () { self.cycleShape(); });
     mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
-    bar.appendChild(h('span', 'sp'));
+    bar.appendChild(h('span', 'dgm__sep'));
     mk('−', '축소', function () { self.zoom(1 / 1.2); });
     mk('+', '확대', function () { self.zoom(1.2); });
-    mk('맞춤', '화면에 맞추기', function () { self.fit(); });
+    mk('맞춤', '화면에 맞추기', function () { self.autoHeight(); self.fit(); });
     this.bMax = mk('넓게', '화면 가득 펼치기 (Esc 로 닫기)', function () { self.toggleMax(); });
+    bar.appendChild(h('span', 'dgm__sep'));
     mk('JSON', '수정 결과를 JSON으로 복사해 원본 파일에 붙여넣기', function () { self.openJson(); });
     this.bReset = mk('원래대로', '이 브라우저에 저장된 편집 내용을 지운다', function () { self.resetSaved(); });
-    bar.appendChild(h('span', 'dgm__hint', '드래그 이동 · 더블클릭 라벨수정 · 휠 줌 · 빈 곳 드래그 팬'));
+    bar.appendChild(h('span', 'sp'));
+    bar.appendChild(h('span', 'dgm__hint', '드래그로 이동 · 더블클릭으로 라벨 수정 · 휠로 확대'));
 
     var svg = s('svg', { 'class': 'dgm__svg' });
     var defs = s('defs');
@@ -1281,9 +1357,9 @@ src\timescaledb\scripts\verify.ps1             <span class="cm"># 표별 행 수
         var mk2 = s('marker', {
           id: m[0] + '-' + Math.random().toString(36).slice(2, 7),
           viewBox: '0 0 10 10', refX: 9, refY: 5,
-          markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'
+          markerWidth: 8, markerHeight: 8, orient: 'auto-start-reverse'
         });
-        var p = s('path', { d: 'M0,1 L10,5 L0,9 z' });
+        var p = s('path', { d: 'M0,0.5 L10,5 L0,9.5 L2.9,5 z' });
         p.setAttribute('style', 'fill:' + m[1]);
         mk2.appendChild(p); defs.appendChild(mk2);
         self['mk_' + m[0].slice(3)] = mk2.getAttribute('id');
@@ -1326,7 +1402,7 @@ src\timescaledb\scripts\verify.ps1             <span class="cm"># 표별 행 수
       try {
         var d = JSON.parse(ta.value);
         self.push(); self.data = d; self.data.nodes = d.nodes || []; self.data.edges = d.edges || []; self.data.groups = d.groups || [];
-        self.render(); self.fit(); modal.classList.remove('is-open');
+        self.render(); self.autoHeight(); self.fit(); modal.classList.remove('is-open');
       } catch (e) { alert('JSON 형식이 올바르지 않습니다: ' + e.message); }
     });
 
@@ -1351,7 +1427,7 @@ src\timescaledb\scripts\verify.ps1             <span class="cm"># 표별 행 수
     this.data.edges.forEach(function (e, i) {
       var a = self.index[e.from], b = self.index[e.to];
       if (!a || !b) return;
-      var r = route(a, b);
+      var r = route(a, b, obstaclesOf(self.data.nodes, a, b));
       var g = s('g', { 'class': 'dgm-edge', 'data-i': i });
       if (e.tone) g.setAttribute('data-tone', e.tone);
       if (e.style) g.setAttribute('data-style', e.style);
@@ -1428,7 +1504,33 @@ src\timescaledb\scripts\verify.ps1             <span class="cm"># 표별 행 수
       this.bMax.textContent = on ? '닫기' : '넓게';
       this.bMax.title = on ? '원래 크기로 (Esc)' : '화면 가득 펼치기 (Esc 로 닫기)';
     }
-    (window.requestAnimationFrame || setTimeout)(function () { self.fit(); });
+    (window.requestAnimationFrame || setTimeout)(function () {
+      if (!on) self.autoHeight();
+      self.fit();
+    });
+  };
+
+  /* 캔버스 높이를 내용 비율에 맞춘다.
+     고정 높이를 쓰면 넓고 납작한 그림은 축소되어 글씨가 안 보이고, 좁은 그림은 빈 띠가 남는다.
+     슬라이드처럼 남는 공간을 채우는 자리(flex:1)와 data-autoheight="off" 는 건드리지 않는다. */
+  Diagram.prototype.autoHeight = function () {
+    if (this.root.classList.contains('is-max')) return;
+    if (this.root.getAttribute('data-autoheight') === 'off') return;
+    var cs = window.getComputedStyle(this.root);
+    if (cs.flexGrow !== '0') return;
+    var items = this.data.nodes.concat(this.data.groups);
+    if (!items.length) return;
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    items.forEach(function (n) {
+      x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+      x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h);
+    });
+    var W = this.svg.clientWidth || this.root.clientWidth || 900;
+    var pad = 28, bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
+    var k = Math.min(W / bw, 1);
+    var bar = this.root.querySelector('.dgm__bar');
+    var want = Math.round(bh * k) + (bar ? bar.offsetHeight : 0) + 2;
+    this.root.style.height = Math.max(220, Math.min(want, 720)) + 'px';
   };
 
   Diagram.prototype.fit = function () {
@@ -1447,7 +1549,7 @@ src\timescaledb\scripts\verify.ps1             <span class="cm"># 표별 행 수
       x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h);
     });
     var pad = 24, bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
-    var k = Math.min(W / bw, H / bh, 1.6);
+    var k = Math.min(W / bw, H / bh, 1);
     this.view.k = k;
     this.view.tx = (W - bw * k) / 2 - (x0 - pad) * k;
     this.view.ty = (H - bh * k) / 2 - (y0 - pad) * k;
@@ -1704,6 +1806,18 @@ src\timescaledb\scripts\verify.ps1             <span class="cm"># 표별 행 수
     if (ev.key !== 'Escape') return;
     var el = document.querySelector('.dgm.is-max');
     if (el && el.__dgm) { ev.preventDefault(); el.__dgm.toggleMax(false); }
+  });
+
+  /* 창 폭이 바뀌면 높이와 배율을 다시 잡는다. 펼쳐 둔 그림은 건드리지 않는다. */
+  var rsT = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(rsT);
+    rsT = setTimeout(function () {
+      Array.prototype.forEach.call(document.querySelectorAll('.dgm'), function (el) {
+        if (!el.__dgm || el.classList.contains('is-max')) return;
+        el.__dgm.autoHeight(); el.__dgm.fit();
+      });
+    }, 160);
   });
 
   window.HWDiagram = { initAll: initAll, Diagram: Diagram };
