@@ -1,0 +1,46 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# cdc-topology — CDC 구성 5안 비교용 스파이크 DB
+#
+# 하이퍼테이블(tsdb)과 일반 표(rdb)가 logical decoding 에 어떻게 보이는지를 실기로 확인한다.
+# lidar 스택(src/timescaledb)과 같은 이미지·같은 wal 설정이다. 데이터는 스파이크가 만드는 수천 행뿐이라
+# 다른 스택과 같이 떠 있어도 부하가 없다.
+#
+#   scripts/spike.ps1        # 기동 → spike/*.sql 실행 → results/ 에 저장 → 정지
+#   scripts/spike.ps1 -Keep  # 끝나도 컨테이너를 남긴다 (psql 로 들여다볼 때)
+#
+# 포트는 64xxx 대역이다. 56xxx~63xxx 는 다른 스택이 쓴다.
+# ─────────────────────────────────────────────────────────────────────────────
+name: cdc-topology
+
+services:
+  spike-pg:
+    image: timescale/timescaledb:2.29.2-pg17
+    container_name: topo-spike-pg
+    environment:
+      POSTGRES_DB: spike
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      TZ: Asia/Seoul
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb
+      - -c
+      - timescaledb.telemetry_level=off
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+      - -c
+      - shared_buffers=64MB
+    ports:
+      - "64432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d spike"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
