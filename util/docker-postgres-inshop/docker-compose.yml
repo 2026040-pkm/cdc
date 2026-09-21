@@ -1,0 +1,34 @@
+# inshop 전용 PostgreSQL
+#
+# 호스트 5432 는 ocean-hotdata 가 쓰고 있어 54432 로 뺐다.
+# (55432 는 DBeaver 의 hotdb, 59248~59347 은 Windows 예약 구간이라 피한다)
+#
+# 실행:  podman compose up -d
+# 정리:  podman compose down -v      (볼륨까지 지움)
+# 접속:  postgresql://inshop:inshop@localhost:54432/inshop
+
+name: inshop-pg
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: inshop-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inshop
+      POSTGRES_USER: inshop
+      POSTGRES_PASSWORD: inshop
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+    ports:
+      - "54432:5432"
+    volumes:
+      - inshop-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inshop -d inshop"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  inshop-pg-data:
