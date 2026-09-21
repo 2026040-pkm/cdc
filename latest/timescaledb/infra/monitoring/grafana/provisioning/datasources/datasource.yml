@@ -1,0 +1,35 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: tsdb-prom
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 5s
+
+  # TimescaleDB 직결.
+  #
+  # 장비 210대의 온도·스캔 속도·품질 점수를 Prometheus 레이블로 올리면
+  # (장비 × 필드) 만큼 시계열이 생긴다. 지표로는 집계(상태별 대수 등)만 내고
+  # 장비 단위 추이는 연속 집계 뷰(lidar_status_1m)를 SQL 로 직접 읽는다.
+  - name: TimescaleDB
+    uid: tsdb-db
+    type: postgres
+    access: proxy
+    url: timescaledb:5432
+    database: lidar
+    user: postgres
+    editable: false
+    secureJsonData:
+      password: postgres
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      # time_bucket 기반 $__timeGroup 매크로를 켠다.
+      timescaledb: true
+      # 대시보드 편집 권한이 있으면 임의 SQL 을 돌릴 수 있다. PoC 라 postgres 로
+      # 붙였지만, 운영에서는 SELECT 만 가진 계정을 따로 판다.

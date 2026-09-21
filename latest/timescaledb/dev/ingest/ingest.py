@@ -1,0 +1,1229 @@
+#!/usr/bin/env python3
+"""
+InterSysLink(OT) LiDAR 필드 데이터 Kafka → TimescaleDB 소비자.
+
+레코드 하나의 값은 태그 여러 개의 값 배열이다 (EES Kafka Provider · data_type=value · V1.0).
+
+    [{"content": {"timestamp": <ns epoch>,
+                  "tid": "135",
+                  "value": "{\"device_role\":\"LIDAR\",\"status\":\"ONLINE\",...}",   # JSON 문자열
+                  "pm_mode": false}}, ...]
+
+채널은 **Kafka 토픽**이 정한다. EES 메시지 하나가 토픽 하나이고, 채널마다 메시지를 따로
+만들어 두었다 (msgHeaderFormat.topic.send_topic). 토픽 이름의 마지막 마디로 고른다.
+
+    ot.lidar.status    ← ot/device/{zone}/lidar/status              → tsdb.lidar_status        (1건/1초·대)
+    ot.lidar.actual    ← ot/sensor/{stage}/actual                   → tsdb.lidar_scan_actual   (1건/1분·대)
+    ot.lidar.artifact  ← ot/pipeline/{zone}/{shop}/{bay}/artifact   → tsdb.lidar_scan_artifact (12건/1분·대)
+
+**content.tid 는 TagId 가 아니라 EES ParameterId(숫자)다.** Provider 가 태그를 실을 때
+문자열 TagId 를 버리고 이 번호만 쓴다 (ValueMessageFormatterV1_0). raw_payload 안에도 장비 id
+필드는 없다 — 즉 Kafka 만 읽어서는 어느 장비인지 알 수 없다. 그래서 InterSysLink 등록부를
+옮겨 둔 lidar_tag_catalog 를 기동할 때 통째로 읽어 (토픽, 숫자) → 장비 id 로 푼다.
+그 표를 채우는 것은 scripts/export-tag-catalog.py 다.
+
+카탈로그에 없는 숫자를 만나도 멈추지 않는다. 표를 다시 읽어 보고(레이트 리밋), 그래도 없으면
+상태 채널은 idempotency_key 앞부분(LDR-…:20260910T151724)에서 장비 id 를 뽑고, 그마저 없으면
+'#<숫자>' 를 장비 축으로 둔다 — 적재를 멈추는 대신 미해석을 눈에 보이게 남긴다.
+
+tagMode=raw 라 content.value 는 raw_payload 통째의 JSON 문자열이다 — 채널마다 키가 다르다.
+
+하는 일은 다섯이다.
+  1. 배열을 풀어 항목마다(채널은 토픽이 정한다) 해당 표에 한 행 (멱등 키 충돌은 DO NOTHING)
+  2. 배치 안의 장비별 최신 상태로 rdb.lidar_device_state UPSERT (오래된 이벤트는 못 덮는다)
+  3. 레코드 자체를 rdb.lidar_status_message 한 행 (헤더·오프셋·채널별 항목 수)
+  4. 파싱이 안 되거나 모르는 토픽인 항목은 lidar_ingest_reject 로 격리 — 나머지는 그대로 적재
+  5. 지표 노출 (/metrics)
+
+전달 보장: DB 트랜잭션이 커밋된 뒤에만 Kafka 오프셋을 커밋한다 (at-least-once).
+재전달로 같은 항목이 다시 와도 (idempotency_key, time) 유니크 인덱스가 걸러 낸다.
+DB 쓰기가 실패하면 오프셋을 커밋하지 않고 같은 배치를 다시 시도한다.
+"""
+import json
+import logging
+import os
+import signal
+import sys
+import time
+import uuid
+from datetime import datetime, timedelta, timezone
+
+import psycopg
+from confluent_kafka import Consumer, KafkaException
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
+
+# ── 설정 ────────────────────────────────────────────────────────────────────
+KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "kafka:9093")
+# 쉼표로 여러 개를 받는다. 채널 하나에 토픽 하나이고, 분류는 토픽 이름의 마지막 마디로 한다
+# (status · actual · artifact). 토픽 이름이 바뀌어도 끝 마디만 맞으면 그대로 동작한다.
+KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "ot.lidar.status,ot.lidar.actual,ot.lidar.artifact")
+KAFKA_GROUP_ID = os.environ.get("KAFKA_GROUP_ID", "tsdb-lidar-ingest")
+KAFKA_AUTO_OFFSET_RESET = os.environ.get("KAFKA_AUTO_OFFSET_RESET", "earliest")
+PG_DSN = os.environ.get("PG_DSN", "postgresql://postgres:postgres@timescaledb:5432/lidar")
+BATCH_MAX_MESSAGES = int(os.environ.get("BATCH_MAX_MESSAGES", "50"))
+BATCH_MAX_WAIT_S = int(os.environ.get("BATCH_MAX_WAIT_MS", "1000")) / 1000.0
+METRICS_PORT = int(os.environ.get("METRICS_PORT", "8000"))
+# 카탈로그에 없는 숫자 tid 를 만났을 때 표를 다시 읽어 보는 최소 간격.
+# 태그를 추가 등록하면 그 사이 들어온 항목은 미해석으로 적재되고 이 주기 뒤부터 풀린다.
+TAG_CATALOG_REFRESH_S = int(os.environ.get("TAG_CATALOG_REFRESH_SECONDS", "60"))
+
+TOPICS = [t.strip() for t in KAFKA_TOPIC.split(",") if t.strip()]
+
+# 어디서 읽는가.
+#   kafka = ISL 경로. EMQX → Mqtt.Agent → Engine → EES Kafka Provider → Kafka → 여기 (기본)
+#   mqtt  = 직결 경로. EMQX → 여기. Agent · Engine · Provider · Kafka 를 전부 건너뛴다
+# 두 경로는 파싱 뒤(행 모양 · DB 쓰기 · 지표 이름)가 같은 코드다. 비교가 전송 경로의 차이만 재도록
+# 하기 위해서다. 어느 쪽인지는 Prometheus 의 pipeline 레이블로 가른다.
+SOURCE = os.environ.get("SOURCE", "kafka").strip().lower()
+PIPELINE = os.environ.get("PIPELINE", "isl-kafka" if SOURCE == "kafka" else "mqtt-direct")
+MQTT_HOST = os.environ.get("MQTT_HOST", "emqx")
+MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
+# 발행기(util/mqtt-lidar-sim)의 세 채널. 마지막 마디가 채널이다.
+MQTT_TOPICS = [t.strip() for t in os.environ.get(
+    "MQTT_TOPICS", "ot/device/+/lidar/status,ot/sensor/+/actual,ot/pipeline/+/+/+/artifact").split(",") if t.strip()]
+MQTT_QOS = int(os.environ.get("MQTT_QOS", "1"))
+# clean_session=False 라 브로커가 이 id 로 세션(구독 · 미전달 메시지)을 들고 있는다. 바꾸면 새 세션이다.
+MQTT_CLIENT_ID = os.environ.get("MQTT_CLIENT_ID", "lidar-mqtt-ingest")
+# MQTT 는 메시지 하나가 항목 하나라 Kafka 레코드(항목 수백 개)와 알갱이가 다르다. 배치 상한을 항목 수로
+# 크게 잡아 두면 정상 운전에서는 BATCH_MAX_WAIT_MS(1초)가 먼저 끊어 Kafka 경로와 같은 "초당 트랜잭션 1개" 가 된다.
+MQTT_BATCH_MAX = int(os.environ.get("MQTT_BATCH_MAX", "5000"))
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    stream=sys.stdout,
+)
+log = logging.getLogger("lidar-ingest")
+
+# ── 지표 ────────────────────────────────────────────────────────────────────
+MESSAGES = Counter("lidar_ingest_messages_total", "Kafka records consumed")
+ITEMS = Counter("lidar_ingest_items_total", "items parsed from records", ["channel"])
+ROWS_INSERTED = Counter("lidar_ingest_rows_inserted_total", "rows inserted (all tables)")
+ROWS_DUPLICATE = Counter("lidar_ingest_rows_duplicate_total", "rows skipped by the idempotency index")
+TABLE_ROWS = Counter("lidar_ingest_table_rows_total", "rows inserted per table", ["table"])
+REJECTS = Counter("lidar_ingest_rejects_total", "items quarantined into lidar_ingest_reject", ["reason"])
+DB_ERRORS = Counter("lidar_ingest_db_errors_total", "failed DB batch writes (retried)")
+KAFKA_ERRORS = Counter("lidar_ingest_kafka_errors_total", "consume/commit failures (retried, not fatal)")
+BATCHES = Counter("lidar_ingest_batches_total", "DB batches committed")
+BATCH_SECONDS = Histogram(
+    "lidar_ingest_batch_seconds", "DB write + commit time per batch",
+    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10),
+)
+BATCH_ROWS = Histogram(
+    "lidar_ingest_batch_rows", "rows per DB batch",
+    buckets=(100, 200, 500, 1000, 2000, 5000, 10000, 20000),
+)
+END_TO_END = Histogram(
+    "lidar_ingest_end_to_end_seconds", "device content.timestamp → DB commit",
+    buckets=(0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 300, 1800),
+)
+TAG_CATALOG_SIZE = Gauge("lidar_ingest_tag_catalog_rows", "rows loaded from lidar_tag_catalog")
+TAG_UNRESOLVED = Counter(
+    "lidar_ingest_tag_unresolved_total",
+    "items whose content.tid was not in lidar_tag_catalog (device axis fell back)", ["channel"])
+TAG_CHANNEL_MISMATCH = Counter(
+    "lidar_ingest_tag_channel_mismatch_total",
+    "items whose catalog channel disagreed with the Kafka topic (EES message misconfigured)")
+KAFKA_LAG = Gauge("lidar_ingest_kafka_lag", "high watermark - consumer position", ["partition"])
+# 소스와 무관한 대기 수. kafka = 파티션 lag 합(레코드), mqtt = 받았지만 아직 DB 에 안 쓴 메시지 수.
+SOURCE_LAG = Gauge("lidar_ingest_source_lag", "records waiting (kafka lag sum / mqtt messages received but not yet written)")
+PIPELINE_INFO = Gauge("lidar_ingest_pipeline_info", "which transport this consumer reads", ["pipeline", "source"])
+LAST_COMMIT = Gauge("lidar_ingest_last_commit_timestamp_seconds", "unix time of the last DB+Kafka commit")
+LAST_EVENT = Gauge("lidar_ingest_last_event_timestamp_seconds", "newest content.timestamp seen (unix seconds)")
+
+# ── 채널 ────────────────────────────────────────────────────────────────────
+# Kafka 토픽 이름의 마지막 마디로 판정한다. '.' 과 '-' 를 모두 구분자로 보므로
+# ot.lidar.status 든 ot-lidar-status 든 같은 채널로 잡힌다.
+CH_STATUS = "status"
+CH_ACTUAL = "actual"
+CH_ARTIFACT = "artifact"
+CHANNELS = (CH_STATUS, CH_ACTUAL, CH_ARTIFACT)
+
+# 산출물은 장비 하나가 종류마다 다른 id 로 발행한다 (LDR-…-01-SEGMENTED_PCD).
+# 장비 축으로 보려면 접미사를 떼야 한다.
+ARTIFACT_TYPES = ("REGISTERED_PCD", "TRANSFORMATION_MATRIX", "SEGMENTED_PCD")
+
+# ── SQL ─────────────────────────────────────────────────────────────────────
+# json_populate_recordset 이 JSON 키를 컬럼에 맞춰 캐스팅한다. timestamptz 문자열은
+# PostgreSQL 이 직접 파싱하므로 (7자리 소수초도 받는다) 파이썬에서 날짜를 다루지 않는다.
+STATUS_COLS = (
+    "time, tid, tag_id, param_id, mqtt_topic, device_role, site, zone, shop, bay, status, error_code, "
+    "scan_rate_pts_per_sec, temperature_c, connectivity_rssi, fov_mode, last_heartbeat_at, "
+    "ingested_at, content_ts, pm_mode, idempotency_key, kafka_offset"
+)
+ACTUAL_COLS = (
+    "time, tid, tag_id, param_id, mqtt_topic, site, zone, shop, bay, stage, record_type, input_method, "
+    "source_system, hull_no, block_id, scan_id, scanned_at, pan_tilt, edge_pc, inference_ws, "
+    "vision_ocr, event_type, block_progress_rate, reference_cad_id, match_confidence, "
+    "model_version, ingested_at, content_ts, pm_mode, idempotency_key, kafka_offset"
+)
+ARTIFACT_COLS = (
+    "time, tid, tag_id, param_id, mqtt_topic, scan_id, artifact_type, hull_no, block_id, segment_id, "
+    "storage_uri, file_size_bytes, checksum, transformation_matrix, produced_by_device_id, "
+    "model_version, ingested_at, content_ts, pm_mode, idempotency_key, kafka_offset"
+)
+
+
+def insert_sql(table, cols):
+    return f"""
+        INSERT INTO {table} ({cols})
+        SELECT {cols} FROM json_populate_recordset(NULL::{table}, %s::json)
+        ON CONFLICT (idempotency_key, time) DO NOTHING
+    """
+
+
+INSERTS = {
+    CH_STATUS: ("lidar_status", insert_sql("tsdb.lidar_status", STATUS_COLS)),
+    CH_ACTUAL: ("lidar_scan_actual", insert_sql("tsdb.lidar_scan_actual", ACTUAL_COLS)),
+    CH_ARTIFACT: ("lidar_scan_artifact", insert_sql("tsdb.lidar_scan_artifact", ARTIFACT_COLS)),
+}
+
+STATE_COLS = (
+    "tid, device_role, site, zone, shop, bay, status, error_code, scan_rate_pts_per_sec, "
+    "temperature_c, connectivity_rssi, fov_mode, last_event_at, last_heartbeat_at"
+)
+UPSERT_STATE = f"""
+    INSERT INTO rdb.lidar_device_state ({STATE_COLS}, updated_at)
+    SELECT {STATE_COLS}, now() FROM json_populate_recordset(NULL::rdb.lidar_device_state, %s::json)
+    ON CONFLICT (tid) DO UPDATE SET
+        device_role = EXCLUDED.device_role,
+        site = EXCLUDED.site,
+        zone = EXCLUDED.zone,
+        shop = EXCLUDED.shop,
+        bay = EXCLUDED.bay,
+        status = EXCLUDED.status,
+        error_code = EXCLUDED.error_code,
+        scan_rate_pts_per_sec = EXCLUDED.scan_rate_pts_per_sec,
+        temperature_c = EXCLUDED.temperature_c,
+        connectivity_rssi = EXCLUDED.connectivity_rssi,
+        fov_mode = EXCLUDED.fov_mode,
+        last_event_at = EXCLUDED.last_event_at,
+        last_heartbeat_at = EXCLUDED.last_heartbeat_at,
+        updated_at = now()
+    WHERE EXCLUDED.last_event_at > lidar_device_state.last_event_at
+"""
+# actual·artifact 의 상태 표. 축은 (hull_no, block_id) 하나이고 stage·artifact_type 은
+# 키가 아니라 컬럼으로 눕는다 — 근거는 01-schema.sql 주석(그러지 않으면 상태 표가
+# 하이퍼테이블의 사본이 된다). 두 표는 축만 같고 모양이 다르므로 UPSERT 도 따로 쓴다.
+#
+# 갱신 규칙이 컬럼 성격마다 셋으로 갈린다.
+#   최신 값  늦게 온 재전달이 덮지 못하도록 last_event_at 비교를 CASE 로 건다
+#   누계    도착 순서와 무관하므로 조건 없이 더한다 (배치 안에서 먼저 합쳐 온다)
+#   마일스톤 GREATEST 로 민다. PostgreSQL 의 GREATEST 는 NULL 을 무시하므로 아직 안 끝난
+#           공정(NULL)과 이미 끝난 공정이 한 식으로 처리되고 되돌려지지도 않는다
+# device_state 는 최신 값만 있어 ON CONFLICT ... WHERE 한 줄로 끝나지만 여기서는 못 쓴다 —
+# WHERE 로 행 전체를 막으면 늦게 온 이벤트의 누계와 마일스톤까지 같이 버려진다.
+#
+# CASE 를 컬럼마다 늘어놓는 대신 여기서 만든다. ON CONFLICT DO UPDATE 는 FROM 절을
+# 못 받아 비교식에 별칭을 달 수 없어, 같은 비교를 컬럼 수만큼 손으로 베껴야 하기 때문이다.
+# 한 줄만 틀려도 그 컬럼만 조용히 안 바뀐다.
+def upsert_state_sql(table, keys, latest_cols, sum_cols, max_cols=(), milestone_cols=()):
+    """
+    (키, 최신 값, 누계, 최댓값, 마일스톤) → 상태 표 UPSERT SQL.
+
+    max_cols 는 GREATEST 로 밀되 의미가 '관측된 최댓값'인 컬럼이고(max_progress_rate),
+    milestone_cols 는 같은 GREATEST 지만 의미가 '그 일이 일어난 시각'인 컬럼이다.
+    식이 같아 한데 묶어도 되지만, 읽는 쪽이 둘을 구별해야 해서 이름을 나눠 둔다.
+    """
+    greatest = list(max_cols) + list(milestone_cols)
+    cols = ", ".join(list(keys) + list(latest_cols) + list(sum_cols) + greatest
+                     + ["first_event_at", "last_event_at"])
+    newer = f"EXCLUDED.last_event_at > {table}.last_event_at"
+    sets = [f"{c} = CASE WHEN {newer} THEN EXCLUDED.{c} ELSE {table}.{c} END" for c in latest_cols]
+    sets += [f"{c} = {table}.{c} + EXCLUDED.{c}" for c in sum_cols]
+    sets += [f"{c} = GREATEST({table}.{c}, EXCLUDED.{c})" for c in greatest]
+    sets += [
+        f"first_event_at = LEAST({table}.first_event_at, EXCLUDED.first_event_at)",
+        f"last_event_at = GREATEST({table}.last_event_at, EXCLUDED.last_event_at)",
+        "updated_at = now()",
+    ]
+    key_list = ", ".join(keys)
+    set_clause = (",\n            ").join(sets)
+    return f"""
+        INSERT INTO {table} ({cols}, updated_at)
+        SELECT {cols}, now() FROM json_populate_recordset(NULL::{table}, %s::json)
+        ON CONFLICT ({key_list}) DO UPDATE SET
+            {set_clause}
+    """
+
+
+# 공정 이름 → 마일스톤 컬럼. 조립 4종·의장 2종이고 구역마다 지나는 공정이 다르다
+# (lidar-sim.cs Zones.StagesOf). 계약에 공정이 늘면 여기와 01-schema.sql 을 같이 고친다.
+STAGE_MILESTONE = {
+    "ARRANGEMENT": "arrangement_completed_at",
+    "FITTING": "fitting_completed_at",
+    "WELDING": "welding_completed_at",
+    "INSPECTION": "inspection_completed_at",
+    "WIRING": "wiring_completed_at",
+    "PIPING": "piping_completed_at",
+}
+
+BLOCK_KEYS = ["hull_no", "block_id"]
+
+PROGRESS_LATEST = [
+    "site", "zone", "shop", "bay", "current_stage", "current_event_type",
+    "current_progress_rate", "current_match_confidence", "current_scan_id", "current_tid",
+    "reference_cad_id", "model_version",
+]
+UPSERT_BLOCK_PROGRESS = upsert_state_sql(
+    "rdb.lidar_block_progress", BLOCK_KEYS, PROGRESS_LATEST,
+    sum_cols=["event_count", "complete_count"],
+    max_cols=["max_progress_rate"],
+    milestone_cols=sorted(STAGE_MILESTONE.values()),
+)
+
+# 산출물은 종류 셋이 건수·용량 컬럼으로 눕는다. 전부 누계라 조건 없이 더한다.
+ARTIFACT_SUMS = [
+    "registered_pcd_count", "registered_pcd_bytes",
+    "transformation_matrix_count",
+    "segmented_pcd_count", "segmented_pcd_bytes",
+    "artifact_count", "total_bytes",
+]
+ARTIFACT_LATEST = [
+    "latest_artifact_type", "latest_scan_id", "latest_segment_id", "latest_storage_uri",
+    "latest_checksum", "latest_file_size_bytes", "produced_by_device_id", "latest_tid",
+    "model_version",
+]
+UPSERT_BLOCK_ARTIFACT = upsert_state_sql(
+    "rdb.lidar_block_artifact", BLOCK_KEYS, ARTIFACT_LATEST, sum_cols=ARTIFACT_SUMS)
+
+
+INSERT_MESSAGE = """
+    INSERT INTO rdb.lidar_status_message
+        (kafka_partition, kafka_offset, kafka_ts, kafka_topic, uniqueid, msg_ts, message_version,
+         method_id, data_type, project_id, infra_proc_name, task_area_code, send_topic,
+         item_count, status_count, actual_count, artifact_count, reject_count)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT (kafka_partition, kafka_offset) DO NOTHING
+"""
+INSERT_REJECT = """
+    INSERT INTO rdb.lidar_ingest_reject (kafka_offset, payload, reason) VALUES (%s, %s::jsonb, %s)
+"""
+
+# ── 변환 ────────────────────────────────────────────────────────────────────
+# 발신 측(EesHeaderBuilderV1_0.ToUnixTimestampOrSeconds)은 ns epoch 를 쓰되 Int64 를 넘치면
+# 초로 떨어뜨린다. 그 경계(2262년)를 자릿수로 가른다 — 초 값은 10자리, ns 값은 19자리다.
+NS_MIN = 10 ** 15
+
+
+def ns_to_dt(value):
+    """ns epoch(또는 초) → tz-aware datetime (µs 로 절삭. timestamptz 정밀도가 µs 다)."""
+    value = int(value)
+    if abs(value) < NS_MIN:
+        return datetime.fromtimestamp(value, tz=timezone.utc)
+    sec, rem = divmod(value, 1_000_000_000)
+    return datetime.fromtimestamp(sec, tz=timezone.utc) + timedelta(microseconds=rem // 1000)
+
+
+def decode_headers(raw):
+    """Kafka 헤더 [(key, bytes|None), ...] → dict[str, str]. 빈 값은 None 으로 접는다."""
+    out = {}
+    for key, val in raw or []:
+        if val is None:
+            out[key] = None
+        else:
+            text = val.decode("utf-8", "replace") if isinstance(val, (bytes, bytearray)) else str(val)
+            out[key] = text or None
+    return out
+
+
+class Reject(Exception):
+    def __init__(self, reason, payload):
+        super().__init__(reason)
+        self.reason = reason
+        self.payload = payload
+
+
+def split_tag_id(tag_id):
+    """
+    문자열 TagId → (장비 id, 토픽 조각, 필드). 토픽의 '/' 가 '_' 로 접혀 있어 늘 정확히
+    세 조각이다 (MqttTagId 주석 참고).
+
+    지금 계약에서는 이 형태가 오지 않는다 — content.tid 는 숫자다. EES 설정을 되돌려
+    문자열 TagId 가 다시 실려 오는 경우를 위해 남겨 둔 경로다.
+    """
+    parts = tag_id.split(".")
+    if len(parts) != 3 or not all(parts):
+        return None
+    return parts[0], parts[1], parts[2]
+
+
+def channel_of_topic(topic):
+    """Kafka 토픽 이름의 마지막 마디로 채널을 고른다. 모르는 토픽이면 None."""
+    if not topic:
+        return None
+    last = topic.replace("-", ".").rsplit(".", 1)[-1].strip().lower()
+    return last if last in CHANNELS else None
+
+
+class TagCatalog:
+    """
+    lidar_tag_catalog 를 통째로 들고 있는 조회표. (send_topic, param_id) → 태그 한 줄.
+
+    Kafka 는 숫자만 싣고 장비 id 를 싣지 않는다. 그 숫자를 장비로 되돌리는 유일한 근거가
+    이 표다. 2,310행 수준이라 통째로 메모리에 둔다 — 항목마다 DB 를 때리면 초당 426개
+    레코드 × 항목 수만큼 조회가 생긴다.
+
+    없는 숫자를 만나면 표를 다시 읽어 본다(최소 간격 TAG_CATALOG_REFRESH_S). 태그를 새로
+    등록한 직후를 위한 것이지, 매번 확인하려는 것이 아니다.
+    """
+
+    def __init__(self):
+        self._by_key = {}
+        self._by_param = {}     # param_id → 행. 같은 숫자가 여러 토픽에 있으면 None 을 넣어 둔다
+        self._last_load = 0.0
+        self._miss_pending = False
+
+    def load(self, conn):
+        by_key, by_param = {}, {}
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT send_topic, param_id, tag_id, tid, mqtt_topic_key, channel "
+                    "FROM rdb.lidar_tag_catalog"
+                )
+                for send_topic, param_id, tag_id, tid, topic_key, channel in cur:
+                    row = (tag_id, tid, topic_key, channel)
+                    key = int(param_id)
+                    by_key[(send_topic, key)] = row
+                    # 같은 숫자가 토픽마다 다른 태그를 가리킬 수 있다. 그런 숫자는
+                    # 토픽 없이 찾을 수 없으므로 None 으로 막아 둔다.
+                    by_param[key] = row if key not in by_param else None
+        finally:
+            # 읽기만 했다. autocommit=False 라 트랜잭션이 열린 채로 남는 것을 막는다.
+            conn.rollback()
+        self._by_key, self._by_param = by_key, by_param
+        self._last_load = time.monotonic()
+        self._miss_pending = False
+        TAG_CATALOG_SIZE.set(len(by_key))
+        if by_key:
+            log.info("태그 카탈로그 %d행 적재 (장비 %d대)",
+                     len(by_key), len({row[1] for row in by_key.values()}))
+        else:
+            log.warning("태그 카탈로그가 비어 있다 — 장비 축이 '#숫자' 로만 남는다. "
+                        "scripts/export-tag-catalog.py 로 03-tag-catalog.sql 을 만든 뒤 "
+                        "down.sh -v 로 다시 올려라.")
+
+    def resolve(self, send_topic, param_id):
+        """(토픽, 숫자) → (tag_id, tid, mqtt_topic_key, channel). 못 찾으면 None."""
+        row = self._by_key.get((send_topic, param_id))
+        if row is not None:
+            return row
+        # 토픽 이름만 바뀐 경우(발행 설정 변경)를 위한 뒷문. 숫자가 유일할 때만 쓴다.
+        row = self._by_param.get(param_id)
+        if row is None:
+            self._miss_pending = True
+        return row
+
+    def should_reload(self):
+        return self._miss_pending and (time.monotonic() - self._last_load) >= TAG_CATALOG_REFRESH_S
+
+
+def fallback_tid(channel, value, param_id):
+    """
+    카탈로그가 못 푼 항목의 장비 축.
+
+    상태 채널만 페이로드에서 장비 id 를 되찾을 수 있다 — idempotency_key 가
+    "{장비 id}:{yyyyMMddTHHmmss}" 이기 때문이다. 실적은 "{scan_id 앞 8자}:{stage}:{event}" 라
+    장비가 없고, 산출물은 멱등 키 자체가 없다. 그 둘은 '#숫자' 로 남긴다 —
+    틀린 장비를 지어내는 것보다 안 푼 것이 드러나는 편이 낫다.
+    """
+    if channel == CH_STATUS:
+        key = value.get("idempotency_key")
+        if isinstance(key, str) and ":" in key:
+            head = key.split(":", 1)[0].strip()
+            if head:
+                return head
+    return f"#{param_id}" if param_id is not None else "#unknown"
+
+
+def device_of(artifact_id):
+    """LDR-…-01-SEGMENTED_PCD → LDR-…-01. 모르는 접미사면 그대로 둔다."""
+    for suffix in ARTIFACT_TYPES:
+        tail = "-" + suffix
+        if artifact_id.endswith(tail):
+            return artifact_id[: -len(tail)]
+    return artifact_id
+
+
+def num(value):
+    """숫자만 통과시킨다. 문자열로 온 숫자는 DB 가 캐스팅하므로 그대로 둔다."""
+    return value if isinstance(value, (int, float, str)) and not isinstance(value, bool) else None
+
+
+def require(value, fields, item):
+    for field in fields:
+        if not value.get(field):
+            raise Reject(f"missing {field}", item)
+
+
+def status_row(value, item):
+    require(value, ("status", "occurred_at", "idempotency_key"), item)
+    return {
+        "time": value["occurred_at"],
+        "device_role": value.get("device_role"),
+        "site": value.get("site"),
+        "zone": value.get("zone"),
+        "shop": value.get("shop"),
+        "bay": value.get("bay"),
+        "status": str(value["status"]),
+        "error_code": value.get("error_code") or None,      # '' · null → NULL
+        "scan_rate_pts_per_sec": num(value.get("scan_rate_pts_per_sec")),
+        "temperature_c": num(value.get("temperature_c")),
+        "connectivity_rssi": num(value.get("connectivity_rssi")),
+        "fov_mode": value.get("fov_mode"),
+        "last_heartbeat_at": value.get("last_heartbeat_at") or None,
+        "idempotency_key": str(value["idempotency_key"]),
+    }
+
+
+def actual_row(value, item):
+    require(value, ("occurred_at", "scan_id", "idempotency_key"), item)
+    return {
+        "time": value["occurred_at"],
+        "site": value.get("site"),
+        "zone": value.get("zone"),
+        "shop": value.get("shop"),
+        "bay": value.get("bay"),
+        "stage": value.get("stage"),
+        "record_type": value.get("record_type"),
+        "input_method": value.get("input_method"),
+        "source_system": value.get("source_system"),
+        "hull_no": value.get("hull_no"),
+        "block_id": value.get("block_id"),
+        "scan_id": str(value["scan_id"]),
+        "scanned_at": value.get("scanned_at") or None,
+        "pan_tilt": value.get("pan_tilt"),
+        "edge_pc": value.get("edge_pc"),
+        "inference_ws": value.get("inference_ws"),
+        "vision_ocr": value.get("vision_ocr") or None,
+        "event_type": value.get("event_type"),
+        "block_progress_rate": num(value.get("block_progress_rate")),
+        "reference_cad_id": value.get("reference_cad_id"),
+        "match_confidence": num(value.get("match_confidence")),
+        "model_version": value.get("model_version"),
+        "idempotency_key": str(value["idempotency_key"]),
+    }
+
+
+def artifact_row(value, item):
+    require(value, ("occurred_at", "scan_id", "artifact_type"), item)
+    scan_id = str(value["scan_id"])
+    artifact_type = str(value["artifact_type"])
+    segment_id = value.get("segment_id") or None
+    return {
+        "time": value["occurred_at"],
+        # 이 채널만 발신 측 멱등 키가 없다. 한 스캔 안에서 (종류, 세그먼트) 가 유일하므로
+        # 그걸로 만든다 — 재전달이 와도 같은 키가 나와 유니크 인덱스가 거른다.
+        "idempotency_key": f"{scan_id}:{artifact_type}:{segment_id or '-'}",
+        "scan_id": scan_id,
+        "artifact_type": artifact_type,
+        "hull_no": value.get("hull_no"),
+        "block_id": value.get("block_id"),
+        "segment_id": segment_id,
+        "storage_uri": value.get("storage_uri") or None,
+        "file_size_bytes": num(value.get("file_size_bytes")),
+        "checksum": value.get("checksum") or None,
+        "transformation_matrix": value.get("transformation_matrix"),
+        "produced_by_device_id": value.get("produced_by_device_id"),
+        "model_version": value.get("model_version"),
+    }
+
+
+BUILDERS = {CH_STATUS: status_row, CH_ACTUAL: actual_row, CH_ARTIFACT: artifact_row}
+
+
+def parse_item(item, channel, send_topic, kafka_offset, catalog):
+    """
+    배열 원소 하나 → (행 dict, content_ts). 깨졌으면 Reject.
+
+    채널은 이미 Kafka 토픽이 정했다(레코드 단위). 여기서는 숫자 tid 를 카탈로그로 풀어
+    장비 축을 붙이는 일만 한다.
+    """
+    if not isinstance(item, dict) or not isinstance(item.get("content"), dict):
+        raise Reject("no content object", item)
+    c = item["content"]
+    raw_tid = c.get("tid")
+    if raw_tid is None or raw_tid == "":
+        raise Reject("missing tid", item)
+    raw_tid = str(raw_tid).strip()
+
+    param_id, tid, tag_id, topic_key = None, None, None, None
+    try:
+        param_id = int(raw_tid)
+    except ValueError:
+        # 숫자가 아니면 옛 계약(문자열 TagId)일 수 있다. 그 형태면 그대로 쓴다.
+        parts = split_tag_id(raw_tid)
+        if parts is None:
+            raise Reject("tid is neither an EES parameter id nor a {device}.{topic}.{field} TagId", item)
+        device_id, topic_key, field = parts
+        # 세 채널은 tagMode=raw 로 구독한다 — raw_payload 통째가 태그 하나의 값이다.
+        # tagMode=fields 로 잡힌 태그는 값이 객체가 아니라 스칼라 하나라 여기 표에 맞지 않는다.
+        if field != "raw_payload":
+            raise Reject(f"unsupported tag field: {field} (tagMode=fields?)", item)
+        tag_id = raw_tid
+        tid = device_of(device_id) if channel == CH_ARTIFACT else device_id
+    else:
+        tag = catalog.resolve(send_topic, param_id)
+        if tag is not None:
+            tag_id, tid, topic_key, tag_channel = tag
+            if tag_channel != channel:
+                # 등록부와 실제 발행 토픽이 어긋났다는 뜻이다. 실려 온 토픽을 믿되
+                # (그 레코드가 실제로 그 토픽에서 왔다) 어긋남을 세어 둔다.
+                TAG_CHANNEL_MISMATCH.inc()
+        else:
+            TAG_UNRESOLVED.labels(channel=channel).inc()
+
+    content_ts = None
+    ts = c.get("timestamp")
+    if ts is not None:
+        try:
+            content_ts = ns_to_dt(ts)
+        except (TypeError, ValueError, OverflowError, OSError):
+            raise Reject("content.timestamp is not a ns epoch", item)
+
+    return build_row(channel, c.get("value"), item, tid, tag_id, param_id, topic_key,
+                     content_ts, c.get("pm_mode"), kafka_offset)
+
+
+def build_row(channel, value, item, tid, tag_id, param_id, topic_key, content_ts, pm_mode, offset):
+    """값(JSON 문자열 또는 객체) + 장비 축 → 표 행. 두 소스(kafka · mqtt)가 여기서 합류한다."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError as e:
+            raise Reject(f"value is not JSON: {e}", item)
+    if not isinstance(value, dict):
+        raise Reject("value is not an object", item)
+
+    row = BUILDERS[channel](value, item)
+    # 카탈로그가 못 푼 항목은 페이로드에서라도 장비를 되찾아 본다(상태 채널만 가능).
+    row["tid"] = tid if tid else fallback_tid(channel, value, param_id)
+    row["tag_id"] = tag_id
+    row["param_id"] = param_id
+    row["mqtt_topic"] = topic_key
+    row["ingested_at"] = value.get("ingested_at") or None
+    row["content_ts"] = content_ts.isoformat() if content_ts else None
+    row["pm_mode"] = pm_mode
+    row["kafka_offset"] = offset
+    return row, content_ts
+
+
+def parse_record(msg, catalog):
+    """
+    Kafka 레코드 → (채널별 행 목록, rejects, message_row).
+    값 전체가 JSON 이 아니면 레코드 하나가 통째로 reject 한 건이 된다.
+    채널은 이 레코드가 실려 온 토픽이 정한다 — 레코드 하나는 한 채널이다.
+    """
+    offset = msg.offset()
+    headers = decode_headers(msg.headers())
+    _ts_type, ts_ms = msg.timestamp()
+    kafka_ts = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc) if ts_ms and ts_ms > 0 else datetime.now(timezone.utc)
+    msg_ts = None
+    if headers.get("msg_timestamp"):
+        try:
+            msg_ts = ns_to_dt(headers["msg_timestamp"])
+        except (TypeError, ValueError, OverflowError, OSError):
+            msg_ts = None
+
+    rows = {channel: [] for channel in CHANNELS}
+    rejects = []
+    # 채널 판정. 토픽 이름은 소비 대상이 KAFKA_TOPIC 으로 정해져 있으므로 평소에는 늘 맞는다.
+    # 발행 설정(send_topic)이 채널과 무관한 이름으로 바뀌면 여기서 레코드째 격리된다 —
+    # 조용히 엉뚱한 표에 넣는 것보다 낫다. 헤더 request 도 같은 값이라 대조에 쓴다.
+    kafka_topic = msg.topic()
+    channel = channel_of_topic(kafka_topic) or channel_of_topic(headers.get("request"))
+    raw = msg.value()
+    try:
+        body = json.loads(raw)
+    except (TypeError, ValueError) as e:
+        text = raw.decode("utf-8", "replace") if isinstance(raw, (bytes, bytearray)) else str(raw)
+        rejects.append((offset, json.dumps({"raw": text[:4000]}), f"record is not JSON: {e}"))
+        body = []
+    if isinstance(body, dict):
+        body = [body]           # 단건으로 오는 경우도 받아 준다
+    if not isinstance(body, list):
+        rejects.append((offset, json.dumps({"raw": body}), "record is neither array nor object"))
+        body = []
+
+    # 격리로 빠져도 "레코드에 항목이 몇 개였나" 는 그대로 남아야 한다.
+    item_count = len(body)
+    if channel is None:
+        for item in body:
+            rejects.append((offset, json.dumps(item, ensure_ascii=False, default=str),
+                            f"unknown channel for topic: {kafka_topic}"))
+        body = []
+
+    send_topic = headers.get("request") or kafka_topic
+    for item in body:
+        try:
+            row, content_ts = parse_item(item, channel, send_topic, offset, catalog)
+            rows[channel].append((row, content_ts))
+        except Reject as r:
+            rejects.append((offset, json.dumps(r.payload, ensure_ascii=False, default=str), r.reason))
+
+    message_row = (
+        msg.partition(), offset, kafka_ts, msg.topic(),
+        headers.get("uniqueid"), msg_ts,
+        headers.get("message_version"), headers.get("method_id"), headers.get("data_type"),
+        headers.get("project_id"), headers.get("infra_proc_name"), headers.get("task_area_code"),
+        headers.get("request"),
+        item_count,
+        len(rows[CH_STATUS]), len(rows[CH_ACTUAL]), len(rows[CH_ARTIFACT]),
+        len(rejects),
+    )
+    return rows, rejects, message_row
+
+
+# ── MQTT 직결 ─────────────────────────────────────────────────────────────
+def channel_of_mqtt_topic(topic):
+    """MQTT 토픽의 마지막 마디가 채널이다 (ot/device/{zone}/lidar/status → status)."""
+    if not topic:
+        return None
+    last = topic.rstrip("/").rsplit("/", 1)[-1].strip().lower()
+    return last if last in CHANNELS else None
+
+
+def iso_to_dt(value):
+    """ISO-8601 (7자리 소수초 · Z · +09:00) → tz-aware datetime. µs 로 절삭한다."""
+    text = str(value).strip().replace("Z", "+00:00")
+    head, sep, tail = text.partition(".")
+    if sep:
+        n = 0
+        while n < len(tail) and tail[n].isdigit():
+            n += 1
+        digits, zone = tail[:n], tail[n:]
+        text = f"{head}.{digits[:6].ljust(6, '0')}{zone}"
+    dt = datetime.fromisoformat(text)
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def parse_mqtt_message(topic, payload, offset):
+    """
+    MQTT 메시지 하나 → (채널, 행, content_ts). 깨졌으면 Reject.
+
+    발행 계약은 {"id": "<장비 id>", "raw_payload": {...}} 하나다(Mqtt.Agent MqttPayloadParser 와 같다).
+    장비 id 가 메시지에 그대로 있어 카탈로그를 거치지 않는다. content_ts 는 raw_payload.occurred_at 이다 —
+    Kafka 경로의 content.timestamp 도 Agent 가 같은 값(occurred_at)으로 정하므로 end-to-end 지연 기준이 같다.
+    tag_id 는 Agent 가 만드는 모양({id}.{토픽 '/'→'_'}.raw_payload)으로 맞춰 둔다 — 두 DB 를 TagId 로 맞춰 볼 수 있게.
+    """
+    text = payload.decode("utf-8", "replace") if isinstance(payload, (bytes, bytearray)) else str(payload)
+    raw_item = {"topic": topic, "payload": text[:4000]}
+    channel = channel_of_mqtt_topic(topic)
+    if channel is None:
+        raise Reject(f"unknown channel for mqtt topic: {topic}", raw_item)
+    try:
+        body = json.loads(text)
+    except ValueError as e:
+        raise Reject(f"record is not JSON: {e}", raw_item)
+    if not isinstance(body, dict):
+        raise Reject("record is not an object", raw_item)
+    device_id = body.get("id")
+    if not device_id:
+        raise Reject("missing id", raw_item)
+    raw = body.get("raw_payload")
+    if not isinstance(raw, dict):
+        raise Reject("raw_payload is not an object", raw_item)
+
+    content_ts = None
+    if raw.get("occurred_at"):
+        try:
+            content_ts = iso_to_dt(raw["occurred_at"])
+        except ValueError:
+            raise Reject("occurred_at is not ISO-8601", raw_item)
+
+    topic_key = topic.strip("/").replace("/", "_")
+    tid = device_of(device_id) if channel == CH_ARTIFACT else device_id
+    row, content_ts = build_row(channel, raw, raw_item, tid, f"{device_id}.{topic_key}.raw_payload", None,
+                                topic_key, content_ts, None, offset)
+    return channel, row, content_ts
+
+
+def parse_mqtt_batch(msgs):
+    """
+    MQTT 메시지 묶음 → (채널별 행 목록, rejects, message_row).
+
+    lidar_status_message 는 Kafka 레코드 원장이다. MQTT 는 메시지마다 원장 행을 쓰면 초당 426행이 더 붙어
+    DB 부하가 Kafka 경로(초당 레코드 서너 개)와 달라진다. 그래서 poll 한 묶음 하나를 원장 행 하나로 적는다 —
+    kafka_partition=0, kafka_offset=묶음 id(µs epoch), kafka_topic='mqtt'. 행의 kafka_offset 도 이 id 다.
+    """
+    batch_id = time.time_ns() // 1000
+    rows = {channel: [] for channel in CHANNELS}
+    rejects = []
+    for m in msgs:
+        try:
+            channel, row, content_ts = parse_mqtt_message(m.topic, m.payload, batch_id)
+            rows[channel].append((row, content_ts))
+        except Reject as r:
+            rejects.append((batch_id, json.dumps(r.payload, ensure_ascii=False, default=str), r.reason))
+    message_row = (
+        0, batch_id, datetime.now(timezone.utc), "mqtt",
+        str(uuid.uuid4()), None,
+        "mqtt-3.1.1", None, "raw",
+        MQTT_CLIENT_ID, None, None,
+        ",".join(MQTT_TOPICS),
+        len(msgs),
+        len(rows[CH_STATUS]), len(rows[CH_ACTUAL]), len(rows[CH_ARTIFACT]),
+        len(rejects),
+    )
+    return rows, rejects, message_row
+
+
+# ── DB ──────────────────────────────────────────────────────────────────────
+def connect_db():
+    delay = 1
+    while True:
+        try:
+            conn = psycopg.connect(PG_DSN, autocommit=False, application_name="lidar-ingest")
+            log.info("DB 연결 %s", PG_DSN.split("@")[-1])
+            return conn
+        except psycopg.OperationalError as e:
+            log.warning("DB 연결 실패, %ds 후 재시도: %s", delay, e)
+            time.sleep(delay)
+            delay = min(delay * 2, 30)
+
+
+def state_rows_of(status_rows):
+    """배치 안 장비별 최신 상태 항목만 골라 상태 표에 반영할 행으로 만든다."""
+    latest = {}
+    for row, content_ts in status_rows:
+        key = content_ts.timestamp() if content_ts else 0.0
+        prev = latest.get(row["tid"])
+        if prev is None or key >= prev[0]:
+            latest[row["tid"]] = (key, row)
+    return [
+        {
+            "tid": r["tid"], "device_role": r["device_role"], "site": r["site"], "zone": r["zone"],
+            "shop": r["shop"], "bay": r["bay"], "status": r["status"], "error_code": r["error_code"],
+            "scan_rate_pts_per_sec": r["scan_rate_pts_per_sec"], "temperature_c": r["temperature_c"],
+            "connectivity_rssi": r["connectivity_rssi"], "fov_mode": r["fov_mode"],
+            "last_event_at": r["time"], "last_heartbeat_at": r["last_heartbeat_at"],
+        }
+        for _, r in latest.values()
+    ]
+
+
+def block_rows(channel_rows, latest_map, sums, maxes=None, milestone=None):
+    """
+    배치 안 항목을 블록 축으로 합쳐 상태 표에 넣을 행으로 만든다.
+
+    같은 블록이 한 배치에 여러 번 나오는 것은 흔하다 — 산출물은 한 스캔이 12건을 낸다.
+    그대로 넘기면 ON CONFLICT 가 "cannot affect row a second time" 으로 배치를 통째로
+    죽인다. 그래서 여기서 먼저 합친다. 합치는 규칙은 SQL 쪽과 같아야 한다 —
+    최신 값은 time 이 가장 큰 항목의 것, 누계는 덧셈, 최댓값·마일스톤은 GREATEST.
+
+    latest_map  {상태 표 컬럼: 항목 키}  이름이 다른 컬럼이 있어 매핑으로 받는다
+    sums        {컬럼: 항목 하나가 더할 값을 내는 함수}
+    maxes       {컬럼: 항목에서 값을 꺼내는 함수}
+    milestone   항목 → {마일스톤 컬럼: 시각} 또는 None
+    """
+    maxes = maxes or {}
+    merged = {}
+    for row, _ in channel_rows:
+        key = (row["hull_no"], row["block_id"])
+        at = row["time"]
+        cur = merged.get(key)
+        if cur is None:
+            cur = {"hull_no": key[0], "block_id": key[1]}
+            cur.update({c: None for c in latest_map})
+            cur.update({c: 0 for c in sums})
+            cur.update({c: None for c in maxes})
+            cur["first_event_at"] = at
+            cur["last_event_at"] = None
+            cur["_latest_at"] = None
+            merged[key] = cur
+        for col, fn in sums.items():
+            cur[col] += fn(row)
+        for col, fn in maxes.items():
+            v = fn(row)
+            if v is not None and (cur[col] is None or v > cur[col]):
+                cur[col] = v
+        if milestone is not None:
+            for col, ts in milestone(row).items():
+                if ts is not None and (cur.get(col) is None or ts > cur[col]):
+                    cur[col] = ts
+        if cur["first_event_at"] is None or (at is not None and at < cur["first_event_at"]):
+            cur["first_event_at"] = at
+        if cur["_latest_at"] is None or (at is not None and at >= cur["_latest_at"]):
+            cur["_latest_at"] = at
+            cur["last_event_at"] = at
+            for col, src in latest_map.items():
+                cur[col] = row.get(src)
+    for cur in merged.values():
+        del cur["_latest_at"]
+        # 이 배치가 건드리지 않은 마일스톤은 키 자체를 빼서 NULL 로 보낸다.
+        # json_populate_recordset 이 없는 키를 NULL 로 채우고, SQL 의 GREATEST 가 그 NULL 을
+        # 무시하므로 이미 기록된 완료 시각이 덮이지 않는다.
+    return list(merged.values())
+
+
+def progress_rows(actual_rows):
+    """actual 항목 → rdb.lidar_block_progress 행. 공정은 마일스톤 컬럼으로 눕는다."""
+    def milestones(r):
+        # COMPLETE 를 받은 공정만 그 시각을 남긴다. 계약에 없는 공정 이름이 오면
+        # 조용히 버리지 않고 그냥 무시한다 — 마일스톤이 안 찍힐 뿐 적재는 계속된다.
+        if r.get("event_type") != "COMPLETE":
+            return {}
+        col = STAGE_MILESTONE.get((r.get("stage") or "").upper())
+        return {col: r["time"]} if col else {}
+
+    return block_rows(
+        actual_rows,
+        latest_map={
+            "site": "site", "zone": "zone", "shop": "shop", "bay": "bay",
+            "current_stage": "stage", "current_event_type": "event_type",
+            "current_progress_rate": "block_progress_rate",
+            "current_match_confidence": "match_confidence",
+            "current_scan_id": "scan_id", "current_tid": "tid",
+            "reference_cad_id": "reference_cad_id", "model_version": "model_version",
+        },
+        sums={
+            "event_count": lambda r: 1,
+            "complete_count": lambda r: 1 if r.get("event_type") == "COMPLETE" else 0,
+        },
+        maxes={"max_progress_rate": lambda r: r.get("block_progress_rate")},
+        milestone=milestones,
+    )
+
+
+def artifact_rows(artifact_rows_in):
+    """artifact 항목 → rdb.lidar_block_artifact 행. 종류 셋이 건수·용량 컬럼으로 눕는다."""
+    def is_type(name):
+        return lambda r: 1 if r.get("artifact_type") == name else 0
+
+    def bytes_of(name):
+        return lambda r: (r.get("file_size_bytes") or 0) if r.get("artifact_type") == name else 0
+
+    return block_rows(
+        artifact_rows_in,
+        latest_map={
+            "latest_artifact_type": "artifact_type", "latest_scan_id": "scan_id",
+            "latest_segment_id": "segment_id", "latest_storage_uri": "storage_uri",
+            "latest_checksum": "checksum", "latest_file_size_bytes": "file_size_bytes",
+            "produced_by_device_id": "produced_by_device_id", "latest_tid": "tid",
+            "model_version": "model_version",
+        },
+        sums={
+            "registered_pcd_count": is_type("REGISTERED_PCD"),
+            "registered_pcd_bytes": bytes_of("REGISTERED_PCD"),
+            "transformation_matrix_count": is_type("TRANSFORMATION_MATRIX"),
+            "segmented_pcd_count": is_type("SEGMENTED_PCD"),
+            "segmented_pcd_bytes": bytes_of("SEGMENTED_PCD"),
+            "artifact_count": lambda r: 1,
+            "total_bytes": lambda r: r.get("file_size_bytes") or 0,
+        },
+    )
+
+
+def write_batch(conn, rows, rejects, message_rows):
+    """한 트랜잭션. 성공하면 (표별 insert 수, 전체 insert 수)."""
+    inserted = {}
+    with conn.transaction():
+        with conn.cursor() as cur:
+            for channel in CHANNELS:
+                channel_rows = rows[channel]
+                if not channel_rows:
+                    continue
+                table, sql = INSERTS[channel]
+                cur.execute(sql, (json.dumps([r for r, _ in channel_rows]),))
+                inserted[table] = cur.rowcount
+            if rows[CH_STATUS]:
+                cur.execute(UPSERT_STATE, (json.dumps(state_rows_of(rows[CH_STATUS])),))
+            # 채널마다 상태 표가 하나씩 있다. status 는 장비 축, 나머지 둘은 블록 축이다.
+            if rows[CH_ACTUAL]:
+                cur.execute(UPSERT_BLOCK_PROGRESS,
+                            (json.dumps(progress_rows(rows[CH_ACTUAL]), default=str),))
+            if rows[CH_ARTIFACT]:
+                cur.execute(UPSERT_BLOCK_ARTIFACT,
+                            (json.dumps(artifact_rows(rows[CH_ARTIFACT]), default=str),))
+            if rejects:
+                cur.executemany(INSERT_REJECT, rejects)
+            if message_rows:
+                cur.executemany(INSERT_MESSAGE, message_rows)
+    return inserted, sum(inserted.values())
+
+
+# ── 소스 ────────────────────────────────────────────────────────────────────
+# 메인 루프는 소스에 세 가지만 묻는다 — 배치 가져오기(poll), DB 커밋 뒤 확정(commit), 대기 수(lag).
+# 배치 하나는 [(rows, rejects, message_row), ...] 이고 파싱은 소스 안에서 끝난다.
+class KafkaSource:
+    name = "kafka"
+
+    def __init__(self, catalog):
+        self.catalog = catalog
+        conf = {
+            "bootstrap.servers": KAFKA_BOOTSTRAP,
+            "group.id": KAFKA_GROUP_ID,
+            "client.id": "tsdb-lidar-ingest",
+            "auto.offset.reset": KAFKA_AUTO_OFFSET_RESET,
+            "enable.auto.commit": False,
+            # 토픽이 max.message.bytes=32MB 로 만들어져 있다. 기본 1MB 면 큰 레코드에서 멈춘다.
+            "message.max.bytes": 33554432,
+            "fetch.message.max.bytes": 33554432,
+            "fetch.max.bytes": 67108864,
+            "session.timeout.ms": 30000,
+            # DB 가 잠깐 죽어 배치를 재시도하는 동안 그룹에서 쫓겨나지 않도록 넉넉히.
+            "max.poll.interval.ms": 600000,
+        }
+        self.consumer = Consumer(conf)
+        self.consumer.subscribe(TOPICS)
+        log.info("Kafka 구독 bootstrap=%s topics=%s group=%s", KAFKA_BOOTSTRAP, ",".join(TOPICS), KAFKA_GROUP_ID)
+
+    def poll(self):
+        try:
+            msgs = self.consumer.consume(num_messages=BATCH_MAX_MESSAGES, timeout=BATCH_MAX_WAIT_S)
+        except KafkaException as e:
+            # 브로커를 못 찾는 동안(aspire 네트워크가 바뀐 경우 등) 죽지 않고 계속 시도한다.
+            KAFKA_ERRORS.inc()
+            log.error("Kafka consume 실패: %s", e)
+            time.sleep(1)
+            return []
+        out = []
+        for msg in msgs:
+            if msg.error():
+                log.error("Kafka 오류: %s", msg.error())
+                continue
+            out.append(parse_record(msg, self.catalog))
+        return out
+
+    def commit(self):
+        # DB 는 이미 커밋됐다. 여기서 실패해도 죽지 않는다 — 다음 성공한 커밋이 현재
+        # 위치를 통째로 올리고, 그 사이 재시작하면 재전달분은 유니크 인덱스가 거른다.
+        try:
+            self.consumer.commit(asynchronous=False)
+        except KafkaException as e:
+            KAFKA_ERRORS.inc()
+            log.error("Kafka 오프셋 커밋 실패 (다음 배치에서 재시도): %s", e)
+
+    def update_lag(self):
+        try:
+            total = 0
+            for tp in self.consumer.assignment():
+                _lo, hi = self.consumer.get_watermark_offsets(tp, timeout=1.0, cached=True)
+                pos = self.consumer.position([tp])[0].offset
+                if hi >= 0 and pos >= 0:
+                    lag = max(hi - pos, 0)
+                    KAFKA_LAG.labels(partition=str(tp.partition)).set(lag)
+                    total += lag
+            SOURCE_LAG.set(total)
+        except KafkaException as e:
+            log.debug("lag 계산 실패: %s", e)
+
+    def close(self):
+        self.consumer.close()
+
+
+class MqttSource:
+    """
+    EMQX 를 직접 구독한다 (MQTT 3.1.1 · QoS 1 · clean_session=False · 수동 ack).
+
+    Kafka 경로와 같은 전달 보장을 맞춘다 — PUBACK 은 DB 커밋 뒤에만 보낸다. 커밋 전에 죽으면 브로커가
+    세션에 남은 미확인 메시지를 다시 보내고, 재전달분은 멱등 인덱스가 거른다(at-least-once).
+    수동 ack 라 브로커의 in-flight 창(EMQX mqtt.max_inflight, 기본 32)이 1초치 메시지(~426)보다 커야 한다.
+    작으면 브로커가 ack 를 기다리느라 전달을 멈춘다 — compose 에서 EMQX 쪽을 올려 둔다.
+
+    paho 네트워크 스레드가 받은 메시지를 큐에 넣고, 메인 루프가 poll 로 묶어 가져간다.
+    """
+    name = "mqtt"
+
+    def __init__(self):
+        import collections
+        import threading
+        import paho.mqtt.client as mqtt
+
+        self._queue = collections.deque()
+        self._cv = threading.Condition()
+        self._pending = []
+        self.client = mqtt.Client(
+            mqtt.CallbackAPIVersion.VERSION2, client_id=MQTT_CLIENT_ID, clean_session=False,
+            protocol=mqtt.MQTTv311, manual_ack=True)
+        self.client.on_connect = self._on_connect
+        self.client.on_disconnect = self._on_disconnect
+        self.client.on_message = self._on_message
+        self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+        self.client.connect_async(MQTT_HOST, MQTT_PORT, keepalive=30)
+        self.client.loop_start()
+        log.info("MQTT 구독 준비 host=%s:%d topics=%s qos=%d client_id=%s",
+                 MQTT_HOST, MQTT_PORT, ",".join(MQTT_TOPICS), MQTT_QOS, MQTT_CLIENT_ID)
+
+    def _on_connect(self, client, _userdata, flags, reason_code, _props):
+        if reason_code.is_failure:
+            log.error("MQTT 연결 거부: %s", reason_code)
+            return
+        client.subscribe([(t, MQTT_QOS) for t in MQTT_TOPICS])
+        log.info("MQTT 연결 · 구독 (session_present=%s)", flags.session_present)
+
+    def _on_disconnect(self, _client, _userdata, _flags, reason_code, _props):
+        KAFKA_ERRORS.inc()
+        log.warning("MQTT 연결 끊김: %s — 자동 재연결", reason_code)
+
+    def _on_message(self, _client, _userdata, msg):
+        with self._cv:
+            self._queue.append(msg)
+            if len(self._queue) >= MQTT_BATCH_MAX:
+                self._cv.notify()
+
+    def poll(self):
+        # Kafka consume(num_messages, timeout) 과 같은 규칙 — 상한이 차거나 대기 시간이 끝나면 돌려준다.
+        deadline = time.monotonic() + BATCH_MAX_WAIT_S
+        with self._cv:
+            while len(self._queue) < MQTT_BATCH_MAX and running:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                self._cv.wait(remaining)
+            n = min(len(self._queue), MQTT_BATCH_MAX)
+            msgs = [self._queue.popleft() for _ in range(n)]
+        self._pending = msgs
+        if not msgs:
+            return []
+        return [parse_mqtt_batch(msgs)]
+
+    def commit(self):
+        msgs, self._pending = self._pending, []
+        for m in msgs:
+            if m.qos > 0:
+                try:
+                    self.client.ack(m.mid, m.qos)
+                except Exception as e:  # noqa: BLE001 — 끊긴 사이 ack 는 실패한다. 재전달분은 멱등 키가 거른다
+                    KAFKA_ERRORS.inc()
+                    log.debug("MQTT ack 실패: %r", e)
+                    break
+
+    def update_lag(self):
+        SOURCE_LAG.set(len(self._queue) + len(self._pending))
+
+    def close(self):
+        try:
+            self.client.disconnect()
+        finally:
+            self.client.loop_stop()
+
+
+# ── 메인 루프 ───────────────────────────────────────────────────────────────
+running = True
+
+
+def stop(signum, _frame):
+    global running
+    log.info("signal %s — 정지", signum)
+    running = False
+
+
+def main():
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    start_http_server(METRICS_PORT)
+    PIPELINE_INFO.labels(pipeline=PIPELINE, source=SOURCE).set(1)
+    log.info("metrics :%d/metrics  pipeline=%s source=%s", METRICS_PORT, PIPELINE, SOURCE)
+
+    conn = connect_db()
+    catalog = TagCatalog()
+    if SOURCE == "kafka":
+        # 숫자 tid → 장비 id 조회표. 소비를 시작하기 전에 먼저 읽는다 — 비어 있는 채로 돌면
+        # 그 사이 들어온 항목이 전부 '#숫자' 로 적재되고, 나중에 표가 채워져도 소급되지 않는다.
+        # mqtt 경로는 장비 id 가 메시지에 실려 오므로 표가 필요 없다.
+        while True:
+            try:
+                catalog.load(conn)
+                break
+            except psycopg.Error as e:
+                log.warning("태그 카탈로그 적재 실패, 재시도: %s", e)
+                if conn.closed or isinstance(e, psycopg.OperationalError):
+                    conn = connect_db()
+                time.sleep(1)
+        source = KafkaSource(catalog)
+    elif SOURCE == "mqtt":
+        source = MqttSource()
+    else:
+        log.error("알 수 없는 SOURCE=%s (kafka | mqtt)", SOURCE)
+        sys.exit(2)
+
+    while running:
+        records = source.poll()
+        source.update_lag()
+        if not records:
+            continue
+
+        rows = {channel: [] for channel in CHANNELS}
+        rejects, message_rows = [], []
+        for r, j, m in records:
+            MESSAGES.inc()
+            for channel in CHANNELS:
+                rows[channel].extend(r[channel])
+                if r[channel]:
+                    ITEMS.labels(channel=channel).inc(len(r[channel]))
+            rejects.extend(j)
+            message_rows.append(m)
+            for _, _, reason in j:
+                REJECTS.labels(reason=reason.split(":")[0]).inc()
+
+        total_rows = sum(len(rows[channel]) for channel in CHANNELS)
+
+        # DB 쓰기. 실패하면 같은 배치를 물고 재시도한다 — 오프셋(ack)은 확정하지 않는다.
+        delay = 1
+        while running:
+            t0 = time.monotonic()
+            try:
+                per_table, inserted = write_batch(conn, rows, rejects, message_rows)
+                break
+            except psycopg.Error as e:
+                DB_ERRORS.inc()
+                log.error("DB 쓰기 실패 (%ds 후 재시도): %s", delay, e)
+                if conn.closed or isinstance(e, psycopg.OperationalError):
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    conn = connect_db()
+                time.sleep(delay)
+                delay = min(delay * 2, 30)
+        else:
+            break
+        elapsed = time.monotonic() - t0
+
+        source.commit()
+
+        now = time.time()
+        BATCHES.inc()
+        BATCH_SECONDS.observe(elapsed)
+        BATCH_ROWS.observe(total_rows)
+        ROWS_INSERTED.inc(inserted)
+        ROWS_DUPLICATE.inc(total_rows - inserted)
+        for table, count in per_table.items():
+            TABLE_ROWS.labels(table=table).inc(count)
+        LAST_COMMIT.set(now)
+        newest = None
+        for channel in CHANNELS:
+            for _, content_ts in rows[channel]:
+                if content_ts:
+                    END_TO_END.observe(max(now - content_ts.timestamp(), 0.0))
+                    if newest is None or content_ts > newest:
+                        newest = content_ts
+        if newest:
+            LAST_EVENT.set(newest.timestamp())
+
+        # 못 푼 숫자를 만났으면 표를 다시 읽어 본다. 트랜잭션 밖(커밋 직후)에서만 한다.
+        # 태그를 새로 등록한 직후를 위한 것이라 최소 간격이 걸려 있다.
+        if SOURCE == "kafka" and catalog.should_reload():
+            try:
+                catalog.load(conn)
+            except psycopg.Error as e:
+                log.warning("태그 카탈로그 재적재 실패 (다음 기회에): %s", e)
+
+        source.update_lag()
+        log.info(
+            "batch records=%d rows=%d (status=%d actual=%d artifact=%d) inserted=%d dup=%d "
+            "reject=%d db=%.3fs offset=%d",
+            len(message_rows), total_rows,
+            len(rows[CH_STATUS]), len(rows[CH_ACTUAL]), len(rows[CH_ARTIFACT]),
+            inserted, total_rows - inserted, len(rejects), elapsed, message_rows[-1][1],
+        )
+
+    source.close()
+    conn.close()
+    log.info("종료")
+
+
+if __name__ == "__main__":
+    main()
