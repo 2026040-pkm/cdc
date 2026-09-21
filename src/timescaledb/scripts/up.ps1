@@ -3,7 +3,10 @@
 # Kafka 는 이 스택 밖(Aspire 세션)에 있다. 소비자를 Aspire 네트워크에 넣으면 Aspire 가
 # 5초 안에 떼어 내므로, 반대로 Kafka 컨테이너를 이쪽 네트워크(tsdb-net)에 alias "kafka" 로
 # 붙인다. 브로커가 광고하는 내부 주소가 kafka:9093 이라 alias 이름은 반드시 kafka 여야 한다.
-$ErrorActionPreference = "Stop"
+# Windows PowerShell 5.1 은 네이티브 명령의 stderr(podman compose 안내·빌드 진행 표시)를 오류로 바꿔
+# Stop 이면 거기서 멈춘다. 실패 판정은 $LASTEXITCODE 로 한다.
+$ErrorActionPreference = "Continue"
+$env:PODMAN_COMPOSE_WARNING_LOGS = "false"
 $root = Split-Path -Parent $PSScriptRoot
 
 $engine = "docker"
