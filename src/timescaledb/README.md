@@ -23,6 +23,18 @@ LiDAR 350대 ──MQTT──▶ Mqtt.Agent ──▶ Engine ──▶ EES Kafka
 (숫자)이고 `raw_payload` 안에도 장비 필드가 없다. 그래서 InterSysLink 등록부를 옮겨 둔
 `lidar_tag_catalog` 가 숫자를 장비로 되돌린다(아래).
 
+### 소비자 소스 두 가지 (`SOURCE`)
+
+`dev/ingest/ingest.py` 는 소스만 바꿔 두 경로를 받는다. 파싱 뒤(행 모양 · DB 쓰기 · 지표 이름)는 같은 코드다.
+
+| `SOURCE` | 읽는 곳 | 장비 id | 쓰는 스택 |
+|---|---|---|---|
+| `kafka` (기본) | EES Kafka Provider 가 낸 `ot.lidar.*` 토픽 | `lidar_tag_catalog` 로 숫자 tid 를 되돌린다 | 이 스택 (`tsdb-lidar-ingest`) |
+| `mqtt` | EMQX 직접 구독 (`ot/device/+/lidar/status` 등 3개 · QoS 1 · DB 커밋 뒤 ack) | 메시지 `id` 그대로 | `src/lidar-compare` (`cmp-lidar-direct-ingest`) |
+
+두 경로 비교는 [`../lidar-compare`](../lidar-compare/README.md) 에 있다. 지표에 `lidar_ingest_source_lag`
+(소스와 무관한 대기 수)와 `lidar_ingest_pipeline_info` 가 더해졌다.
+
 ## 기동 · 정지
 
 ```bash

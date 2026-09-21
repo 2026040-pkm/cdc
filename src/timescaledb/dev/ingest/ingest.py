@@ -45,6 +45,7 @@ import os
 import signal
 import sys
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import psycopg
@@ -67,6 +68,25 @@ METRICS_PORT = int(os.environ.get("METRICS_PORT", "8000"))
 TAG_CATALOG_REFRESH_S = int(os.environ.get("TAG_CATALOG_REFRESH_SECONDS", "60"))
 
 TOPICS = [t.strip() for t in KAFKA_TOPIC.split(",") if t.strip()]
+
+# 어디서 읽는가.
+#   kafka = ISL 경로. EMQX → Mqtt.Agent → Engine → EES Kafka Provider → Kafka → 여기 (기본)
+#   mqtt  = 직결 경로. EMQX → 여기. Agent · Engine · Provider · Kafka 를 전부 건너뛴다
+# 두 경로는 파싱 뒤(행 모양 · DB 쓰기 · 지표 이름)가 같은 코드다. 비교가 전송 경로의 차이만 재도록
+# 하기 위해서다. 어느 쪽인지는 Prometheus 의 pipeline 레이블로 가른다.
+SOURCE = os.environ.get("SOURCE", "kafka").strip().lower()
+PIPELINE = os.environ.get("PIPELINE", "isl-kafka" if SOURCE == "kafka" else "mqtt-direct")
+MQTT_HOST = os.environ.get("MQTT_HOST", "emqx")
+MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
+# 발행기(util/mqtt-lidar-sim)의 세 채널. 마지막 마디가 채널이다.
+MQTT_TOPICS = [t.strip() for t in os.environ.get(
+    "MQTT_TOPICS", "ot/device/+/lidar/status,ot/sensor/+/actual,ot/pipeline/+/+/+/artifact").split(",") if t.strip()]
+MQTT_QOS = int(os.environ.get("MQTT_QOS", "1"))
+# clean_session=False 라 브로커가 이 id 로 세션(구독 · 미전달 메시지)을 들고 있는다. 바꾸면 새 세션이다.
+MQTT_CLIENT_ID = os.environ.get("MQTT_CLIENT_ID", "lidar-mqtt-ingest")
+# MQTT 는 메시지 하나가 항목 하나라 Kafka 레코드(항목 수백 개)와 알갱이가 다르다. 배치 상한을 항목 수로
+# 크게 잡아 두면 정상 운전에서는 BATCH_MAX_WAIT_MS(1초)가 먼저 끊어 Kafka 경로와 같은 "초당 트랜잭션 1개" 가 된다.
+MQTT_BATCH_MAX = int(os.environ.get("MQTT_BATCH_MAX", "5000"))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,6 +125,9 @@ TAG_CHANNEL_MISMATCH = Counter(
     "lidar_ingest_tag_channel_mismatch_total",
     "items whose catalog channel disagreed with the Kafka topic (EES message misconfigured)")
 KAFKA_LAG = Gauge("lidar_ingest_kafka_lag", "high watermark - consumer position", ["partition"])
+# 소스와 무관한 대기 수. kafka = 파티션 lag 합(레코드), mqtt = 받았지만 아직 DB 에 안 쓴 메시지 수.
+SOURCE_LAG = Gauge("lidar_ingest_source_lag", "records waiting (kafka lag sum / mqtt messages received but not yet written)")
+PIPELINE_INFO = Gauge("lidar_ingest_pipeline_info", "which transport this consumer reads", ["pipeline", "source"])
 LAST_COMMIT = Gauge("lidar_ingest_last_commit_timestamp_seconds", "unix time of the last DB+Kafka commit")
 LAST_EVENT = Gauge("lidar_ingest_last_event_timestamp_seconds", "newest content.timestamp seen (unix seconds)")
 
@@ -551,15 +574,6 @@ def parse_item(item, channel, send_topic, kafka_offset, catalog):
         else:
             TAG_UNRESOLVED.labels(channel=channel).inc()
 
-    value = c.get("value")
-    if isinstance(value, str):
-        try:
-            value = json.loads(value)
-        except ValueError as e:
-            raise Reject(f"value is not JSON: {e}", item)
-    if not isinstance(value, dict):
-        raise Reject("value is not an object", item)
-
     content_ts = None
     ts = c.get("timestamp")
     if ts is not None:
@@ -567,6 +581,20 @@ def parse_item(item, channel, send_topic, kafka_offset, catalog):
             content_ts = ns_to_dt(ts)
         except (TypeError, ValueError, OverflowError, OSError):
             raise Reject("content.timestamp is not a ns epoch", item)
+
+    return build_row(channel, c.get("value"), item, tid, tag_id, param_id, topic_key,
+                     content_ts, c.get("pm_mode"), kafka_offset)
+
+
+def build_row(channel, value, item, tid, tag_id, param_id, topic_key, content_ts, pm_mode, offset):
+    """값(JSON 문자열 또는 객체) + 장비 축 → 표 행. 두 소스(kafka · mqtt)가 여기서 합류한다."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError as e:
+            raise Reject(f"value is not JSON: {e}", item)
+    if not isinstance(value, dict):
+        raise Reject("value is not an object", item)
 
     row = BUILDERS[channel](value, item)
     # 카탈로그가 못 푼 항목은 페이로드에서라도 장비를 되찾아 본다(상태 채널만 가능).
@@ -576,8 +604,8 @@ def parse_item(item, channel, send_topic, kafka_offset, catalog):
     row["mqtt_topic"] = topic_key
     row["ingested_at"] = value.get("ingested_at") or None
     row["content_ts"] = content_ts.isoformat() if content_ts else None
-    row["pm_mode"] = c.get("pm_mode")
-    row["kafka_offset"] = kafka_offset
+    row["pm_mode"] = pm_mode
+    row["kafka_offset"] = offset
     return row, content_ts
 
 
@@ -641,6 +669,100 @@ def parse_record(msg, catalog):
         headers.get("project_id"), headers.get("infra_proc_name"), headers.get("task_area_code"),
         headers.get("request"),
         item_count,
+        len(rows[CH_STATUS]), len(rows[CH_ACTUAL]), len(rows[CH_ARTIFACT]),
+        len(rejects),
+    )
+    return rows, rejects, message_row
+
+
+# ── MQTT 직결 ─────────────────────────────────────────────────────────────
+def channel_of_mqtt_topic(topic):
+    """MQTT 토픽의 마지막 마디가 채널이다 (ot/device/{zone}/lidar/status → status)."""
+    if not topic:
+        return None
+    last = topic.rstrip("/").rsplit("/", 1)[-1].strip().lower()
+    return last if last in CHANNELS else None
+
+
+def iso_to_dt(value):
+    """ISO-8601 (7자리 소수초 · Z · +09:00) → tz-aware datetime. µs 로 절삭한다."""
+    text = str(value).strip().replace("Z", "+00:00")
+    head, sep, tail = text.partition(".")
+    if sep:
+        n = 0
+        while n < len(tail) and tail[n].isdigit():
+            n += 1
+        digits, zone = tail[:n], tail[n:]
+        text = f"{head}.{digits[:6].ljust(6, '0')}{zone}"
+    dt = datetime.fromisoformat(text)
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def parse_mqtt_message(topic, payload, offset):
+    """
+    MQTT 메시지 하나 → (채널, 행, content_ts). 깨졌으면 Reject.
+
+    발행 계약은 {"id": "<장비 id>", "raw_payload": {...}} 하나다(Mqtt.Agent MqttPayloadParser 와 같다).
+    장비 id 가 메시지에 그대로 있어 카탈로그를 거치지 않는다. content_ts 는 raw_payload.occurred_at 이다 —
+    Kafka 경로의 content.timestamp 도 Agent 가 같은 값(occurred_at)으로 정하므로 end-to-end 지연 기준이 같다.
+    tag_id 는 Agent 가 만드는 모양({id}.{토픽 '/'→'_'}.raw_payload)으로 맞춰 둔다 — 두 DB 를 TagId 로 맞춰 볼 수 있게.
+    """
+    text = payload.decode("utf-8", "replace") if isinstance(payload, (bytes, bytearray)) else str(payload)
+    raw_item = {"topic": topic, "payload": text[:4000]}
+    channel = channel_of_mqtt_topic(topic)
+    if channel is None:
+        raise Reject(f"unknown channel for mqtt topic: {topic}", raw_item)
+    try:
+        body = json.loads(text)
+    except ValueError as e:
+        raise Reject(f"record is not JSON: {e}", raw_item)
+    if not isinstance(body, dict):
+        raise Reject("record is not an object", raw_item)
+    device_id = body.get("id")
+    if not device_id:
+        raise Reject("missing id", raw_item)
+    raw = body.get("raw_payload")
+    if not isinstance(raw, dict):
+        raise Reject("raw_payload is not an object", raw_item)
+
+    content_ts = None
+    if raw.get("occurred_at"):
+        try:
+            content_ts = iso_to_dt(raw["occurred_at"])
+        except ValueError:
+            raise Reject("occurred_at is not ISO-8601", raw_item)
+
+    topic_key = topic.strip("/").replace("/", "_")
+    tid = device_of(device_id) if channel == CH_ARTIFACT else device_id
+    row, content_ts = build_row(channel, raw, raw_item, tid, f"{device_id}.{topic_key}.raw_payload", None,
+                                topic_key, content_ts, None, offset)
+    return channel, row, content_ts
+
+
+def parse_mqtt_batch(msgs):
+    """
+    MQTT 메시지 묶음 → (채널별 행 목록, rejects, message_row).
+
+    lidar_status_message 는 Kafka 레코드 원장이다. MQTT 는 메시지마다 원장 행을 쓰면 초당 426행이 더 붙어
+    DB 부하가 Kafka 경로(초당 레코드 서너 개)와 달라진다. 그래서 poll 한 묶음 하나를 원장 행 하나로 적는다 —
+    kafka_partition=0, kafka_offset=묶음 id(µs epoch), kafka_topic='mqtt'. 행의 kafka_offset 도 이 id 다.
+    """
+    batch_id = time.time_ns() // 1000
+    rows = {channel: [] for channel in CHANNELS}
+    rejects = []
+    for m in msgs:
+        try:
+            channel, row, content_ts = parse_mqtt_message(m.topic, m.payload, batch_id)
+            rows[channel].append((row, content_ts))
+        except Reject as r:
+            rejects.append((batch_id, json.dumps(r.payload, ensure_ascii=False, default=str), r.reason))
+    message_row = (
+        0, batch_id, datetime.now(timezone.utc), "mqtt",
+        str(uuid.uuid4()), None,
+        "mqtt-3.1.1", None, "raw",
+        MQTT_CLIENT_ID, None, None,
+        ",".join(MQTT_TOPICS),
+        len(msgs),
         len(rows[CH_STATUS]), len(rows[CH_ACTUAL]), len(rows[CH_ARTIFACT]),
         len(rejects),
     )
@@ -821,37 +943,161 @@ def write_batch(conn, rows, rejects, message_rows):
     return inserted, sum(inserted.values())
 
 
-# ── Kafka ───────────────────────────────────────────────────────────────────
-def make_consumer():
-    conf = {
-        "bootstrap.servers": KAFKA_BOOTSTRAP,
-        "group.id": KAFKA_GROUP_ID,
-        "client.id": "tsdb-lidar-ingest",
-        "auto.offset.reset": KAFKA_AUTO_OFFSET_RESET,
-        "enable.auto.commit": False,
-        # 토픽이 max.message.bytes=32MB 로 만들어져 있다. 기본 1MB 면 큰 레코드에서 멈춘다.
-        "message.max.bytes": 33554432,
-        "fetch.message.max.bytes": 33554432,
-        "fetch.max.bytes": 67108864,
-        "session.timeout.ms": 30000,
-        # DB 가 잠깐 죽어 배치를 재시도하는 동안 그룹에서 쫓겨나지 않도록 넉넉히.
-        "max.poll.interval.ms": 600000,
-    }
-    consumer = Consumer(conf)
-    consumer.subscribe(TOPICS)
-    log.info("Kafka 구독 bootstrap=%s topics=%s group=%s", KAFKA_BOOTSTRAP, ",".join(TOPICS), KAFKA_GROUP_ID)
-    return consumer
+# ── 소스 ────────────────────────────────────────────────────────────────────
+# 메인 루프는 소스에 세 가지만 묻는다 — 배치 가져오기(poll), DB 커밋 뒤 확정(commit), 대기 수(lag).
+# 배치 하나는 [(rows, rejects, message_row), ...] 이고 파싱은 소스 안에서 끝난다.
+class KafkaSource:
+    name = "kafka"
+
+    def __init__(self, catalog):
+        self.catalog = catalog
+        conf = {
+            "bootstrap.servers": KAFKA_BOOTSTRAP,
+            "group.id": KAFKA_GROUP_ID,
+            "client.id": "tsdb-lidar-ingest",
+            "auto.offset.reset": KAFKA_AUTO_OFFSET_RESET,
+            "enable.auto.commit": False,
+            # 토픽이 max.message.bytes=32MB 로 만들어져 있다. 기본 1MB 면 큰 레코드에서 멈춘다.
+            "message.max.bytes": 33554432,
+            "fetch.message.max.bytes": 33554432,
+            "fetch.max.bytes": 67108864,
+            "session.timeout.ms": 30000,
+            # DB 가 잠깐 죽어 배치를 재시도하는 동안 그룹에서 쫓겨나지 않도록 넉넉히.
+            "max.poll.interval.ms": 600000,
+        }
+        self.consumer = Consumer(conf)
+        self.consumer.subscribe(TOPICS)
+        log.info("Kafka 구독 bootstrap=%s topics=%s group=%s", KAFKA_BOOTSTRAP, ",".join(TOPICS), KAFKA_GROUP_ID)
+
+    def poll(self):
+        try:
+            msgs = self.consumer.consume(num_messages=BATCH_MAX_MESSAGES, timeout=BATCH_MAX_WAIT_S)
+        except KafkaException as e:
+            # 브로커를 못 찾는 동안(aspire 네트워크가 바뀐 경우 등) 죽지 않고 계속 시도한다.
+            KAFKA_ERRORS.inc()
+            log.error("Kafka consume 실패: %s", e)
+            time.sleep(1)
+            return []
+        out = []
+        for msg in msgs:
+            if msg.error():
+                log.error("Kafka 오류: %s", msg.error())
+                continue
+            out.append(parse_record(msg, self.catalog))
+        return out
+
+    def commit(self):
+        # DB 는 이미 커밋됐다. 여기서 실패해도 죽지 않는다 — 다음 성공한 커밋이 현재
+        # 위치를 통째로 올리고, 그 사이 재시작하면 재전달분은 유니크 인덱스가 거른다.
+        try:
+            self.consumer.commit(asynchronous=False)
+        except KafkaException as e:
+            KAFKA_ERRORS.inc()
+            log.error("Kafka 오프셋 커밋 실패 (다음 배치에서 재시도): %s", e)
+
+    def update_lag(self):
+        try:
+            total = 0
+            for tp in self.consumer.assignment():
+                _lo, hi = self.consumer.get_watermark_offsets(tp, timeout=1.0, cached=True)
+                pos = self.consumer.position([tp])[0].offset
+                if hi >= 0 and pos >= 0:
+                    lag = max(hi - pos, 0)
+                    KAFKA_LAG.labels(partition=str(tp.partition)).set(lag)
+                    total += lag
+            SOURCE_LAG.set(total)
+        except KafkaException as e:
+            log.debug("lag 계산 실패: %s", e)
+
+    def close(self):
+        self.consumer.close()
 
 
-def update_lag(consumer):
-    try:
-        for tp in consumer.assignment():
-            _lo, hi = consumer.get_watermark_offsets(tp, timeout=1.0, cached=True)
-            pos = consumer.position([tp])[0].offset
-            if hi >= 0 and pos >= 0:
-                KAFKA_LAG.labels(partition=str(tp.partition)).set(max(hi - pos, 0))
-    except KafkaException as e:
-        log.debug("lag 계산 실패: %s", e)
+class MqttSource:
+    """
+    EMQX 를 직접 구독한다 (MQTT 3.1.1 · QoS 1 · clean_session=False · 수동 ack).
+
+    Kafka 경로와 같은 전달 보장을 맞춘다 — PUBACK 은 DB 커밋 뒤에만 보낸다. 커밋 전에 죽으면 브로커가
+    세션에 남은 미확인 메시지를 다시 보내고, 재전달분은 멱등 인덱스가 거른다(at-least-once).
+    수동 ack 라 브로커의 in-flight 창(EMQX mqtt.max_inflight, 기본 32)이 1초치 메시지(~426)보다 커야 한다.
+    작으면 브로커가 ack 를 기다리느라 전달을 멈춘다 — compose 에서 EMQX 쪽을 올려 둔다.
+
+    paho 네트워크 스레드가 받은 메시지를 큐에 넣고, 메인 루프가 poll 로 묶어 가져간다.
+    """
+    name = "mqtt"
+
+    def __init__(self):
+        import collections
+        import threading
+        import paho.mqtt.client as mqtt
+
+        self._queue = collections.deque()
+        self._cv = threading.Condition()
+        self._pending = []
+        self.client = mqtt.Client(
+            mqtt.CallbackAPIVersion.VERSION2, client_id=MQTT_CLIENT_ID, clean_session=False,
+            protocol=mqtt.MQTTv311, manual_ack=True)
+        self.client.on_connect = self._on_connect
+        self.client.on_disconnect = self._on_disconnect
+        self.client.on_message = self._on_message
+        self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+        self.client.connect_async(MQTT_HOST, MQTT_PORT, keepalive=30)
+        self.client.loop_start()
+        log.info("MQTT 구독 준비 host=%s:%d topics=%s qos=%d client_id=%s",
+                 MQTT_HOST, MQTT_PORT, ",".join(MQTT_TOPICS), MQTT_QOS, MQTT_CLIENT_ID)
+
+    def _on_connect(self, client, _userdata, flags, reason_code, _props):
+        if reason_code.is_failure:
+            log.error("MQTT 연결 거부: %s", reason_code)
+            return
+        client.subscribe([(t, MQTT_QOS) for t in MQTT_TOPICS])
+        log.info("MQTT 연결 · 구독 (session_present=%s)", flags.session_present)
+
+    def _on_disconnect(self, _client, _userdata, _flags, reason_code, _props):
+        KAFKA_ERRORS.inc()
+        log.warning("MQTT 연결 끊김: %s — 자동 재연결", reason_code)
+
+    def _on_message(self, _client, _userdata, msg):
+        with self._cv:
+            self._queue.append(msg)
+            if len(self._queue) >= MQTT_BATCH_MAX:
+                self._cv.notify()
+
+    def poll(self):
+        # Kafka consume(num_messages, timeout) 과 같은 규칙 — 상한이 차거나 대기 시간이 끝나면 돌려준다.
+        deadline = time.monotonic() + BATCH_MAX_WAIT_S
+        with self._cv:
+            while len(self._queue) < MQTT_BATCH_MAX and running:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                self._cv.wait(remaining)
+            n = min(len(self._queue), MQTT_BATCH_MAX)
+            msgs = [self._queue.popleft() for _ in range(n)]
+        self._pending = msgs
+        if not msgs:
+            return []
+        return [parse_mqtt_batch(msgs)]
+
+    def commit(self):
+        msgs, self._pending = self._pending, []
+        for m in msgs:
+            if m.qos > 0:
+                try:
+                    self.client.ack(m.mid, m.qos)
+                except Exception as e:  # noqa: BLE001 — 끊긴 사이 ack 는 실패한다. 재전달분은 멱등 키가 거른다
+                    KAFKA_ERRORS.inc()
+                    log.debug("MQTT ack 실패: %r", e)
+                    break
+
+    def update_lag(self):
+        SOURCE_LAG.set(len(self._queue) + len(self._pending))
+
+    def close(self):
+        try:
+            self.client.disconnect()
+        finally:
+            self.client.loop_stop()
 
 
 # ── 메인 루프 ───────────────────────────────────────────────────────────────
@@ -868,44 +1114,41 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     start_http_server(METRICS_PORT)
-    log.info("metrics :%d/metrics", METRICS_PORT)
+    PIPELINE_INFO.labels(pipeline=PIPELINE, source=SOURCE).set(1)
+    log.info("metrics :%d/metrics  pipeline=%s source=%s", METRICS_PORT, PIPELINE, SOURCE)
 
     conn = connect_db()
-    # 숫자 tid → 장비 id 조회표. 소비를 시작하기 전에 먼저 읽는다 — 비어 있는 채로 돌면
-    # 그 사이 들어온 항목이 전부 '#숫자' 로 적재되고, 나중에 표가 채워져도 소급되지 않는다.
     catalog = TagCatalog()
-    while True:
-        try:
-            catalog.load(conn)
-            break
-        except psycopg.Error as e:
-            log.warning("태그 카탈로그 적재 실패, 재시도: %s", e)
-            if conn.closed or isinstance(e, psycopg.OperationalError):
-                conn = connect_db()
-            time.sleep(1)
-    consumer = make_consumer()
+    if SOURCE == "kafka":
+        # 숫자 tid → 장비 id 조회표. 소비를 시작하기 전에 먼저 읽는다 — 비어 있는 채로 돌면
+        # 그 사이 들어온 항목이 전부 '#숫자' 로 적재되고, 나중에 표가 채워져도 소급되지 않는다.
+        # mqtt 경로는 장비 id 가 메시지에 실려 오므로 표가 필요 없다.
+        while True:
+            try:
+                catalog.load(conn)
+                break
+            except psycopg.Error as e:
+                log.warning("태그 카탈로그 적재 실패, 재시도: %s", e)
+                if conn.closed or isinstance(e, psycopg.OperationalError):
+                    conn = connect_db()
+                time.sleep(1)
+        source = KafkaSource(catalog)
+    elif SOURCE == "mqtt":
+        source = MqttSource()
+    else:
+        log.error("알 수 없는 SOURCE=%s (kafka | mqtt)", SOURCE)
+        sys.exit(2)
 
     while running:
-        try:
-            msgs = consumer.consume(num_messages=BATCH_MAX_MESSAGES, timeout=BATCH_MAX_WAIT_S)
-        except KafkaException as e:
-            # 브로커를 못 찾는 동안(aspire 네트워크가 바뀐 경우 등) 죽지 않고 계속 시도한다.
-            KAFKA_ERRORS.inc()
-            log.error("Kafka consume 실패: %s", e)
-            time.sleep(1)
-            continue
-        update_lag(consumer)
-        if not msgs:
+        records = source.poll()
+        source.update_lag()
+        if not records:
             continue
 
         rows = {channel: [] for channel in CHANNELS}
         rejects, message_rows = [], []
-        for msg in msgs:
-            if msg.error():
-                log.error("Kafka 오류: %s", msg.error())
-                continue
+        for r, j, m in records:
             MESSAGES.inc()
-            r, j, m = parse_record(msg, catalog)
             for channel in CHANNELS:
                 rows[channel].extend(r[channel])
                 if r[channel]:
@@ -914,12 +1157,10 @@ def main():
             message_rows.append(m)
             for _, _, reason in j:
                 REJECTS.labels(reason=reason.split(":")[0]).inc()
-        if not message_rows:
-            continue
 
         total_rows = sum(len(rows[channel]) for channel in CHANNELS)
 
-        # DB 쓰기. 실패하면 같은 배치를 물고 재시도한다 — 오프셋은 커밋하지 않는다.
+        # DB 쓰기. 실패하면 같은 배치를 물고 재시도한다 — 오프셋(ack)은 확정하지 않는다.
         delay = 1
         while running:
             t0 = time.monotonic()
@@ -941,13 +1182,7 @@ def main():
             break
         elapsed = time.monotonic() - t0
 
-        # DB 는 이미 커밋됐다. 여기서 실패해도 죽지 않는다 — 다음 성공한 커밋이 현재
-        # 위치를 통째로 올리고, 그 사이 재시작하면 재전달분은 유니크 인덱스가 거른다.
-        try:
-            consumer.commit(asynchronous=False)
-        except KafkaException as e:
-            KAFKA_ERRORS.inc()
-            log.error("Kafka 오프셋 커밋 실패 (다음 배치에서 재시도): %s", e)
+        source.commit()
 
         now = time.time()
         BATCHES.inc()
@@ -970,13 +1205,13 @@ def main():
 
         # 못 푼 숫자를 만났으면 표를 다시 읽어 본다. 트랜잭션 밖(커밋 직후)에서만 한다.
         # 태그를 새로 등록한 직후를 위한 것이라 최소 간격이 걸려 있다.
-        if catalog.should_reload():
+        if SOURCE == "kafka" and catalog.should_reload():
             try:
                 catalog.load(conn)
             except psycopg.Error as e:
                 log.warning("태그 카탈로그 재적재 실패 (다음 기회에): %s", e)
 
-        update_lag(consumer)
+        source.update_lag()
         log.info(
             "batch records=%d rows=%d (status=%d actual=%d artifact=%d) inserted=%d dup=%d "
             "reject=%d db=%.3fs offset=%d",
@@ -985,7 +1220,7 @@ def main():
             inserted, total_rows - inserted, len(rejects), elapsed, message_rows[-1][1],
         )
 
-    consumer.close()
+    source.close()
     conn.close()
     log.info("종료")
 
