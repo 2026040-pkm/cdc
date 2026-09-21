@@ -194,8 +194,13 @@ x86/
 # drawio auto-save backup
 .$*.bkp
 
+### 도구 산출물 · 로컬 보관본
+# graphify 지식그래프 출력. 입력에서 언제든 다시 만든다
+graphify-out/
+# 손 뗀 스택(embedded-cdc · embedded-cdc-go · cdc-custom)의 로컬 보관본.
+# 원본은 저장소 이력에 그대로 남아 있다 — 필요하면 그쪽에서 꺼낸다
+src/backup/
+
 ### 위 규칙에 잘못 걸리는 소스 경로 되살리기
 # out/ (IntelliJ 빌드 출력) 이 헥사고날 아웃바운드 포트 패키지를 먹는다
 !**/domain/port/out/
-# target/ (Maven) 이 대상 DB 초기화 스크립트를 먹는다
-!src/embedded-cdc/infra/db/target/
