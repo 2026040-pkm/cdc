@@ -204,3 +204,6 @@ src/backup/
 ### 위 규칙에 잘못 걸리는 소스 경로 되살리기
 # out/ (IntelliJ 빌드 출력) 이 헥사고날 아웃바운드 포트 패키지를 먹는다
 !**/domain/port/out/
+# target/ (Maven) 이 "수신 DB" 초기화 스크립트를 먹는다. CDC 에서 target 은 빌드 출력이 아니다
+!**/infra/db/target/
+!**/infra/db/target/**
