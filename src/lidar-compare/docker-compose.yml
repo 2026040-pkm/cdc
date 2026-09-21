@@ -1,0 +1,319 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# lidar-compare — 같은 MQTT 데이터를 세 경로로 hot DB 에 넣고 한 화면에서 비교한다
+#
+#   A. isl-kafka   : EMQX → Mqtt.Agent → ISL Engine → EES Kafka Provider → Kafka
+#                    → lidar-ingest(SOURCE=kafka) → tsdb-lidar-pg        (src/timescaledb 스택)
+#   B. mqtt-direct : EMQX → lidar-direct-ingest(SOURCE=mqtt) → cmp-direct-pg   (이 스택, ISL 없음)
+#   C. isl-db      : EMQX → Mqtt.Agent → ISL Engine → Db.Provider → cmp-provider-pg
+#                    (Provider 는 호스트 프로세스, 표로 펼치는 일은 DB 함수 isl.apply_tag_batch)
+#
+# A·B 두 소비자는 같은 이미지·같은 ingest.py 다. C 는 같은 규칙을 SQL 로 옮긴 함수(infra/db/10-isl-db-provider.sql)다.
+# 세 경로 모두 같은 표·같은 행·같은 지표 이름이라 대시보드에 보이는 차이는 전송 경로의 차이다.
+#
+# 이 스택이 띄우는 것 : EMQX(세 경로가 같이 구독하는 브로커) · 발행기(lidar-sim) · B 경로 전체 ·
+#                     C 경로 DB · 비교용 Prometheus/Grafana · exporter
+# 밖에 있는 것        : A 경로 적재(src/timescaledb) · ISL(Aspire 컨테이너 + scripts/isl-services.ps1 —
+#                     Engine · EES Kafka Provider · Db.Provider · Mqtt.Agent)
+#
+#   scripts/up.ps1      # 순서대로 전부 올린다 (timescaledb → 이 스택 → Aspire 연결)
+#   scripts/verify.ps1  # 두 DB 의 행 수·장비 수·지연을 나란히 찍는다
+#   scripts/down.ps1    # 이 스택만 내린다 (-Volumes 면 볼륨까지)
+#
+# 포트는 63xxx 대역이다. EMQX 만 ISL 등록부(EDGE_GROUP.ConfigJson.brokerUrl)가
+# mqtt://localhost:1884 로 박혀 있어 1884 를 그대로 쓴다.
+# ─────────────────────────────────────────────────────────────────────────────
+name: lidar-compare
+
+networks:
+  cmp-net:
+    name: cmp-net
+  # A 경로(src/timescaledb) 가 만드는 네트워크. A 소비자·A DB·A exporter 를 여기서 본다.
+  tsdb-net:
+    external: true
+    name: tsdb-net
+
+volumes:
+  cmp-direct-pgdata:
+  cmp-provider-pgdata:
+  cmp-prometheus-data:
+  cmp-grafana-data:
+  cmp-emqx-data:
+  cmp-sim-nuget:
+
+services:
+  # ── MQTT 브로커 ─────────────────────────────────────────────────────────────
+  # util/docker-mqtt 의 mqtt-emqx 와 같은 설정이다. ISL Agent 는 호스트 프로세스라 localhost:1884 로,
+  # 발행기는 컨테이너라 emqx:1883 으로 붙는다.
+  emqx:
+    image: emqx/emqx:5.8
+    container_name: cmp-emqx
+    networks: [cmp-net]
+    environment:
+      EMQX_NODE__NAME: "emqx@127.0.0.1"
+      EMQX_NODE__COOKIE: "lidar-compare-cookie"
+      EMQX_ALLOW_ANONYMOUS: "true"
+      EMQX_MQTT__MAX_PACKET_SIZE: "1MB"
+      # 세션당 PUBACK 을 기다릴 수 있는 QoS1 메시지 수(기본 32). B 소비자는 DB 커밋 뒤에 ack 하므로
+      # 1초치(~426)를 들고 있다 — 32 면 브로커가 전달을 멈춘다. Mqtt.Agent 는 받는 즉시 ack 해 영향이 없다.
+      EMQX_MQTT__MAX_INFLIGHT: "10000"
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: "public"
+    volumes:
+      - cmp-emqx-data:/opt/emqx/data
+    ports:
+      - "1884:1883"
+      - "18083:18083"
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  # ── 발행기 ──────────────────────────────────────────────────────────────────
+  # util/mqtt-lidar-sim 을 그대로 돌린다(350대 · 3채널 · 기본 ~426 msg/s).
+  # 호스트 창에서 돌리면 창을 닫는 순간 끊기므로 컨테이너로 둔다. 인자는 SIM_ARGS 로 바꾼다.
+  lidar-sim:
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    container_name: cmp-lidar-sim
+    networks: [cmp-net]
+    depends_on:
+      emqx:
+        condition: service_healthy
+    working_dir: /sim
+    environment:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+      SIM_ARGS: ${SIM_ARGS:-}
+    command: ["sh", "-c", "exec dotnet run lidar-sim.cs -- --host emqx --port 1883 $$SIM_ARGS"]
+    volumes:
+      - ../../util/mqtt-lidar-sim:/sim:ro
+      - cmp-sim-nuget:/root/.nuget/packages
+    restart: unless-stopped
+
+  # ── B 경로 hot DB ──────────────────────────────────────────────────────────
+  # A 경로 DB(tsdb-lidar-pg)와 같은 이미지·같은 스키마·같은 메모리 설정이다. CDC 원천 역할
+  # (wal_level=logical · 04-cdc-lidar.sql)과 태그 카탈로그 시드(03)만 뺐다 — B 경로는 장비 id 가
+  # 메시지에 실려 와 카탈로그가 필요 없다. DB 를 나눈 것은 두 경로의 DB 부하를 섞지 않기 위해서다.
+  direct-pg:
+    image: timescale/timescaledb:2.29.2-pg17
+    container_name: cmp-direct-pg
+    networks: [cmp-net]
+    environment:
+      POSTGRES_DB: lidar
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      TZ: Asia/Seoul
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb
+      - -c
+      - timescaledb.telemetry_level=off
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=100
+      - -c
+      - timescaledb.max_background_workers=16
+      - -c
+      - max_worker_processes=32
+      - -c
+      - log_min_duration_statement=1000
+    ports:
+      - "63432:5432"
+    volumes:
+      - cmp-direct-pgdata:/var/lib/postgresql/data
+      # 스키마 원본은 A 스택의 것을 그대로 쓴다. 복사본을 두면 두 DB 가 어긋나는 순간 비교가 깨진다.
+      - ../timescaledb/infra/db/init/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ../timescaledb/infra/db/init/02-policies.sql:/docker-entrypoint-initdb.d/02-policies.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lidar"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # ── B 경로 소비자 ──────────────────────────────────────────────────────────
+  # EMQX 를 직접 구독한다. ISL(Agent · Engine · Provider)도 Kafka 도 거치지 않는다.
+  lidar-direct-ingest:
+    build:
+      context: ../timescaledb/dev/ingest
+    image: timescaledb/lidar-ingest:local
+    container_name: cmp-lidar-direct-ingest
+    networks: [cmp-net]
+    depends_on:
+      direct-pg:
+        condition: service_healthy
+      emqx:
+        condition: service_healthy
+    environment:
+      SOURCE: mqtt
+      PIPELINE: mqtt-direct
+      MQTT_HOST: emqx
+      MQTT_PORT: "1883"
+      MQTT_TOPICS: ot/device/+/lidar/status,ot/sensor/+/actual,ot/pipeline/+/+/+/artifact
+      MQTT_QOS: "1"
+      MQTT_CLIENT_ID: lidar-mqtt-ingest
+      PG_DSN: postgresql://postgres:postgres@direct-pg:5432/lidar
+      # 대기 1초는 A 소비자와 같은 값이다. 메시지 하나가 항목 하나라 상한은 항목 수(5000)로 크게 두어
+      # 정상 운전에서는 1초가 먼저 끊는다 — 두 경로 모두 초당 DB 트랜잭션 하나.
+      MQTT_BATCH_MAX: "5000"
+      BATCH_MAX_WAIT_MS: "1000"
+      METRICS_PORT: "8000"
+      TZ: Asia/Seoul
+    ports:
+      - "63080:8000"
+    restart: unless-stopped
+
+  # ── C 경로 hot DB ──────────────────────────────────────────────────────────
+  # B DB 와 같은 이미지·같은 스키마·같은 설정이다. 적재 함수(10-isl-db-provider.sql)만 더 얹는다.
+  # 쓰는 쪽은 컨테이너가 아니라 호스트의 ISL Db.Provider 라 호스트 포트(63433)로 붙는다.
+  provider-pg:
+    image: timescale/timescaledb:2.29.2-pg17
+    container_name: cmp-provider-pg
+    networks: [cmp-net]
+    environment:
+      POSTGRES_DB: lidar
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      TZ: Asia/Seoul
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb
+      - -c
+      - timescaledb.telemetry_level=off
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=100
+      - -c
+      - timescaledb.max_background_workers=16
+      - -c
+      - max_worker_processes=32
+      - -c
+      - log_min_duration_statement=1000
+    ports:
+      - "63433:5432"
+    volumes:
+      - cmp-provider-pgdata:/var/lib/postgresql/data
+      - ../timescaledb/infra/db/init/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ../timescaledb/infra/db/init/02-policies.sql:/docker-entrypoint-initdb.d/02-policies.sql:ro
+      - ./infra/db/10-isl-db-provider.sql:/docker-entrypoint-initdb.d/10-isl-db-provider.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lidar"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # ── 모니터링 ────────────────────────────────────────────────────────────────
+  direct-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+    container_name: cmp-direct-exporter
+    networks: [cmp-net]
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@direct-pg:5432/lidar?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/pgexporter/queries-tsdb.yaml
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "false"
+    command:
+      - --collector.stat_checkpointer
+      - --collector.long_running_transactions
+    volumes:
+      - ../timescaledb/infra/monitoring/exporter:/etc/pgexporter:ro
+    ports:
+      - "63187:9187"
+    restart: unless-stopped
+
+  provider-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+    container_name: cmp-provider-exporter
+    networks: [cmp-net]
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@provider-pg:5432/lidar?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/pgexporter/queries-tsdb.yaml
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "false"
+    command:
+      - --collector.stat_checkpointer
+      - --collector.long_running_transactions
+    volumes:
+      - ../timescaledb/infra/monitoring/exporter:/etc/pgexporter:ro
+    ports:
+      - "63188:9187"
+    restart: unless-stopped
+
+  # 컨테이너별 CPU·메모리 (소비자 · 세 DB · EMQX · Aspire 의 Kafka/NATS).
+  podman-exporter:
+    image: quay.io/navidys/prometheus-podman-exporter:v1.21.2
+    container_name: cmp-podman-exporter
+    networks: [cmp-net]
+    user: root
+    security_opt: ["label=disable"]
+    environment:
+      CONTAINER_HOST: unix:///run/podman/podman.sock
+    command:
+      - --collector.enhance-metrics
+    volumes:
+      - ${PODMAN_SOCK:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:ro
+    ports:
+      - "63193:9882"
+    restart: unless-stopped
+
+  # ISL 은 컨테이너가 아니라 호스트(.NET) 프로세스다. scripts/isl-process-metrics.ps1 이
+  # Get-Process 결과를 textfile 형식으로 isl-metrics/ 에 5초마다 쓰고, 이 exporter 가 읽는다.
+  # C 경로 Db.Provider 도 적재 지표(lidar_ingest_*{pipeline="isl-db"})를 같은 폴더(isl-db-provider.prom)에 쓴다.
+  isl-process-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: cmp-isl-process-exporter
+    networks: [cmp-net]
+    command:
+      - --collector.disable-defaults
+      - --collector.textfile
+      - --collector.textfile.directory=/textfile
+    volumes:
+      - ./isl-metrics:/textfile:ro
+    restart: unless-stopped
+
+  cmp-prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: cmp-prometheus
+    networks: [cmp-net, tsdb-net]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./infra/monitoring/prometheus:/etc/prometheus:ro
+      - cmp-prometheus-data:/prometheus
+    ports:
+      - "63090:9090"
+    restart: unless-stopped
+
+  cmp-grafana:
+    image: grafana/grafana:11.2.0
+    container_name: cmp-grafana
+    networks: [cmp-net, tsdb-net]
+    depends_on: [cmp-prometheus]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_DEFAULT_THEME: light
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/lidar-compare.json
+      TZ: Asia/Seoul
+    volumes:
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - cmp-grafana-data:/var/lib/grafana
+    ports:
+      - "63380:3000"
+    restart: unless-stopped

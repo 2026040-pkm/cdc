@@ -1,0 +1,3414 @@
+{
+  "uid": "lidar-compare",
+  "title": "LiDAR 적재 경로 비교 — ISL Kafka vs MQTT 직결 vs ISL Db Provider",
+  "tags": [
+    "lidar",
+    "compare"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "description": "같은 MQTT 입력(lidar-sim 350대)을 A(Agent→Engine→EES Kafka Provider→Kafka→소비자), B(EMQX 를 서비스가 직접 구독), C(Agent→Engine→Db.Provider→DB 함수) 세 경로로 각자의 hot DB 에 적재한다. 세 경로 모두 같은 표·같은 행 규칙·같은 지표 이름이다.",
+  "panels": [
+    {
+      "type": "row",
+      "title": "한눈에 — 같은 MQTT 입력, 세 경로의 결과",
+      "id": 1,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "적재 행/초 (1분 평균)",
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "DB 에 새로 들어간 행/초. 입력은 발행기 ~426 msg/s(상태 350 + 실적 5.8 + 산출물 70). A 는 EES Kafka Provider 가 태그당 최신값만 보내 산출물이 합쳐진다.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "orientation": "vertical"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(cmp:rows_inserted:rate1m{pipeline=\"isl-kafka\"})",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(cmp:rows_inserted:rate1m{pipeline=\"mqtt-direct\"})",
+          "legendFormat": "B · MQTT 직결 서비스",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(cmp:rows_inserted:rate1m{pipeline=\"isl-db\"})",
+          "legendFormat": "C · ISL Engine→Db Provider",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "end-to-end p95",
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "장비 occurred_at → DB 커밋. A 는 Agent 가 occurred_at 으로 정한 content.timestamp, B 는 메시지의 occurred_at, C 는 Engine 태그 변경의 changedAt — 같은 값이다.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "orientation": "vertical"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p95{pipeline=\"isl-kafka\"}",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p95{pipeline=\"mqtt-direct\"}",
+          "legendFormat": "B · MQTT 직결 서비스",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p95{pipeline=\"isl-db\"}",
+          "legendFormat": "C · ISL Engine→Db Provider",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "대기 레코드 (소스 lag)",
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "A = Kafka 파티션 lag 합(레코드 · 레코드 하나에 항목 수백 개), B = 받았지만 아직 DB 에 안 쓴 MQTT 메시지 수(메시지 하나 = 항목 하나), C = Db.Provider 큐에 쌓인 태그 변경 수. 알갱이가 달라 절대값보다 추세를 본다.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "orientation": "vertical"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "max(lidar_ingest_source_lag{pipeline=\"isl-kafka\"})",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "max(lidar_ingest_source_lag{pipeline=\"mqtt-direct\"})",
+          "legendFormat": "B · MQTT 직결 서비스",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "max(lidar_ingest_source_lag{pipeline=\"isl-db\"})",
+          "legendFormat": "C · ISL Engine→Db Provider",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "최근 1분 장비 수 (status)",
+      "id": 5,
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "hot DB 를 직접 센다. 350 이어야 한다. A 는 태그 카탈로그로 장비를 푸는데 못 풀면 '#숫자' 로 남아 수가 달라진다.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "orientation": "vertical"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-kafka"
+          },
+          "rawSql": "SELECT count(DISTINCT tid) AS \"A · ISL Engine→Kafka\" FROM tsdb.lidar_status WHERE time > now() - interval '1 minute'",
+          "format": "table",
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-mqtt"
+          },
+          "rawSql": "SELECT count(DISTINCT tid) AS \"B · MQTT 직결 서비스\" FROM tsdb.lidar_status WHERE time > now() - interval '1 minute'",
+          "format": "table",
+          "refId": "B",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-isldb"
+          },
+          "rawSql": "SELECT count(DISTINCT tid) AS \"C · ISL Engine→Db Provider\" FROM tsdb.lidar_status WHERE time > now() - interval '1 minute'",
+          "format": "table",
+          "refId": "C",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "미해석 장비 축 (#숫자)",
+      "id": 6,
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "장비 id 를 못 찾아 숫자 ParameterId 로 적재된 수. B 는 MQTT 메시지의 id 를 그대로 써서 구조적으로 0 이다.",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "orientation": "vertical"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-kafka"
+          },
+          "rawSql": "SELECT count(DISTINCT tid) AS \"A · ISL Engine→Kafka\" FROM tsdb.lidar_status WHERE time > now() - interval '5 minutes' AND tid LIKE '#%'",
+          "format": "table",
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-mqtt"
+          },
+          "rawSql": "SELECT count(DISTINCT tid) AS \"B · MQTT 직결 서비스\" FROM tsdb.lidar_status WHERE time > now() - interval '5 minutes' AND tid LIKE '#%'",
+          "format": "table",
+          "refId": "B",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-isldb"
+          },
+          "rawSql": "SELECT count(DISTINCT tid) AS \"C · ISL Engine→Db Provider\" FROM tsdb.lidar_status WHERE time > now() - interval '5 minutes' AND tid LIKE '#%'",
+          "format": "table",
+          "refId": "C",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "격리(reject)/분",
+      "id": 7,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.1
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "orientation": "vertical"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(rate(lidar_ingest_rejects_total{pipeline=\"isl-kafka\"}[5m])) * 60 or vector(0)",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(rate(lidar_ingest_rejects_total{pipeline=\"mqtt-direct\"}[5m])) * 60 or vector(0)",
+          "legendFormat": "B · MQTT 직결 서비스",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(rate(lidar_ingest_rejects_total{pipeline=\"isl-db\"}[5m])) * 60 or vector(0)",
+          "legendFormat": "C · ISL Engine→Db Provider",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "처리량",
+      "id": 8,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "적재 행/초",
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "rows_inserted 는 멱등 인덱스에 걸린 중복을 뺀 값이다.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:rows_inserted:rate1m{pipeline=\"isl-kafka\"}",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:rows_inserted:rate1m{pipeline=\"mqtt-direct\"}",
+          "legendFormat": "B · MQTT 직결 서비스",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:rows_inserted:rate1m{pipeline=\"isl-db\"}",
+          "legendFormat": "C · ISL Engine→Db Provider",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "채널별 수신 항목/초",
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:items:rate1m{pipeline=\"isl-kafka\"}",
+          "legendFormat": "A · ISL Engine→Kafka · {{channel}}",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:items:rate1m{pipeline=\"mqtt-direct\"}",
+          "legendFormat": "B · MQTT 직결 서비스 · {{channel}}",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:items:rate1m{pipeline=\"isl-db\"}",
+          "legendFormat": "C · ISL Engine→Db Provider · {{channel}}",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "분당 적재 행 (hot DB 직접 · 이벤트 시각 기준)",
+      "id": 11,
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "status 하이퍼테이블 행을 occurred_at 분 단위로 센다. 정상이면 선이 350×60=21,000 에서 겹친다. 마지막 분은 아직 차는 중이다.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-kafka"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, count(*) AS \"A · ISL Engine→Kafka\" FROM tsdb.lidar_status WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-mqtt"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, count(*) AS \"B · MQTT 직결 서비스\" FROM tsdb.lidar_status WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "B",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-isldb"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, count(*) AS \"C · ISL Engine→Db Provider\" FROM tsdb.lidar_status WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "C",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "분당 적재 행 — 실적·산출물 (hot DB 직접)",
+      "id": 12,
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "1분 주기 채널. 기대값 actual 350/분, artifact 4,200/분.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-kafka"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, count(*) AS \"A · ISL Engine→Kafka · actual\" FROM tsdb.lidar_scan_actual WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-mqtt"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, count(*) AS \"B · MQTT 직결 서비스 · actual\" FROM tsdb.lidar_scan_actual WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "C",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-isldb"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, count(*) AS \"C · ISL Engine→Db Provider · actual\" FROM tsdb.lidar_scan_actual WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "E",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-kafka"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, count(*) AS \"A · ISL Engine→Kafka · artifact\" FROM tsdb.lidar_scan_artifact WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "B",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-mqtt"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, count(*) AS \"B · MQTT 직결 서비스 · artifact\" FROM tsdb.lidar_scan_artifact WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "D",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-isldb"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, count(*) AS \"C · ISL Engine→Db Provider · artifact\" FROM tsdb.lidar_scan_artifact WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "F",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "표별 행 수 (hot DB 직접)",
+      "id": 13,
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "같은 SQL 을 세 hot DB 에 던진 결과. 5분 창은 이벤트 시각(time) 기준이라 늦게 도착한 항목까지 센다. '수신 레코드' 는 A = Kafka 레코드, B = 소비자가 1초마다 묶은 MQTT 메시지 묶음, C = Db.Provider 가 1초마다 묶은 태그 변경 묶음이라 알갱이가 다르다.",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-kafka"
+          },
+          "rawSql": "SELECT 'A · ISL Engine→Kafka' AS \"경로\", (SELECT count(*) FROM tsdb.lidar_status WHERE time > now() - interval '5 minutes') AS \"status 5분\", (SELECT count(*) FROM tsdb.lidar_scan_actual WHERE time > now() - interval '5 minutes') AS \"actual 5분\", (SELECT count(*) FROM tsdb.lidar_scan_artifact WHERE time > now() - interval '5 minutes') AS \"artifact 5분\", approximate_row_count('tsdb.lidar_status') AS \"status 누적(근사)\", (SELECT count(*) FROM rdb.lidar_device_state) AS \"장비 상태 행\", (SELECT count(*) FROM rdb.lidar_ingest_reject) AS \"격리 누적\", (SELECT count(*) FROM rdb.lidar_status_message) AS \"수신 레코드 누적\"",
+          "format": "table",
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-mqtt"
+          },
+          "rawSql": "SELECT 'B · MQTT 직결 서비스' AS \"경로\", (SELECT count(*) FROM tsdb.lidar_status WHERE time > now() - interval '5 minutes') AS \"status 5분\", (SELECT count(*) FROM tsdb.lidar_scan_actual WHERE time > now() - interval '5 minutes') AS \"actual 5분\", (SELECT count(*) FROM tsdb.lidar_scan_artifact WHERE time > now() - interval '5 minutes') AS \"artifact 5분\", approximate_row_count('tsdb.lidar_status') AS \"status 누적(근사)\", (SELECT count(*) FROM rdb.lidar_device_state) AS \"장비 상태 행\", (SELECT count(*) FROM rdb.lidar_ingest_reject) AS \"격리 누적\", (SELECT count(*) FROM rdb.lidar_status_message) AS \"수신 레코드 누적\"",
+          "format": "table",
+          "refId": "B",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-isldb"
+          },
+          "rawSql": "SELECT 'C · ISL Engine→Db Provider' AS \"경로\", (SELECT count(*) FROM tsdb.lidar_status WHERE time > now() - interval '5 minutes') AS \"status 5분\", (SELECT count(*) FROM tsdb.lidar_scan_actual WHERE time > now() - interval '5 minutes') AS \"actual 5분\", (SELECT count(*) FROM tsdb.lidar_scan_artifact WHERE time > now() - interval '5 minutes') AS \"artifact 5분\", approximate_row_count('tsdb.lidar_status') AS \"status 누적(근사)\", (SELECT count(*) FROM rdb.lidar_device_state) AS \"장비 상태 행\", (SELECT count(*) FROM rdb.lidar_ingest_reject) AS \"격리 누적\", (SELECT count(*) FROM rdb.lidar_status_message) AS \"수신 레코드 누적\"",
+          "format": "table",
+          "refId": "C",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "지연",
+      "id": 14,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "end-to-end 지연 (occurred_at → DB 커밋)",
+      "id": 15,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "히스토그램 버킷(0.1 · 0.25 · 0.5 · 1 · 2 · 5 · 10 · 30 …) 경계라 분위수는 버킷 사이 선형 보간값이다. 정밀 비교는 오른쪽 DB 직접 값을 본다.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p50{pipeline=\"isl-kafka\"}",
+          "legendFormat": "A · ISL Engine→Kafka p50",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p50{pipeline=\"mqtt-direct\"}",
+          "legendFormat": "B · MQTT 직결 서비스 p50",
+          "refId": "D",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p50{pipeline=\"isl-db\"}",
+          "legendFormat": "C · ISL Engine→Db Provider p50",
+          "refId": "G",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p95{pipeline=\"isl-kafka\"}",
+          "legendFormat": "A · ISL Engine→Kafka p95",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p95{pipeline=\"mqtt-direct\"}",
+          "legendFormat": "B · MQTT 직결 서비스 p95",
+          "refId": "E",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p95{pipeline=\"isl-db\"}",
+          "legendFormat": "C · ISL Engine→Db Provider p95",
+          "refId": "H",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p99{pipeline=\"isl-kafka\"}",
+          "legendFormat": "A · ISL Engine→Kafka p99",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p99{pipeline=\"mqtt-direct\"}",
+          "legendFormat": "B · MQTT 직결 서비스 p99",
+          "refId": "F",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:e2e_seconds:p99{pipeline=\"isl-db\"}",
+          "legendFormat": "C · ISL Engine→Db Provider p99",
+          "refId": "I",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "적재 지연 평균 (hot DB 직접 · received_at − time)",
+      "id": 16,
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "행마다 DB 기본값 now()(트랜잭션 시작 시각)와 장비 occurred_at 의 차. 히스토그램 보간이 없는 실측 평균.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-kafka"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, avg(extract(epoch FROM received_at - time)) AS \"A · ISL Engine→Kafka\" FROM tsdb.lidar_status WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-mqtt"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, avg(extract(epoch FROM received_at - time)) AS \"B · MQTT 직결 서비스\" FROM tsdb.lidar_status WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "B",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-isldb"
+          },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, avg(extract(epoch FROM received_at - time)) AS \"C · ISL Engine→Db Provider\" FROM tsdb.lidar_status WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "C",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "소스 대기 (lag)",
+      "id": 17,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 36
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "max(lidar_ingest_source_lag{pipeline=\"isl-kafka\"})",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "max(lidar_ingest_source_lag{pipeline=\"mqtt-direct\"})",
+          "legendFormat": "B · MQTT 직결 서비스",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "max(lidar_ingest_source_lag{pipeline=\"isl-db\"})",
+          "legendFormat": "C · ISL Engine→Db Provider",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "DB 배치 시간 p95",
+      "id": 18,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 36
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:batch_seconds:p95{pipeline=\"isl-kafka\"}",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:batch_seconds:p95{pipeline=\"mqtt-direct\"}",
+          "legendFormat": "B · MQTT 직결 서비스",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:batch_seconds:p95{pipeline=\"isl-db\"}",
+          "legendFormat": "C · ISL Engine→Db Provider",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "배치당 행 수 (평균)",
+      "id": 19,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 36
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:rows_per_batch:avg{pipeline=\"isl-kafka\"}",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:rows_per_batch:avg{pipeline=\"mqtt-direct\"}",
+          "legendFormat": "B · MQTT 직결 서비스",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:rows_per_batch:avg{pipeline=\"isl-db\"}",
+          "legendFormat": "C · ISL Engine→Db Provider",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "정합성 · 품질",
+      "id": 20,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "중복 스킵/초",
+      "id": 21,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "멱등 인덱스가 거른 행. MQTT QoS1 재전달·소비자 재시작 뒤 재전달이 여기 보인다. 유실이 아니다.",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 45
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(rate(lidar_ingest_rows_duplicate_total{pipeline=\"isl-kafka\"}[1m]))",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(rate(lidar_ingest_rows_duplicate_total{pipeline=\"mqtt-direct\"}[1m]))",
+          "legendFormat": "B · MQTT 직결 서비스",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(rate(lidar_ingest_rows_duplicate_total{pipeline=\"isl-db\"}[1m]))",
+          "legendFormat": "C · ISL Engine→Db Provider",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "격리/분 (사유별)",
+      "id": 22,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 45
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum by (reason) (rate(lidar_ingest_rejects_total{pipeline=\"isl-kafka\"}[5m])) * 60",
+          "legendFormat": "A · ISL Engine→Kafka · {{reason}}",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum by (reason) (rate(lidar_ingest_rejects_total{pipeline=\"mqtt-direct\"}[5m])) * 60",
+          "legendFormat": "B · MQTT 직결 서비스 · {{reason}}",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum by (reason) (rate(lidar_ingest_rejects_total{pipeline=\"isl-db\"}[5m])) * 60",
+          "legendFormat": "C · ISL Engine→Db Provider · {{reason}}",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(rate(lidar_ingest_rejects_total{pipeline=\"isl-kafka\"}[5m])) * 60 or vector(0)",
+          "legendFormat": "A · ISL Engine→Kafka · 합계",
+          "refId": "D",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(rate(lidar_ingest_rejects_total{pipeline=\"mqtt-direct\"}[5m])) * 60 or vector(0)",
+          "legendFormat": "B · MQTT 직결 서비스 · 합계",
+          "refId": "E",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(rate(lidar_ingest_rejects_total{pipeline=\"isl-db\"}[5m])) * 60 or vector(0)",
+          "legendFormat": "C · ISL Engine→Db Provider · 합계",
+          "refId": "F",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "장비 축 미해석/분 (A 전용)",
+      "id": 23,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "Kafka content.tid(숫자)가 lidar_tag_catalog 에 없어 장비를 못 푼 항목. B 경로에는 이 단계 자체가 없다.",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 45
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(rate(lidar_ingest_tag_unresolved_total{pipeline=\"isl-kafka\"}[5m])) * 60 or vector(0)",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "장비별 최근 상태 차이 (최근 1분 status 건수)",
+      "id": 24,
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "description": "세 DB 를 장비로 맞춰 본다. B(MQTT 직결)를 기준으로 A·C 의 차이를 낸다. A−B 가 큰 장비가 위로 온다. 빈칸은 한쪽에만 있는 장비다(A 의 '#숫자' 등).",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-kafka"
+          },
+          "rawSql": "SELECT tid AS \"장비\", count(*) AS \"A 건수\" FROM tsdb.lidar_status WHERE time > now() - interval '1 minute' GROUP BY 1",
+          "format": "table",
+          "refId": "A",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-mqtt"
+          },
+          "rawSql": "SELECT tid AS \"장비\", count(*) AS \"B 건수\" FROM tsdb.lidar_status WHERE time > now() - interval '1 minute' GROUP BY 1",
+          "format": "table",
+          "refId": "B",
+          "editorMode": "code",
+          "rawQuery": true
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cmp-db-isldb"
+          },
+          "rawSql": "SELECT tid AS \"장비\", count(*) AS \"C 건수\" FROM tsdb.lidar_status WHERE time > now() - interval '1 minute' GROUP BY 1",
+          "format": "table",
+          "refId": "C",
+          "editorMode": "code",
+          "rawQuery": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binary",
+            "alias": "차이 (A−B)",
+            "binary": {
+              "left": "A 건수",
+              "operator": "-",
+              "right": "B 건수"
+            },
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binary",
+            "alias": "차이 (C−B)",
+            "binary": {
+              "left": "C 건수",
+              "operator": "-",
+              "right": "B 건수"
+            },
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "차이 (A−B)",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "리소스 — 경로마다 무엇이 돌고 있나",
+      "id": 25,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "ISL 호스트 프로세스 CPU (코어)",
+      "id": 26,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "Mqtt.Agent · Engine(primary+secondary) 는 A·C 가 같이 쓴다. EES.Kafka.Provider(3개)는 A 전용, Db.Provider 는 C 전용이다. B 는 ISL 을 쓰지 않는다.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 62
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "decimals": 2
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:isl_process_cpu_cores",
+          "legendFormat": "{{process}}",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "ISL 호스트 프로세스 메모리",
+      "id": 27,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 62
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:isl_process_mem_bytes",
+          "legendFormat": "{{process}}",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "컨테이너 CPU (코어)",
+      "id": 28,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "A: 소비자 · hot DB · Kafka · NATS(Engine↔Provider). B: 소비자 · hot DB. C: hot DB(행으로 펼치는 적재 함수가 DB 안에서 돈다). NATS 는 A·C 공통이라 A 쪽에만 그린다. EMQX 는 세 경로 공통 브로커다.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 70
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "decimals": 2
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:container_cpu_cores{name=~\"tsdb-lidar-ingest|tsdb-lidar-pg|kafka-[a-z0-9]+|nats-(primary|secondary)-[a-z0-9]+\"}",
+          "legendFormat": "A · ISL Engine→Kafka · {{name}}",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:container_cpu_cores{name=~\"cmp-lidar-direct-ingest|cmp-direct-pg\"}",
+          "legendFormat": "B · MQTT 직결 서비스 · {{name}}",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:container_cpu_cores{name=~\"cmp-provider-pg\"}",
+          "legendFormat": "C · ISL Engine→Db Provider · {{name}}",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:container_cpu_cores{name=\"cmp-emqx\"}",
+          "legendFormat": "공통 · {{name}}",
+          "refId": "D",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "컨테이너 메모리",
+      "id": 29,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 70
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:container_mem_bytes{name=~\"tsdb-lidar-ingest|tsdb-lidar-pg|kafka-[a-z0-9]+|nats-(primary|secondary)-[a-z0-9]+\"}",
+          "legendFormat": "A · ISL Engine→Kafka · {{name}}",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:container_mem_bytes{name=~\"cmp-lidar-direct-ingest|cmp-direct-pg\"}",
+          "legendFormat": "B · MQTT 직결 서비스 · {{name}}",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:container_mem_bytes{name=~\"cmp-provider-pg\"}",
+          "legendFormat": "C · ISL Engine→Db Provider · {{name}}",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "cmp:container_mem_bytes{name=\"cmp-emqx\"}",
+          "legendFormat": "공통 · {{name}}",
+          "refId": "D",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "경로 전용 CPU 합계 (코어)",
+      "id": 30,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "경로를 혼자 돌린다고 칠 때 필요한 구성요소의 CPU 합. Agent · Engine · NATS 는 A·C 가 실제로는 같이 쓰므로 두 선에 모두 들어간다. 공통인 EMQX · 발행기는 빠져 있다.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 78
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "decimals": 2
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(cmp:isl_process_cpu_cores{process=~\"Mqtt.Agent|Engine|EES.Kafka.Provider\"}) + sum(cmp:container_cpu_cores{name=~\"tsdb-lidar-ingest|tsdb-lidar-pg|kafka-[a-z0-9]+|nats-(primary|secondary)-[a-z0-9]+\"})",
+          "legendFormat": "A · ISL Engine→Kafka (Agent+Engine+Provider+NATS+Kafka+소비자+DB)",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(cmp:container_cpu_cores{name=~\"cmp-lidar-direct-ingest|cmp-direct-pg\"})",
+          "legendFormat": "B · MQTT 직결 서비스 (소비자+DB)",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(cmp:isl_process_cpu_cores{process=~\"Mqtt.Agent|Engine|Db.Provider\"}) + sum(cmp:container_cpu_cores{name=~\"cmp-provider-pg|nats-(primary|secondary)-[a-z0-9]+\"})",
+          "legendFormat": "C · ISL Engine→Db Provider (Agent+Engine+Provider+NATS+DB)",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "hot DB 크기",
+      "id": 31,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cmp-prom"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 78
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^A · ISL Engine→Kafka.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2994A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^B · MQTT 직결 서비스.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2F80ED"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^C · ISL Engine→Db Provider.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#27AE60"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(tsdb_db_size_bytes{pipeline=\"isl-kafka\"}) or sum(pg_database_size_bytes{pipeline=\"isl-kafka\",datname=\"lidar\"})",
+          "legendFormat": "A · ISL Engine→Kafka",
+          "refId": "A",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(tsdb_db_size_bytes{pipeline=\"mqtt-direct\"}) or sum(pg_database_size_bytes{pipeline=\"mqtt-direct\",datname=\"lidar\"})",
+          "legendFormat": "B · MQTT 직결 서비스",
+          "refId": "B",
+          "instant": false,
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cmp-prom"
+          },
+          "expr": "sum(tsdb_db_size_bytes{pipeline=\"isl-db\"}) or sum(pg_database_size_bytes{pipeline=\"isl-db\",datname=\"lidar\"})",
+          "legendFormat": "C · ISL Engine→Db Provider",
+          "refId": "C",
+          "instant": false,
+          "range": true
+        }
+      ]
+    }
+  ]
+}

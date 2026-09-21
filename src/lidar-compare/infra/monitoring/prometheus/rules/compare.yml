@@ -1,0 +1,34 @@
+# 비교 대시보드가 읽는 지표를 pipeline 축으로 미리 접어 둔다.
+groups:
+  - name: lidar-compare
+    rules:
+      - record: cmp:rows_inserted:rate1m
+        expr: sum by (pipeline) (rate(lidar_ingest_rows_inserted_total[1m]))
+      - record: cmp:items:rate1m
+        expr: sum by (pipeline, channel) (rate(lidar_ingest_items_total[1m]))
+      - record: cmp:table_rows:rate1m
+        expr: sum by (pipeline, table) (rate(lidar_ingest_table_rows_total[1m]))
+      - record: cmp:e2e_seconds:p50
+        expr: histogram_quantile(0.50, sum by (pipeline, le) (rate(lidar_ingest_end_to_end_seconds_bucket[1m])))
+      - record: cmp:e2e_seconds:p95
+        expr: histogram_quantile(0.95, sum by (pipeline, le) (rate(lidar_ingest_end_to_end_seconds_bucket[1m])))
+      - record: cmp:e2e_seconds:p99
+        expr: histogram_quantile(0.99, sum by (pipeline, le) (rate(lidar_ingest_end_to_end_seconds_bucket[1m])))
+      - record: cmp:e2e_seconds:avg
+        expr: sum by (pipeline) (rate(lidar_ingest_end_to_end_seconds_sum[1m])) / sum by (pipeline) (rate(lidar_ingest_end_to_end_seconds_count[1m]))
+      - record: cmp:batch_seconds:p95
+        expr: histogram_quantile(0.95, sum by (pipeline, le) (rate(lidar_ingest_batch_seconds_bucket[1m])))
+      - record: cmp:rows_per_batch:avg
+        expr: sum by (pipeline) (rate(lidar_ingest_batch_rows_sum[1m])) / sum by (pipeline) (rate(lidar_ingest_batch_rows_count[1m]))
+
+      # 컨테이너 리소스 — podman-exporter 는 name 레이블로 컨테이너를 준다.
+      - record: cmp:container_cpu_cores
+        expr: sum by (name) (rate(podman_container_cpu_seconds_total[1m]))
+      - record: cmp:container_mem_bytes
+        expr: sum by (name) (podman_container_mem_usage_bytes)
+
+      # 호스트 ISL 프로세스 — process 레이블(Engine · Mqtt.Agent · EES.Kafka.Provider · Db.Provider)
+      - record: cmp:isl_process_cpu_cores
+        expr: sum by (process) (rate(isl_process_cpu_seconds_total[1m]))
+      - record: cmp:isl_process_mem_bytes
+        expr: sum by (process) (isl_process_working_set_bytes)

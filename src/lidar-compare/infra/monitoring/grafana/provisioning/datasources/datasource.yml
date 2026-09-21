@@ -1,0 +1,60 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: cmp-prom
+    type: prometheus
+    access: proxy
+    url: http://cmp-prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 5s
+
+  # A 경로 hot DB — src/timescaledb 의 tsdb-lidar-pg (tsdb-net 의 timescaledb)
+  - name: HotDB isl-kafka
+    uid: cmp-db-kafka
+    type: postgres
+    access: proxy
+    url: timescaledb:5432
+    database: lidar
+    user: postgres
+    editable: false
+    secureJsonData:
+      password: postgres
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: true
+
+  # B 경로 hot DB — 이 스택의 cmp-direct-pg
+  - name: HotDB mqtt-direct
+    uid: cmp-db-mqtt
+    type: postgres
+    access: proxy
+    url: direct-pg:5432
+    database: lidar
+    user: postgres
+    editable: false
+    secureJsonData:
+      password: postgres
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: true
+
+  # C 경로 hot DB — 이 스택의 cmp-provider-pg (ISL Db.Provider 가 쓴다)
+  - name: HotDB isl-db
+    uid: cmp-db-isldb
+    type: postgres
+    access: proxy
+    url: provider-pg:5432
+    database: lidar
+    user: postgres
+    editable: false
+    secureJsonData:
+      password: postgres
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: true
