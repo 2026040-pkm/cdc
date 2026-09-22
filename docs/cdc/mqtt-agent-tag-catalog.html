@@ -1,0 +1,2321 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MQTT 브로커 → Mqtt.Agent 태그 카탈로그</title>
+<style>
+/* ============================================================
+   HW Doc Kit - design tokens & base primitives
+   금지: 이모지, 보라/바이올렛/인디고 계열, 무지개 그라데이션
+   기준색: 한화 오렌지 계열
+   ============================================================ */
+:root{
+  /* brand */
+  --hw:#F37321;          /* 기본 오렌지 */
+  --hw-dk:#D2590F;       /* 진한 오렌지 (호버/강조선) */
+  --hw-dp:#A8420A;       /* 가장 진한 오렌지 (제목 강조) */
+  --hw-lt:#FFB27A;       /* 밝은 오렌지 (보조 채움) */
+  --hw-pale:#FFF1E7;     /* 아주 옅은 오렌지 (배경 톤) */
+  --hw-tint:#FDE3D1;     /* 옅은 오렌지 (테두리/칩) */
+
+  /* ink & surface */
+  --ink:#141414; --ink2:#3F3F3F; --ink3:#6E6E6E; --ink4:#9A9A9A;
+  --bg:#FFFFFF; --bg2:#FAF8F6; --bg3:#F2EEEA;
+  --line:#E4E1DE; --line2:#CFCAC5;
+
+  /* semantic (보라 금지 - 보색은 청록/황토/벽돌색으로) */
+  --ok:#2E7D5B; --ok-bg:#E8F3EE;
+  --warn:#B8791A; --warn-bg:#FBF1DF;
+  --risk:#C0392B; --risk-bg:#FBEAE7;
+  --info:#2A6F97; --info-bg:#E7F0F6;
+
+  --radius:10px; --radius-sm:6px;
+  --shadow:0 1px 2px rgba(20,20,20,.06), 0 8px 24px rgba(20,20,20,.06);
+  --font:"Pretendard","Malgun Gothic","Apple SD Gothic Neo","Segoe UI",system-ui,sans-serif;
+  --mono:"D2Coding","Cascadia Mono","Consolas","JetBrains Mono",ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --hw:#FF8A3D; --hw-dk:#F37321; --hw-dp:#FFB27A; --hw-lt:#7A3E14; --hw-pale:#241812; --hw-tint:#4A2A15;
+  --ink:#F2EFEC; --ink2:#CFC9C3; --ink3:#9E9691; --ink4:#77706B;
+  --bg:#141312; --bg2:#1C1A18; --bg3:#252220;
+  --line:#332F2C; --line2:#464038;
+  --ok:#5CB58C; --ok-bg:#17251F; --warn:#D9A445; --warn-bg:#2A2317;
+  --risk:#E2705F; --risk-bg:#2A1917; --info:#6BA6CC; --info-bg:#161F26;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font); color:var(--ink); background:var(--bg2);
+  -webkit-font-smoothing:antialiased; line-height:1.55;
+  font-variant-numeric:tabular-nums;
+}
+h1,h2,h3,h4{margin:0; line-height:1.25; font-weight:700; letter-spacing:-.01em}
+p{margin:0 0 .6em}
+a{color:var(--hw-dk); text-underline-offset:2px}
+:root[data-theme="dark"] a{color:var(--hw)}
+code,kbd,pre,samp{font-family:var(--mono)}
+hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+
+/* ---------- 공통 프리미티브 ---------- */
+.kicker{
+  font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--hw-dk);
+}
+.rule{height:3px;background:var(--hw);border-radius:2px;width:56px}
+.muted{color:var(--ink3)}
+.small{font-size:13px}
+.mono{font-family:var(--mono);font-size:.92em}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;
+  background:var(--hw-pale);color:var(--hw-dp);border:1px solid var(--hw-tint);
+}
+.chip--ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.chip--warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.chip--risk{background:var(--risk-bg);color:var(--risk);border-color:var(--risk)}
+.chip--info{background:var(--info-bg);color:var(--info);border-color:var(--info)}
+.chip--neutral{background:var(--bg3);color:var(--ink2);border-color:var(--line2)}
+
+.card{
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;
+}
+.card--accent{border-left:4px solid var(--hw)}
+.card__t{font-size:16px;font-weight:700;margin:0 0 6px}
+.card__d{font-size:14px;color:var(--ink2);margin:0}
+
+.kpi{display:flex;gap:14px;flex-wrap:wrap}
+.kpi__item{
+  flex:1 1 0;min-width:140px;background:var(--bg);border:1px solid var(--line);
+  border-top:3px solid var(--hw);border-radius:var(--radius);padding:14px 16px;
+}
+.kpi__v{font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--hw-dp)}
+:root[data-theme="dark"] .kpi__v{color:var(--hw)}
+.kpi__l{font-size:12px;color:var(--ink3);font-weight:600}
+
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--bg)}
+.tbl th,.tbl td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.tbl thead th{background:var(--hw-pale);color:var(--hw-dp);font-size:12.5px;
+  letter-spacing:.03em;text-transform:uppercase;border-color:var(--hw-tint)}
+.tbl tbody tr:nth-child(even){background:var(--bg2)}
+.tbl td.num{text-align:right;font-family:var(--mono)}
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius-sm)}
+
+.note{
+  border:1px solid var(--line);border-left:4px solid var(--ink3);
+  background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-size:14px;
+}
+.note__t{font-weight:700;font-size:13px;margin:0 0 4px;letter-spacing:.02em}
+.note--info{border-left-color:var(--info);background:var(--info-bg)}
+.note--info .note__t{color:var(--info)}
+.note--ok{border-left-color:var(--ok);background:var(--ok-bg)}
+.note--ok .note__t{color:var(--ok)}
+.note--warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.note--warn .note__t{color:var(--warn)}
+.note--risk{border-left-color:var(--risk);background:var(--risk-bg)}
+.note--risk .note__t{color:var(--risk)}
+
+/* 코드 블록 */
+.code{border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg)}
+.code__bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;color:var(--ink3)
+}
+.code__copy{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer
+}
+.code__copy:hover{border-color:var(--hw);color:var(--hw-dk)}
+.code pre{margin:0;padding:12px 14px;overflow-x:auto;font-size:13px;line-height:1.6}
+.code .cm{color:var(--ink4)}
+.code .hl{color:var(--hw-dk);font-weight:700}
+
+/* 단계 흐름 */
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.step{
+  flex:1 1 0;min-width:150px;position:relative;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px
+}
+.step__n{
+  display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:50%;background:var(--hw);color:#fff;font-size:12px;font-weight:800;margin-bottom:6px
+}
+.step__t{font-weight:700;font-size:14px}
+.step__d{font-size:12.5px;color:var(--ink3)}
+
+/* UI 목업 프레임 */
+.ui{border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--bg);box-shadow:var(--shadow)}
+.ui__bar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border-bottom:1px solid var(--line)}
+.ui__dot{width:9px;height:9px;border-radius:50%;background:var(--line2)}
+.ui__addr{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  padding:2px 8px;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+.ui__body{padding:14px}
+.ui-row{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.ui-row:last-child{border-bottom:0}
+.ui-btn{background:var(--hw);color:#fff;border:0;border-radius:5px;padding:6px 14px;font-size:12.5px;font-weight:700}
+.ui-btn--ghost{background:transparent;color:var(--hw-dk);border:1px solid var(--hw)}
+.ui-field{flex:1;border:1px solid var(--line2);border-radius:5px;padding:6px 9px;font-size:12.5px;color:var(--ink3);background:var(--bg2)}
+
+/* 출처 표기 */
+.ref{
+  font-size:.62em;font-weight:800;vertical-align:super;color:var(--hw-dk);
+  background:var(--hw-pale);border:1px solid var(--hw-tint);border-radius:4px;
+  padding:0 4px;margin-left:2px;cursor:pointer;text-decoration:none
+}
+.refs{list-style:none;padding:0;margin:0;font-size:13px}
+.refs li{display:grid;grid-template-columns:26px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.refs li:last-child{border-bottom:0}
+.refs .refs__n{color:var(--hw-dk);font-weight:800;font-family:var(--mono)}
+.refs .refs__src{color:var(--ink);font-weight:600}
+.refs .refs__meta{color:var(--ink3);font-size:12px;font-family:var(--mono);word-break:break-all}
+
+/* 그리드 */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.stack{display:flex;flex-direction:column;gap:12px}
+
+/* ---------- 다이어그램 캔버스 ---------- */
+.dgm{
+  position:relative;border:1px solid var(--line);border-radius:12px;
+  background:var(--bg);overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 1px 2px rgba(20,20,20,.04)
+}
+.dgm__bar{
+  display:flex;align-items:center;gap:4px;flex-wrap:wrap;
+  padding:7px 10px;border-bottom:1px solid var(--line);background:var(--bg2);flex:0 0 auto
+}
+.dgm__bar .sp{flex:1}
+.dgm__sep{width:1px;height:15px;background:var(--line2);margin:0 5px;flex:0 0 auto}
+.dgm__btn{
+  border:1px solid transparent;background:transparent;color:var(--ink2);
+  border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--font);line-height:1.5;
+  transition:background .12s ease,color .12s ease,border-color .12s ease
+}
+.dgm__btn:hover{background:var(--bg);border-color:var(--line2);color:var(--hw-dk)}
+.dgm__btn:focus-visible{outline:2px solid var(--hw);outline-offset:1px}
+.dgm__btn.is-on{background:var(--hw);border-color:var(--hw);color:#fff}
+.dgm__hint{font-size:11px;color:var(--ink4);letter-spacing:-.01em}
+.dgm__svg{display:block;width:100%;flex:1 1 auto;min-height:0;touch-action:none;cursor:grab;
+  background:radial-gradient(circle at 1px 1px, var(--line) .9px, transparent 0) 0 0/26px 26px, var(--bg)}
+.dgm__svg.is-panning{cursor:grabbing}
+.dgm[data-edit="off"] .dgm__bar{display:none}
+
+/* 화면 가득 펼치기 — 툴바의 "넓게" 버튼 / Esc 로 닫는다 */
+.dgm.is-max{
+  position:fixed;inset:14px;z-index:80;
+  width:auto !important;max-width:none !important;height:auto !important;
+  box-shadow:0 12px 48px rgba(20,20,20,.28);border-color:var(--line2)
+}
+html.dgm-locked,html.dgm-locked body{overflow:hidden}
+
+.dgm-node{cursor:move}
+.dgm-node .box{
+  fill:var(--bg);stroke:var(--line2);stroke-width:1.25;
+  filter:drop-shadow(0 1px 1.5px rgba(20,20,20,.07))
+}
+.dgm-node:hover .box{stroke:var(--hw-lt)}
+.dgm-node .lbl{
+  font-family:var(--font);font-size:13.5px;font-weight:700;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;text-align:center;padding:6px 10px;line-height:1.32;overflow:hidden;
+  letter-spacing:-.01em
+}
+.dgm-node .lbl .sub{font-size:11px;font-weight:500;color:var(--ink3);margin-top:3px;line-height:1.35}
+.dgm-node .lbl[contenteditable="true"]{outline:2px solid var(--hw);background:var(--bg);border-radius:4px}
+.dgm-node.is-sel .box{stroke:var(--hw);stroke-width:2.5}
+.dgm-node[data-tone="primary"] .box{fill:var(--hw);stroke:var(--hw-dk)}
+.dgm-node[data-tone="primary"] .lbl{color:#fff}
+.dgm-node[data-tone="primary"] .lbl .sub{color:rgba(255,255,255,.88)}
+.dgm-node[data-tone="accent"] .box{fill:var(--hw-pale);stroke:var(--hw)}
+.dgm-node[data-tone="accent"] .lbl{color:var(--hw-dp)}
+.dgm-node[data-tone="accent"] .lbl .sub{color:var(--hw-dk)}
+.dgm-node[data-tone="muted"] .box{fill:var(--bg3);stroke:var(--line2)}
+.dgm-node[data-tone="muted"] .lbl{color:var(--ink3)}
+.dgm-node[data-tone="ok"] .box{fill:var(--ok-bg);stroke:var(--ok)}
+.dgm-node[data-tone="ok"] .lbl{color:var(--ok)}
+.dgm-node[data-tone="warn"] .box{fill:var(--warn-bg);stroke:var(--warn)}
+.dgm-node[data-tone="warn"] .lbl{color:var(--warn)}
+.dgm-node[data-tone="risk"] .box{fill:var(--risk-bg);stroke:var(--risk)}
+.dgm-node[data-tone="risk"] .lbl{color:var(--risk)}
+.dgm-node[data-tone="info"] .box{fill:var(--info-bg);stroke:var(--info)}
+.dgm-node[data-tone="info"] .lbl{color:var(--info)}
+
+.dgm-grp .box{fill:none;stroke:var(--line2);stroke-dasharray:5 5;stroke-width:1.25}
+.dgm-grp .gl{font-family:var(--font);font-size:10.5px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;fill:var(--ink4)}
+.dgm-grp{cursor:move}
+
+.dgm-edge .wire{fill:none;stroke:var(--ink4);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.dgm-edge .hit{fill:none;stroke:transparent;stroke-width:16;cursor:pointer}
+.dgm-edge:hover .wire{stroke:var(--ink2)}
+.dgm-edge.is-sel .wire{stroke:var(--hw);stroke-width:2.6}
+.dgm-edge[data-style="dash"] .wire{stroke-dasharray:5 5}
+.dgm-edge[data-tone="primary"] .wire{stroke:var(--hw);stroke-width:2.2}
+.dgm-edge[data-tone="risk"] .wire{stroke:var(--risk)}
+.dgm-edge[data-tone="ok"] .wire{stroke:var(--ok)}
+.dgm-edge .elbl{
+  font-family:var(--font);font-size:10.5px;font-weight:600;color:var(--ink3);
+  display:flex;align-items:center;justify-content:center;height:100%;text-align:center;
+}
+.dgm-edge .elbl span{background:var(--bg);padding:2px 8px;border-radius:999px;
+  border:1px solid var(--line);white-space:nowrap;letter-spacing:-.01em}
+
+.dgm__modal{
+  position:absolute;inset:0;background:rgba(0,0,0,.45);display:none;
+  align-items:center;justify-content:center;padding:24px;z-index:9
+}
+.dgm__modal.is-open{display:flex}
+.dgm__modal .pane{background:var(--bg);border-radius:var(--radius);width:min(680px,100%);
+  max-height:100%;display:flex;flex-direction:column;border:1px solid var(--line2)}
+.dgm__modal textarea{
+  flex:1;min-height:240px;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:12px;font-family:var(--mono);font-size:12px;resize:vertical;background:var(--bg2);color:var(--ink)
+}
+.dgm__modal .head,.dgm__modal .foot{display:flex;align-items:center;gap:8px;padding:10px 12px}
+.dgm__modal .head b{font-size:14px}
+.dgm__modal .sp{flex:1}
+
+/* ── 차트 (scripts/make-chart.sh 산출물) ─────────────────────────────────── */
+.cht{ margin:16px 0 18px; padding:14px 14px 10px; border:1px solid var(--line); border-radius:var(--radius); background:var(--bg2) }
+.cht__t{ margin:0 0 8px; font-size:13.5px; font-weight:700; color:var(--ink); letter-spacing:-.01em }
+.cht svg{ display:block; width:100%; height:auto; font-family:inherit }
+.cht rect, .cht circle{ cursor:default }
+.cht rect:hover, .cht circle:hover{ opacity:.75 }
+.cht__c{ margin:8px 0 0; font-size:12px; line-height:1.65; color:var(--ink3) }
+
+/* 인쇄 */
+@media print{
+  .cht{ page-break-inside:avoid; background:transparent }
+  body{background:#fff}
+  .no-print{display:none !important}
+  .dgm__bar{display:none !important}
+  .dgm__svg{background:none}
+  .dgm.is-max{position:static;inset:auto;box-shadow:none}
+}
+
+/* ── 한글 줄바꿈 ─────────────────────────────────────────────────────────────
+   브라우저 기본값은 낱말 한가운데를 끊는다. "남은 결/정" 처럼 갈라지면 제목이
+   읽히지 않는다. keep-all 은 띄어쓰기에서만 줄을 바꾼다.
+   반대로 긴 영문 식별자나 경로는 keep-all 이면 칸을 넘치므로 overflow-wrap 으로 받고,
+   코드·경로 계열은 어디서든 끊어 넘침을 막는다. */
+h1, h2, h3, h4, p, li, td, th, dt, dd,
+.card__d, .step__d, .note, .lead, .sub, figcaption {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.mono, pre, code, .refs__meta { word-break: break-all; overflow-wrap: normal }
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 레이아웃 (사이드 TOC + 본문 단일 컬럼)
+   ============================================================ */
+body{ background:var(--bg2) }
+
+.doc{ display:grid; grid-template-columns:270px minmax(0,1fr); align-items:start; }
+
+/* 사이드바 */
+.side{
+  position:sticky; top:0; height:100vh; overflow:auto;
+  background:var(--bg); border-right:1px solid var(--line); padding:20px 16px 40px;
+}
+.side__brand{ display:flex; align-items:center; gap:9px; margin-bottom:6px }
+.side__brand .bar{ width:5px; height:26px; background:var(--hw); border-radius:2px }
+.side__brand b{ font-size:14.5px; letter-spacing:-.01em }
+.side__meta{ font-size:11.5px; color:var(--ink4); margin:0 0 16px; font-family:var(--mono) }
+.toc{ list-style:none; margin:0; padding:0; font-size:13.5px }
+.toc li{ margin:1px 0 }
+.toc a{
+  display:block; padding:5px 10px; border-radius:6px; color:var(--ink2);
+  text-decoration:none; border-left:2px solid transparent;
+}
+.toc a:hover{ background:var(--bg3); color:var(--ink) }
+.toc a.is-cur{ background:var(--hw-pale); color:var(--hw-dp); font-weight:700; border-left-color:var(--hw) }
+.toc .sub a{ padding-left:22px; font-size:12.5px; color:var(--ink3) }
+.side__foot{ margin-top:18px; padding-top:14px; border-top:1px solid var(--line); display:flex; gap:6px; flex-wrap:wrap }
+.side__foot button{
+  border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:5px;
+  padding:3px 9px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:var(--font);
+}
+.side__foot button:hover{ border-color:var(--hw); color:var(--hw-dk) }
+
+/* 본문 */
+.main{ padding:34px 44px 100px; max-width:1040px; }
+.doc-head{ border-bottom:2px solid var(--hw); padding-bottom:18px; margin-bottom:26px }
+.doc-head h1{ font-size:32px; letter-spacing:-.025em; margin:6px 0 8px }
+.doc-head .sub{ font-size:15px; color:var(--ink2); max-width:80ch }
+.doc-head .meta{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px }
+
+.sec{ margin:0 0 44px; scroll-margin-top:18px }
+.sec > h2{
+  font-size:21px; margin:0 0 4px; display:flex; align-items:baseline; gap:10px;
+}
+.sec > h2 .n{ font-family:var(--mono); font-size:14px; font-weight:800; color:var(--hw) }
+.sec > .why{ font-size:13.5px; color:var(--ink3); margin:0 0 16px; padding-left:2px }
+.sec h3{ font-size:16px; margin:24px 0 10px; padding-left:10px; border-left:3px solid var(--hw-tint) }
+.sec h4{ font-size:14px; margin:16px 0 6px; color:var(--ink2) }
+.sec p, .sec li{ font-size:14.5px }
+.sec ul, .sec ol{ margin:0 0 12px; padding-left:20px }
+.sec li{ margin:3px 0 }
+
+/* 체크리스트 */
+.chk{ list-style:none; padding:0; margin:0 }
+.chk li{
+  display:flex; gap:10px; align-items:flex-start; padding:9px 12px;
+  border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--bg); margin-bottom:6px;
+}
+.chk input{ margin-top:3px; width:15px; height:15px; accent-color:var(--hw); flex:0 0 auto }
+.chk li.is-done{ background:var(--bg2); border-color:var(--line) }
+.chk li.is-done .t{ text-decoration:line-through; color:var(--ink4) }
+.chk .t{ font-weight:600; font-size:14px }
+.chk .d{ font-size:12.5px; color:var(--ink3); display:block; margin-top:2px }
+
+/* 시나리오 (Given/When/Then) */
+.gwt{ border:1px solid var(--line); border-left:4px solid var(--hw); border-radius:var(--radius-sm);
+  background:var(--bg); padding:14px 16px; margin:0 0 12px }
+.gwt__t{ font-weight:700; font-size:14.5px; margin:0 0 8px }
+.gwt dl{ margin:0; display:grid; grid-template-columns:64px 1fr; gap:4px 10px; font-size:13.5px }
+.gwt dt{ font-weight:800; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--hw-dk); padding-top:2px }
+.gwt dd{ margin:0; color:var(--ink2) }
+
+/* 작업 단위 카드 */
+.slice{ border:1px solid var(--line); border-radius:var(--radius); background:var(--bg); overflow:hidden; margin-bottom:12px }
+.slice__h{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg3); border-bottom:1px solid var(--line) }
+.slice__h .no{ font-family:var(--mono); font-weight:800; color:#fff; background:var(--hw);
+  border-radius:5px; padding:1px 8px; font-size:12px }
+.slice__h b{ font-size:14.5px }
+.slice__h .sp{ flex:1 }
+.slice__b{ padding:12px 14px; font-size:13.5px }
+.slice__b dl{ margin:0; display:grid; grid-template-columns:110px 1fr; gap:6px 12px }
+.slice__b dt{ color:var(--ink3); font-size:12.5px; font-weight:700 }
+.slice__b dd{ margin:0; color:var(--ink2) }
+
+/* 의사결정 기록 */
+.adr{ border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; background:var(--bg); margin-bottom:12px }
+.adr__t{ font-size:15px; font-weight:700; margin:0 0 8px }
+.adr dl{ margin:0; display:grid; grid-template-columns:96px 1fr; gap:5px 12px; font-size:13.5px }
+.adr dt{ color:var(--hw-dk); font-weight:700; font-size:12.5px }
+.adr dd{ margin:0; color:var(--ink2) }
+
+/* 높이는 diagram.js 의 autoHeight 가 내용 비율에 맞춰 인라인으로 잡는다.
+   아래 값은 스크립트가 돌기 전의 자리 잡기용이다. */
+.dgm{ margin:0 0 16px; height:420px }
+/* 다이어그램은 본문 글줄 폭에 갇히지 않고 사이드바 오른쪽을 전부 쓴다.
+   270px 사이드바 + 본문 좌우 패딩 88px + 스크롤바 여유 18px 를 뺀 값. */
+@media (min-width:1001px){
+  .dgm{ width:min(calc(100vw - 376px), 1700px); max-width:none }
+}
+.tbl-wrap{ margin-bottom:14px }
+.note{ margin-bottom:12px }
+.code{ margin-bottom:14px }
+
+@media (max-width:1000px){
+  .doc{ grid-template-columns:1fr }
+  .side{ position:static; height:auto; border-right:0; border-bottom:1px solid var(--line) }
+  .main{ padding:24px 20px 60px }
+}
+@media print{
+  @page{ size:A4; margin:14mm }
+  .side{ display:none }
+  .doc{ display:block }
+  .main{ max-width:none; padding:0 }
+  .sec{ page-break-inside:avoid }
+  .dgm{ height:340px !important; width:auto }
+}
+
+/* ============================================================
+   flow — 웹 스타일 워크플로우 그림 (카드 + 곡선 연결 + 흐르는 점 + 인라인 편집)
+   마크업: .flow > .flow__head + .flow__in(그리드) > .fnode[data-id]  +  script.flow-links(JSON)
+   엔진: flow.js · 작성 안내: references/flow.md · 생성기: scripts/make-flow.py
+   ============================================================ */
+.flow{
+  --f-gap-x: 46px; --f-gap-y: 30px;
+  position:relative; margin:14px 0 22px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0/22px 22px,
+    var(--bg2);
+  border:1px solid var(--line); border-radius:18px;
+  padding:18px 22px 16px; overflow-x:auto;
+}
+/* 개발 문서: 본문 글줄 폭을 넘어 사이드바 오른쪽 전체를 쓴다 (.dgm 과 같은 규칙) */
+@media (min-width: 1200px){
+  .main .flow{ width:min(calc(100vw - 376px), 1560px); max-width:none }
+}
+/* 슬라이드: 무대 안에 들어가도록 최소 폭을 풀고 카드를 줄인다 */
+.slide .flow{ margin:6px 0; padding:12px 14px 10px; overflow:visible; display:flex; flex-direction:column }
+.slide .flow__in{ flex:1; align-content:center }
+.slide .flow__in{ min-width:0; column-gap:34px }
+.slide .fnode{ padding:8px 10px 8px 9px; min-height:0 }
+.slide .fnode__s{ font-size:11.5px }
+.flow__head{ display:flex; align-items:center; gap:12px; margin:0 0 14px; flex-wrap:wrap }
+.flow__title{ font-weight:700; font-size:14px; color:var(--ink) }
+.flow__hint{ font-size:12px; color:var(--ink4) }
+.flow__head .sp{ flex:1 }
+.flow__seg{ display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:999px; padding:3px }
+.flow__seg button{
+  border:0; background:transparent; color:var(--ink3); font:inherit; font-size:12px; font-weight:600;
+  padding:5px 12px; border-radius:999px; cursor:pointer;
+}
+.flow__seg button.on{ background:var(--hw); color:#fff }
+.flow__in{ position:relative; display:grid; column-gap:var(--f-gap-x); row-gap:var(--f-gap-y); align-items:center; min-width:1080px }
+.flow__links{ position:absolute; left:0; top:0; pointer-events:none; overflow:visible; z-index:0 }
+.flow__lbls{ position:absolute; left:0; top:0; width:0; height:0; z-index:2; pointer-events:none }
+
+/* ── 노드 카드 ─────────────────────────────────────────── */
+.fnode{
+  position:relative; z-index:1; display:flex; gap:10px; align-items:flex-start;
+  background:var(--bg); border:1px solid var(--line); border-radius:14px;
+  padding:11px 12px 11px 11px; min-height:58px;
+  box-shadow:0 1px 2px rgba(20,20,20,.04), 0 8px 22px -12px rgba(20,20,20,.18);
+  transition:transform .18s ease, box-shadow .18s ease, opacity .25s ease, border-color .18s ease;
+}
+.fnode:hover{ transform:translateY(-2px); box-shadow:0 2px 4px rgba(20,20,20,.05), 0 14px 30px -14px rgba(20,20,20,.28); border-color:var(--line2) }
+.fnode__ic{
+  flex:0 0 34px; width:34px; height:34px; border-radius:10px; display:grid; place-items:center;
+  background:var(--bg3); color:var(--ink3);
+}
+.fnode__ic svg{ width:18px; height:18px }
+.fnode__body{ min-width:0 }
+.fnode__t{ font-weight:700; font-size:13.5px; line-height:1.3; color:var(--ink) }
+.fnode__s{ font-size:11.8px; line-height:1.45; color:var(--ink3); margin-top:2px }
+.fnode__tag{
+  display:inline-block; margin-top:6px; font-family:var(--mono); font-size:10.8px; color:var(--ink3);
+  background:var(--bg2); border:1px solid var(--line); border-radius:6px; padding:1px 6px;
+}
+.fnode__no{
+  position:absolute; top:-9px; left:-9px; width:22px; height:22px; border-radius:50%;
+  background:var(--ink); color:var(--bg); font-size:11px; font-weight:700; display:grid; place-items:center;
+  box-shadow:0 0 0 3px var(--bg2);
+}
+.fnode__badge{
+  position:absolute; top:-10px; right:10px; font-size:10.5px; font-weight:700; letter-spacing:.02em;
+  padding:2px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--line2); color:var(--ink2);
+}
+
+/* 역할별 */
+.fnode--src{ border-color:var(--hw-tint) }
+.fnode--src .fnode__ic{ background:var(--hw); color:#fff }
+.fnode--new{ border-color:var(--hw-tint); background:linear-gradient(var(--bg),var(--bg)) padding-box }
+.fnode--new::before{ content:""; position:absolute; left:14px; right:14px; top:-1px; height:3px; border-radius:0 0 3px 3px; background:var(--hw) }
+.fnode--new .fnode__ic{ background:var(--hw-pale); color:var(--hw-dk) }
+.fnode--isl .fnode__ic{ background:var(--bg3); color:var(--ink2) }
+.fnode--store .fnode__ic{ background:color-mix(in srgb, var(--info) 12%, var(--bg)); color:var(--info) }
+.fnode--ok{ border-color:color-mix(in srgb, var(--ok) 35%, var(--line)) }
+.fnode--ok .fnode__ic{ background:color-mix(in srgb, var(--ok) 13%, var(--bg)); color:var(--ok) }
+.fnode--risk{ border-color:color-mix(in srgb, var(--risk) 40%, var(--line)); background:color-mix(in srgb, var(--risk) 4%, var(--bg)) }
+.fnode--risk .fnode__ic{ background:color-mix(in srgb, var(--risk) 13%, var(--bg)); color:var(--risk) }
+.fnode--risk .fnode__badge{ color:var(--risk); border-color:color-mix(in srgb, var(--risk) 45%, var(--line)) }
+.fnode--warn{ border-color:color-mix(in srgb, var(--warn) 40%, var(--line)) }
+.fnode--warn .fnode__ic{ background:color-mix(in srgb, var(--warn) 14%, var(--bg)); color:var(--warn) }
+.fnode--dim{ background:var(--bg2); box-shadow:none }
+.fnode--dim .fnode__t{ color:var(--ink3) }
+.fnode--decide .fnode__ic{ background:var(--bg); border:1.5px dashed var(--line2); color:var(--ink2); transform:rotate(45deg); border-radius:8px }
+.fnode--decide .fnode__ic svg{ transform:rotate(-45deg) }
+.fnode--small{ min-height:0; padding:8px 10px 8px 9px }
+.fnode--small .fnode__ic{ flex-basis:28px; width:28px; height:28px; border-radius:8px }
+.fnode--small .fnode__ic svg{ width:15px; height:15px }
+.fnode--small .fnode__t{ font-size:12.5px }
+
+/* 우회 띠 (B 경로가 건너뛰는 구간) */
+.fbypass{
+  position:relative; z-index:1; height:48px; border-radius:999px; display:flex; align-items:center; justify-content:center; gap:10px;
+  border:1.5px dashed var(--hw-lt); background:color-mix(in srgb, var(--hw) 5%, transparent);
+  color:var(--hw-dk); font-size:12.5px; font-weight:600;
+}
+.fbypass svg{ width:16px; height:16px }
+.fbypass [data-ic]{ display:inline-grid }
+
+/* 레인 머리 */
+.flane{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:2px 0; z-index:1; position:relative }
+.flane__k{ font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--hw-dk) }
+.flane__n{ font-weight:700; font-size:13.5px; color:var(--ink) }
+.flane__m{ display:inline-flex; gap:6px; flex-wrap:wrap }
+.flane__m span{ font-size:11.5px; font-family:var(--mono); padding:2px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--line); color:var(--ink2) }
+.flane__m span.bad{ color:var(--risk); border-color:color-mix(in srgb, var(--risk) 40%, var(--line)) }
+.flane__m span.good{ color:var(--ok); border-color:color-mix(in srgb, var(--ok) 40%, var(--line)) }
+
+/* ── 연결선 ───────────────────────────────────────────── */
+.flow__links path.ln{ fill:none; stroke:var(--line2); stroke-width:1.8; transition:opacity .25s ease, stroke-width .15s ease }
+.flow__links path.ln--flow{ stroke:var(--hw); stroke-width:2.2; stroke-opacity:.55 }
+.flow__links path.ln--ok{ stroke:var(--ok); stroke-width:2.2; stroke-opacity:.6 }
+.flow__links path.ln--risk{ stroke:var(--risk); stroke-dasharray:6 6; animation:flow-dash 1.2s linear infinite; stroke-opacity:.8 }
+.flow__links path.ln--muted{ stroke:var(--ink4); stroke-dasharray:4 5; stroke-opacity:.7 }
+.flow__links circle.dot{ fill:var(--hw) }
+.flow__links circle.dot--ok{ fill:var(--ok) }
+@keyframes flow-dash{ to{ stroke-dashoffset:-24 } }
+.flbl{
+  position:absolute; transform:translate(-50%,-50%); white-space:nowrap;
+  font-size:11px; font-weight:600; color:var(--ink2); background:var(--bg); border:1px solid var(--line);
+  border-radius:999px; padding:1px 8px; box-shadow:0 2px 6px -3px rgba(20,20,20,.2); transition:opacity .25s ease;
+}
+.flbl--risk{ color:var(--risk); border-color:color-mix(in srgb, var(--risk) 40%, var(--line)) }
+.flbl--flow{ color:var(--hw-dk); border-color:var(--hw-tint) }
+.flbl--ok{ color:var(--ok); border-color:color-mix(in srgb, var(--ok) 40%, var(--line)) }
+
+/* 강조: 레인 토글 · 호버 */
+.flow[data-focus="a"] [data-lane="b"], .flow[data-focus="b"] [data-lane="a"]{ opacity:.18 }
+.flow.is-hover .ln:not(.hot), .flow.is-hover .flbl:not(.hot), .flow.is-hover .dot:not(.hot){ opacity:.15 }
+.flow.is-hover .ln.hot{ stroke-width:3; stroke-opacity:1 }
+
+/* 범례 */
+.flow__legend{ display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; padding-top:10px; border-top:1px dashed var(--line); font-size:11.5px; color:var(--ink3) }
+.flow__legend i{ display:inline-block; vertical-align:middle; width:26px; height:0; margin-right:6px; border-top:2.2px solid var(--hw) }
+.flow__legend i.ok{ border-top-color:var(--ok) }
+.flow__legend i.risk{ border-top:2px dashed var(--risk) }
+.flow__legend i.muted{ border-top:2px dashed var(--ink4) }
+.flow__legend b.nw{ display:inline-block; width:14px; height:4px; border-radius:2px; background:var(--hw); vertical-align:middle; margin-right:6px }
+
+/* ── 편집 모드 ───────────────────────────────────────── */
+.flow__edit{ display:inline-flex; gap:6px }
+.flow__bar{ margin:-4px 0 12px; border-radius:10px; flex-wrap:wrap }
+.flow:not(.is-edit) .flow__bar{ display:none }
+.flow.is-edit{ border-color:var(--hw-lt); box-shadow:0 0 0 3px var(--hw-pale) }
+.flow.is-edit .fnode{ cursor:grab; user-select:none }
+.flow.is-edit .fnode.is-drag{ cursor:grabbing; transition:none; box-shadow:0 18px 40px -16px rgba(20,20,20,.35) }
+.flow.is-edit .fnode:hover{ transform:none }
+.flow .is-sel.fnode{ outline:2px solid var(--hw); outline-offset:3px }
+.flow .is-from.fnode{ outline:2px dashed var(--hw); outline-offset:3px }
+.flow.is-edit .flow__links .ln-hit{ fill:none; stroke:transparent; stroke-width:14; pointer-events:stroke; cursor:pointer }
+.flow.is-edit .flbl{ pointer-events:auto; cursor:text }
+.flow .flow__links path.ln.is-sel{ stroke-width:3.6; stroke-opacity:1 }
+.flow .flbl.is-sel{ box-shadow:0 0 0 2px var(--hw) }
+.flow [contenteditable="true"]{ outline:2px solid var(--hw); outline-offset:2px; border-radius:4px; background:var(--bg); cursor:text; user-select:text }
+.flow .dgm__modal{ position:fixed; z-index:50 }
+.flow__status{ max-width:48ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+@media (prefers-reduced-motion: reduce){ .flow__links circle.dot{ display:none } .flow__links path.ln--risk{ animation:none } }
+@media print{
+  .flow{ width:auto; overflow:visible; background:var(--bg); page-break-inside:avoid }
+  .flow__seg, .flow__edit, .flow__bar{ display:none }
+  .flow__links circle.dot{ display:none }
+}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- ================= 사이드바 ================= -->
+  <aside class="side no-print">
+  <div class="side__brand"><span class="bar"></span><b>MQTT→Agent 태그 카탈로그</b></div>
+    <p class="side__meta">v1 · 2026-09-22 · 데이터 정리</p>
+    <ul class="toc"></ul>
+    <div class="side__foot">
+      <button id="bTheme" type="button">테마</button>
+      <button id="bPrint" type="button">인쇄</button>
+      <button id="bReset" type="button">체크 초기화</button>
+    </div>
+  </aside>
+
+  <!-- ================= 본문 ================= -->
+  <main class="main">
+
+    <header class="doc-head">
+      <span class="kicker">Field Catalog</span>
+      <h1>MQTT 브로커에서 Mqtt.Agent 태그 생성까지</h1>
+      <p class="sub">EMQX 로 들어온 LiDAR MQTT 메시지가 Mqtt.Agent 안에서 태그(TagId · 값 · changedAt)로
+        접히는 규칙을 필드 단위로 정리한다. Engine 이후 NATS · Kafka · DB 경로는 범위 밖이며 §09 참고자료로 넘긴다.</p>
+      <div class="meta">
+        <span class="chip">범위: EMQX → Mqtt.Agent</span>
+        <span class="chip chip--info">출처: nats-tag-stream · mqtt-lidar-sim · lidar-compare</span>
+        <span class="chip chip--warn">미확정: 상태 주기 · FITTING 등록 누락</span>
+        <span class="chip chip--neutral">정리 2026-09-22</span>
+      </div>
+    </header>
+
+    <!-- ---------- 0. 범위 ---------- -->
+    <section class="sec" id="s0">
+      <h2><span class="n">00</span>범위와 전제</h2>
+      <p class="why">태그가 어디서 끝나는지를 먼저 그어야 카탈로그가 흩어지지 않는다.</p>
+      <div class="g2">
+        <div class="card card--accent">
+          <p class="card__t">이 문서가 다루는 것</p>
+          <ul style="margin:6px 0 0">
+            <li>MQTT 토픽 · 메시지 봉투 (EMQX 수신 시점까지)</li>
+            <li>Mqtt.Agent 가 만드는 태그의 필드 대응표 (TagId · valueKind · value · changedAt)</li>
+            <li>태그 등록 파일(CSV) 형식과 등록 누락 현황</li>
+          </ul>
+        </div>
+        <div class="card">
+          <p class="card__t">이 문서가 다루지 않는 것</p>
+          <ul style="margin:6px 0 0">
+            <li>Engine → NATS → Kafka Provider / Db.Provider → 소스 DB 경로 (<span class="mono">docs/cdc/lidar-source-pipeline.html</span> §05 이하)</li>
+            <li>세 적재 경로(A·B·C) 비교 · 성능 수치 (<span class="mono">src/lidar-compare/README.md</span>)</li>
+            <li>TimescaleDB 스키마 · 보존 정책</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">전제</p>
+        페이로드 규격 자체가 필드 정의서 §6.2~§6.4 의 <b>제안 규격</b>이며 ISL 벤더 합의 전 미확정이다.
+        아래 표의 "미확정" 칩이 붙은 값은 코드 기본값이지 합의값이 아니다.
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">2026-09-22 재설계로 아래 토픽 예시가 바뀌었다 — 숫자는 이 문서에서 최신화했지만, 흐름·태그화 규칙 설명은 그대로 유효하다</p>
+        이 문서를 쓴 뒤 같은 날 <span class="mono">util/mqtt-lidar-sim/lidar-sim.cs</span>가 다시 짜였다.
+        실적 토픽은 <span class="mono">ot/sensor/{stage}/actual</span>(6개, stage 있음)에서
+        <span class="mono">ot/sensor/{zone}/actual</span>(2개, stage 없음)로, 산출물 토픽은 shop/bay마다 있던 14개에서
+        zone마다 2개로 줄었다 — 상태 토픽의 <span class="mono">lidar</span> 세그먼트도 빠졌다. 아래 §02·§03·§05·§06의
+        숫자·예시는 그 최종 형태로 고쳐 두었다. 최신 전체 그림·실제 코드 대조는
+        <span class="mono">latest/docs/lidar-topic-tag-respec.html</span>·<span class="mono">latest/docs/message.md</span> 를 본다.
+      </div>
+    </section>
+
+    <!-- ---------- 1. 전체 흐름 ---------- -->
+    <section class="sec" id="s1">
+      <h2><span class="n">01</span>전체 흐름</h2>
+      <p class="why">카드에 마우스를 올리면 연결된 선만 남는다. <span class="mono">편집</span> 으로 이 자리에서 바로 고칠 수 있다.</p>
+
+      <div class="flow" data-key="overview">
+  <div class="flow__head"><span class="flow__title">전체 흐름 개요</span><span class="flow__hint">주황 카드가 이 문서의 범위(Mqtt.Agent 의 태그 생성)입니다. 그 다음은 범위 밖입니다.</span><span class="sp"></span></div>
+  <div class="flow__in" style="grid-template-columns:repeat(6, 1fr);grid-template-rows:auto auto;">
+    <div style="grid-column:1 / span 1;grid-row:1 / span 1;" class="fnode fnode--src" data-id="sim"><span class="fnode__ic" data-ic="send"></span><div class="fnode__body"><div class="fnode__t">lidar-sim</div><div class="fnode__s">350대 · 426 msg/s</div><span class="fnode__tag">발행기</span></div></div>
+    <div style="grid-column:2 / span 1;grid-row:1 / span 1;" class="fnode fnode--isl" data-id="emqx"><span class="fnode__ic" data-ic="broker"></span><div class="fnode__body"><div class="fnode__t">EMQX</div><div class="fnode__s">MQTT 브로커</div><span class="fnode__tag">1884</span></div></div>
+    <div style="grid-column:3 / span 1;grid-row:1 / span 1;" class="fnode" data-id="agent"><span class="fnode__ic" data-ic="tag"></span><div class="fnode__body"><div class="fnode__t">Mqtt.Agent</div><div class="fnode__s">토픽+id → 태그 하나로 접음</div><span class="fnode__tag">이 문서의 범위</span></div></div>
+    <div style="grid-column:4 / span 1;grid-row:1 / span 1;" class="fnode fnode--isl" data-id="engine"><span class="fnode__ic" data-ic="server"></span><div class="fnode__body"><div class="fnode__t">Engine</div><div class="fnode__s">gRPC 수신</div><span class="fnode__tag">InterSysLink</span></div></div>
+    <div style="grid-column:5 / span 1;grid-row:1 / span 1;" class="fnode fnode--isl" data-id="nats"><span class="fnode__ic" data-ic="stream"></span><div class="fnode__body"><div class="fnode__t">NATS 발행</div><div class="fnode__s">intersyslink.workflow.ot.lidar.all.tags</div></div></div>
+    <div style="grid-column:6 / span 1;grid-row:1 / span 1;" class="fnode fnode--dim" data-id="down"><span class="fnode__ic" data-ic="split"></span><div class="fnode__body"><div class="fnode__t">Kafka · Db.Provider · WS</div><div class="fnode__s">각자 사본 구독 (일반 Publish)</div><span class="fnode__tag">범위 밖</span></div></div>
+    <div style="grid-column:2 / span 1;grid-row:2 / span 1;" class="fnode fnode--risk fnode--small" data-id="e1"><span class="fnode__ic" data-ic="alert"></span><div class="fnode__body"><div class="fnode__t">프로토콜 v5 접속</div><div class="fnode__s">CONNACK 0x01 즉시 끊김</div></div></div>
+    <div style="grid-column:3 / span 1;grid-row:2 / span 1;" class="fnode fnode--risk fnode--small" data-id="e2"><span class="fnode__ic" data-ic="alert"></span><div class="fnode__body"><div class="fnode__t">미등록 토픽</div><div class="fnode__s">등록 CSV 누락 시 그 채널 전체가 조용히 사라짐</div></div></div>
+    <div style="grid-column:5 / span 1;grid-row:2 / span 1;" class="fnode fnode--dim fnode--small" data-id="e3"><span class="fnode__ic" data-ic="trash"></span><div class="fnode__body"><div class="fnode__t">붙기 전 메시지</div><div class="fnode__s">일반 구독이라 재전달 없음</div></div></div>
+  </div>
+  <div class="flow__legend"><span><i></i>데이터 흐름</span><span><i class="ok"></i>저장 · 확정</span><span><i class="risk"></i>실패 · 유실되는 경로</span><span><i class="muted"></i>버림 · 보류</span><span><b class="nw"></b>이번에 만드는 구성요소</span><span>카드에 마우스를 올리면 연결된 선만 강조됩니다 · 편집 버튼으로 바로 고칠 수 있습니다</span></div>
+  <script type="application/json" class="flow-links">[{"from": "sim", "to": "emqx", "kind": "flow", "label": "publish"}, {"from": "emqx", "to": "agent", "kind": "flow", "label": "subscribe"}, {"from": "agent", "to": "engine", "kind": "flow", "label": "gRPC"}, {"from": "engine", "to": "nats", "kind": "flow"}, {"from": "nats", "to": "down", "kind": "muted"}, {"from": "emqx", "to": "e1", "kind": "risk", "label": "v5", "port": "b>t"}, {"from": "agent", "to": "e2", "kind": "risk", "label": "미등록", "port": "b>t"}, {"from": "nats", "to": "e3", "kind": "muted", "label": "일반구독", "port": "b>t"}]</script>
+</div>
+
+      <div class="flow" data-key="sequence">
+  <div class="flow__head"><span class="flow__title">메시지 한 건이 태그가 되기까지</span><span class="flow__hint">Agent 는 메시지를 저장하지 않는다 — 토픽과 장비를 태그 하나로 접고 값만 갱신한다</span><span class="sp"></span></div>
+  <div class="flow__in" style="grid-template-columns:repeat(6, 1fr);grid-template-rows:auto auto;">
+    <div style="grid-column:1 / span 1;grid-row:1 / span 1;" class="fnode fnode--src" data-id="s1"><span class="fnode__no">1</span><span class="fnode__ic" data-ic="send"></span><div class="fnode__body"><div class="fnode__t">MQTT 발행</div><div class="fnode__s">id + raw_payload</div></div></div>
+    <div style="grid-column:2 / span 1;grid-row:1 / span 1;" class="fnode" data-id="s2"><span class="fnode__no">2</span><span class="fnode__ic" data-ic="inbox"></span><div class="fnode__body"><div class="fnode__t">Agent 수신</div><div class="fnode__s">QoS1 구독</div></div></div>
+    <div style="grid-column:3 / span 1;grid-row:1 / span 1;" class="fnode" data-id="s3"><span class="fnode__no">3</span><span class="fnode__ic" data-ic="filter"></span><div class="fnode__body"><div class="fnode__t">봉투 해석</div><div class="fnode__s">중첩 없는 평탄 구조 전제</div></div></div>
+    <div style="grid-column:4 / span 1;grid-row:1 / span 1;" class="fnode" data-id="s4"><span class="fnode__no">4</span><span class="fnode__ic" data-ic="tag"></span><div class="fnode__body"><div class="fnode__t">TagId 조립</div><div class="fnode__s">{id}.{topic &#x27;/&#x27;→&#x27;_&#x27;}.{field}</div></div></div>
+    <div style="grid-column:5 / span 1;grid-row:1 / span 1;" class="fnode" data-id="s5"><span class="fnode__no">5</span><span class="fnode__ic" data-ic="clock"></span><div class="fnode__body"><div class="fnode__t">changedAt 지정</div><div class="fnode__s">raw_payload.occurred_at 복사</div></div></div>
+    <div style="grid-column:6 / span 1;grid-row:1 / span 1;" class="fnode fnode--ok" data-id="s6"><span class="fnode__no">6</span><span class="fnode__ic" data-ic="check"></span><div class="fnode__body"><div class="fnode__t">gRPC 전송</div><div class="fnode__s">Engine 으로 — 태그 생성 완료</div></div></div>
+    <div style="grid-column:2 / span 1;grid-row:2 / span 1;" class="fnode fnode--risk fnode--small" data-id="e1"><span class="fnode__ic" data-ic="alert"></span><div class="fnode__body"><div class="fnode__t">미등록 토픽</div><div class="fnode__s">태그 자체가 만들어지지 않음</div></div></div>
+    <div style="grid-column:4 / span 1;grid-row:2 / span 1;" class="fnode fnode--risk fnode--small" data-id="e2"><span class="fnode__ic" data-ic="alert"></span><div class="fnode__body"><div class="fnode__t">TagId 100자 초과</div><div class="fnode__s">산출물 채널 · export-tags 가 제외</div></div></div>
+    <div style="grid-column:5 / span 1;grid-row:2 / span 1;" class="fnode fnode--dim fnode--small" data-id="e3"><span class="fnode__ic" data-ic="layers"></span><div class="fnode__body"><div class="fnode__t">세그먼트 미병합</div><div class="fnode__s">같은 TagId 로 여러 번, 여기선 안 합침</div></div></div>
+  </div>
+  <div class="flow__legend"><span><i></i>데이터 흐름</span><span><i class="ok"></i>저장 · 확정</span><span><i class="risk"></i>실패 · 유실되는 경로</span><span><i class="muted"></i>버림 · 보류</span><span><b class="nw"></b>이번에 만드는 구성요소</span><span>카드에 마우스를 올리면 연결된 선만 강조됩니다 · 편집 버튼으로 바로 고칠 수 있습니다</span></div>
+  <script type="application/json" class="flow-links">[{"from": "s1", "to": "s2", "kind": "flow"}, {"from": "s2", "to": "s3", "kind": "flow"}, {"from": "s3", "to": "s4", "kind": "flow"}, {"from": "s4", "to": "s5", "kind": "flow"}, {"from": "s5", "to": "s6", "kind": "ok"}, {"from": "s2", "to": "e1", "kind": "risk", "label": "미등록", "port": "b>t"}, {"from": "s4", "to": "e2", "kind": "risk", "label": "100자↑", "port": "b>t"}, {"from": "s5", "to": "e3", "kind": "muted", "label": "세그먼트", "port": "b>t"}]</script>
+</div>
+    </section>
+
+    <!-- ---------- 2. 토픽 카탈로그 ---------- -->
+    <section class="sec" id="s2">
+      <h2><span class="n">02</span>토픽 카탈로그 — 6개</h2>
+      <p class="why">토픽 이름이 곧 TagId 의 한 조각이 된다. 여기서 정한 문자열이 태그 생성까지 그대로 따라간다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:11%">채널</th><th style="width:26%">토픽 패턴</th><th style="width:7%">토픽 수</th><th style="width:26%">실제 값</th><th style="width:9%">주기</th><th>토픽당 태그</th></tr></thead>
+          <tbody>
+            <tr><td><span class="chip">상태</span></td><td class="mono">ot/device/{zone}/status</td><td class="num mono">2</td><td class="mono">assembly · outfitting</td><td class="mono">1초</td><td class="num mono">210 · 140</td></tr>
+            <tr><td><span class="chip chip--info">실적</span></td><td class="mono">ot/sensor/{zone}/actual</td><td class="num mono">2</td><td class="mono">assembly · outfitting</td><td class="mono">1분</td><td class="num mono">210 · 140</td></tr>
+            <tr><td><span class="chip chip--warn">산출물</span></td><td class="mono">ot/pipeline/{zone}/artifact</td><td class="num mono">2</td><td class="mono">assembly · outfitting</td><td class="mono">1분</td><td class="num mono">630 · 420 (장비×3종)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>산출물 태그 수가 장비 수의 3배인 것은 장비 하나가 산출물 종류마다 다른 <span class="mono">id</span> 로
+        발행하기 때문이다(<span class="mono">-REGISTERED_PCD</span> · <span class="mono">-TRANSFORMATION_MATRIX</span> ·
+        <span class="mono">-SEGMENTED_PCD</span>). 발행기 기준 태그 총량은 6 토픽 · <b>1,750개</b>다(상태 350 + 실적 350 + 산출물 1,050) —
+        상세는 §06.</p>
+      <div class="note note--info">
+        <p class="note__t">브로커 포트</p>
+        이 저장소 주변에 MQTT 를 받는 컨테이너가 셋이다. <span class="mono">mqtt-emqx</span> = <b>1884</b>,
+        <span class="mono">mqtt-mosquitto</span> = 1883, <span class="mono">mqtt-nats</span> = 1885. 기본값은 EMQX(1884)다.
+      </div>
+    </section>
+
+    <!-- ---------- 3. 메시지 봉투 ---------- -->
+    <section class="sec" id="s3">
+      <h2><span class="n">03</span>메시지 봉투</h2>
+      <p class="why">세 채널 모두 봉투 모양이 같다 — Agent 의 계약이 그 모양 하나만 받는다.</p>
+      <p><span class="mono">Mqtt.Agent.Core.Domain.MqttPayloadParser</span> 가 받는 형식 그대로, <span class="mono">id</span> 와
+        <span class="mono">raw_payload</span> 한 겹뿐이다. 필드 정의서의 중첩 객체(<span class="mono">device_ids</span> 등)는
+        브로커로 나갈 때 <b>평탄화한다</b> — 중첩을 두면 나중에 <span class="mono">tagMode=fields</span> 로 바꿨을 때
+        키 이름이 달라지기 때문이다.</p>
+      <div class="code">
+        <div class="code__bar"><span>ot/device/assembly/status — 메시지 1건</span><button class="code__copy" type="button">복사</button></div>
+<pre>{
+  "id": "<span class="hl">LDR-GJ-A1B3-07</span>",
+  "raw_payload": {
+    "device_role": "LIDAR",
+    "site": "geoje", "zone": "ASSEMBLY", "shop": "assembly1", "bay": "bay3",
+    "status": "ONLINE",
+    "last_heartbeat_at": "2026-09-10T12:59:23.3532050+09:00",
+    "error_code": null,
+    "occurred_at": "<span class="hl">2026-09-10T12:59:23.3603189+09:00</span>",   <span class="cm">// 태그의 changedAt 이 된다</span>
+    "ingested_at": "2026-09-10T12:59:24.5303189+09:00",                          <span class="cm">// 버려진다</span>
+    "idempotency_key": "LDR-GJ-A1B3-07:20260910T125923",
+    "scan_rate_pts_per_sec": 229866,
+    "temperature_c": 40.9,
+    "connectivity_rssi": -52,
+    "fov_mode": "wide"
+  }
+}</pre>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">프로토콜 3.1.1 고정</p>
+        <span class="mono">MqttNetSession.BuildOptions</span> 와 같은 조건으로 붙기 위해서다. v5 로 붙으면
+        브로커가 CONNACK <span class="mono">0x01</span> 로 즉시 끊는다(발행기 · 시뮬레이터 공통 주의사항).
+      </div>
+    </section>
+
+    <!-- ---------- 4. 필드 카탈로그 ---------- -->
+    <section class="sec" id="s4">
+      <h2><span class="n">04</span>필드 카탈로그 — MQTT → Agent 태그</h2>
+      <p class="why">누가 어떤 값을 보내고, Agent 안에서 그 값이 어느 필드로 떨어지는지를 한 줄씩 못박는다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:20%">MQTT 필드 (원천)</th><th style="width:16%">Agent 태그 필드</th><th style="width:26%">변환 규칙</th><th style="width:20%">예시</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">topic</td><td class="mono">TagId 가운데 마디</td><td><span class="mono">/</span> → <span class="mono">_</span> 치환</td><td class="mono">ot_device_assembly_status</td><td>마지막 <span class="mono">_</span> 조각이 채널(status·actual·artifact)이 된다</td></tr>
+            <tr><td class="mono">id</td><td class="mono">TagId 첫 마디 (device)</td><td>그대로. 산출물만 종류 접미사가 붙는다</td><td class="mono">LDR-GJ-A1B3-07<br>LDR-GJ-A1B1-01-SEGMENTED_PCD</td><td>장비 하나가 산출물 종류마다 다른 id 로 발행한다</td></tr>
+            <tr><td class="mono">raw_payload</td><td class="mono">value</td><td><span class="mono">tagMode=raw</span> 라 객체 통째가 STRING 값이 된다</td><td class="mono">{"device_role":"LIDAR",…}</td><td>필드마다 태그를 쪼개지 않는다</td></tr>
+            <tr><td class="mono">raw_payload.occurred_at</td><td class="mono">changedAt</td><td>그대로 복사</td><td class="mono">2026-09-10T12:59:23.36+09:00</td><td>도착 시각이 아니라 발생 시각. <span class="mono">ingested_at</span> 은 버려진다</td></tr>
+            <tr><td>(고정값)</td><td class="mono">TagId 마지막 마디 (field)</td><td>항상 <span class="mono">raw_payload</span></td><td class="mono">raw_payload</td><td><span class="mono">tagMode=raw</span> 채널은 필드가 하나뿐이라 고정</td></tr>
+            <tr><td class="mono">등록 CSV 의 dataType</td><td class="mono">valueKind</td><td>등록값 그대로 실림</td><td class="mono">STRING</td><td>세 채널 전부 STRING</td></tr>
+            <tr><td>—</td><td class="mono">param_id · pm_mode</td><td>Agent 경로에는 없음</td><td class="mono">NULL</td><td>EES 계약 값이라 Kafka 경로(<span class="mono">lidar-compare</span> A)에만 있다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="code">
+        <div class="code__bar"><span>태그 한 줄이 만들어지는 규칙</span><button class="code__copy" type="button">복사</button></div>
+<pre><span class="cm"># 들어온 MQTT 메시지</span>
+토픽   ot/device/assembly/status
+본문   {"id": "LDR-GJ-A1B3-07", "raw_payload": { ... }}
+
+<span class="cm"># Agent 안에서</span>
+TagId      <span class="hl">LDR-GJ-A1B3-07</span>.<span class="hl">ot_device_assembly_status</span>.<span class="hl">raw_payload</span>
+           └ 장비 id ────────┘ └ 토픽(/ 를 _ 로) ────┘ └ 필드 ┘
+dataType   STRING
+value      {"device_role":"LIDAR","site":"geoje", ... }   <span class="cm"># JSON 문자열 통째</span>
+changedAt  raw_payload.occurred_at                        <span class="cm"># 도착 시각이 아니다</span></pre>
+      </div>
+      <div class="note note--risk">
+        <p class="note__t">이 표는 지금 cdc PoC 기준이다 — 필드 인터페이스 정의서 v0.3의 실적·산출물 스키마는 이 규칙으로 태그가 안 만들어진다</p>
+        위 규칙 전체가 <span class="mono">id</span>(장비 식별자)가 메시지 최상위에 있다는 전제 위에 서 있다. 지금 cdc의
+        상태·실적·산출물 세 채널 모두 장비 기준 <span class="mono">id</span>를 쓰기 때문에(산출물은 종류 접미사만 붙음)
+        문제가 없다. 하지만 <b>필드 인터페이스 정의서 v0.3</b>은 실적·산출물을 장비 단위가 아니라 shop/bay 단위 채널
+        태그로 재설계했고, 그 스키마(§6.3·§6.4)에는 <span class="mono">id</span>라는 이름의 필드 자체가 없다 —
+        <span class="mono">MqttPayloadParser.Parse</span>는 최상위에 <span class="mono">id</span> 문자열이 없으면
+        메시지를 통째로 버리므로(로그도 없음), 그 스키마 그대로 발행하면 <b>태그가 0개</b> 나온다. 상세 분석은
+        <span class="mono">latest/docs/lidar-topic-tag-respec.html</span> §04·§07, 실제 토픽 개수까지 반영한 결론은
+        <span class="mono">latest/docs/message.md</span> 참고 — 이 문서는 "지금 동작하는 것"을 다루고, 그 둘은
+        "v0.3에 맞추려면 무엇을 더 정해야 하는지"를 다룬다.
+      </div>
+    </section>
+
+    <!-- ---------- 5. 태그 등록 파일 ---------- -->
+    <section class="sec" id="s5">
+      <h2><span class="n">05</span>태그 등록 파일 (CSV)</h2>
+      <p class="why">Agent 는 등록된 토픽만 안다. 등록되지 않은 토픽은 메시지가 와도 태그가 생기지 않는다(§06).</p>
+      <p>UI 의 MQTT 태그 가져오기는 <b>한 파일이 정확히 한 토픽</b>을 설명한다. 발행기의
+        <span class="mono">--export-tags</span> 가 <b>발행 토픽에서 그대로</b> CSV 를 뽑는다 — 발행기와 태그 목록을
+        따로 관리하면 반드시 어긋나므로 출처를 하나로 뒀다.<sup class="ref" data-ref="2">2</sup></p>
+      <div class="code">
+        <div class="code__bar"><span>mqtt-tags_edge.mqtt.p3.ot_ot_pipeline_assembly_artifact.csv</span><button class="code__copy" type="button">복사</button></div>
+<pre>topic,qos,tagMode,deviceId,field,dataType,monitoring
+ot/pipeline/assembly/artifact,1,<span class="hl">raw</span>,LDR-GJ-A1B1-01-REGISTERED_PCD,raw_payload,STRING,true
+ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-TRANSFORMATION_MATRIX,raw_payload,STRING,true
+ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STRING,true
+<span class="cm">... 산출물 종류 3개 × 조립 장비 210대 = 630행 (파일은 zone당 1개 — topic 열이 이제 zone까지만 있어서 shop·bay 구분 없이 한 파일)</span></pre>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:16%">컬럼</th><th>의미</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">topic</td><td>구독할 MQTT 토픽. 파일 하나에 한 값만</td></tr>
+            <tr><td class="mono">qos</td><td>구독 QoS. 발행기와 같은 1</td></tr>
+            <tr><td class="mono">tagMode</td><td><span class="mono">raw</span> 고정 — <span class="mono">raw_payload</span> 통째를 태그 하나로. <span class="mono">fields</span> 로 바꾸면 필드마다 태그가 갈라진다(미검증)</td></tr>
+            <tr><td class="mono">deviceId</td><td>TagId 첫 마디. 산출물은 종류 접미사 포함</td></tr>
+            <tr><td class="mono">field</td><td>TagId 마지막 마디. <span class="mono">raw</span> 모드에서는 항상 <span class="mono">raw_payload</span></td></tr>
+            <tr><td class="mono">dataType</td><td>Engine 이 태그를 저장할 타입 → <span class="mono">valueKind</span></td></tr>
+            <tr><td class="mono">monitoring</td><td>Engine UI 노출 여부. 태그 생성 자체와는 무관</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--info">
+        <p class="note__t">TagId 100자 상한 — 지금은 여유가 많다</p>
+        Engine 의 <span class="mono">TagCatalogId</span> 컬럼 제약이자 <span class="mono">MqttTagId.MaxLength</span> 다.
+        예전엔 토픽에 shop·bay 까지 들어가 산출물 채널이 최대 97자(여유 3자)까지 갔었는데, 토픽이 zone까지만
+        남으면서(§02) 같은 산출물 TagId가 <b>약 80자대</b>로 줄었다 — <span class="mono">LDR-GJ-A1B3-01-TRANSFORMATION_MATRIX.ot_pipeline_outfitting_artifact.raw_payload</span>
+        기준 80자. shop·bay 이름이 길어져도 지금은 여유가 있다.
+      </div>
+    </section>
+
+    <!-- ---------- 6. 태그 개수 검증 ---------- -->
+    <section class="sec" id="s6">
+      <h2><span class="n">06</span>태그 개수 검증 — 발행기 vs 등록부</h2>
+      <p class="why">등록이 안 되면 Agent 는 그 토픽의 존재 자체를 모른다. 조용히 사라지는 데이터가 여기서 나온다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:14%">채널</th><th style="width:10%">토픽</th><th style="width:22%">태그 수 계산</th><th>발행기 기준(2026-09-22 재설계 이후)</th></tr></thead>
+          <tbody>
+            <tr><td>상태</td><td class="num mono">2</td><td>350대 × 1</td><td class="num mono">350</td></tr>
+            <tr><td>실적</td><td class="num mono">2</td><td>350대 × 1</td><td class="num mono">350</td></tr>
+            <tr><td>산출물</td><td class="num mono">2</td><td>350대 × 3종</td><td class="num mono">1,050</td></tr>
+            <tr><td><b>합계</b></td><td class="num mono"><b>6</b></td><td></td><td class="num mono"><b>1,750</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--warn">
+        <p class="note__t">이 재설계 기준 발행기 대 ISL 등록부 재검증은 아직 안 했다</p>
+        아래는 재설계 <b>전</b> 실제 ISL v4 Engine 캡처에서 나온 값이다 — 실적 토픽이 공정 단계(stage)마다 갈려 있던
+        시절, 조립 공정 4종 중 <span class="mono">ot/sensor/fitting/actual</span> 하나만 태그 등록이 누락돼
+        <b>조립 210대의 FITTING 실적이 조용히 사라지는 문제</b>가 있었다(등록 2,310 vs 기대 2,520, 차이 210).
+        재설계로 실적 토픽에서 stage 자체가 없어졌으니 <i>이 특정 누락 시나리오는 더 이상 일어날 수 없다</i> — 다만
+        그렇다고 위 6토픽·1,750개가 실제 ISL Engine에 전부 등록돼 있는지는 <b>아직 확인 전</b>이다. 재설계 이후
+        <span class="mono">--export-tags</span>로 새 CSV를 뽑아 Engine에 다시 넣고 같은 방식으로 대조해야 한다.
+      </div>
+    </section>
+
+    <!-- ---------- 7. 제약과 미확정 ---------- -->
+    <section class="sec" id="s7">
+      <h2><span class="n">07</span>제약과 미확정</h2>
+      <p class="why">코드 기본값과 합의값을 섞으면 나중에 어느 쪽을 고쳐야 할지 없어진다.</p>
+      <div class="g2">
+        <div class="note note--warn">
+          <p class="note__t">세그먼트는 여기서 합쳐지지 않는다</p>
+          스캔 한 번의 <span class="mono">SEGMENTED_PCD</span> 10건이 같은 TagId 로 연달아 온다. Agent → NATS 까지는
+          그대로 여러 번 실린다 — 합치는 것은 그 다음 EES Kafka Provider(범위 밖)다.
+        </div>
+        <div class="note note--info">
+          <p class="note__t">발행 QoS 와 세션</p>
+          발행기는 QoS 1 · <span class="mono">clean_session=False</span> 이고, PUBACK 을 자기 쪽 처리(DB 커밋 등) 뒤에 보내는
+          다운스트림 소비자와 달리 <b>Agent 는 받는 즉시 ack</b> 한다 — 저장하지 않고 최신값만 들고 있기 때문이다.
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">항목</th><th style="width:26%">현재 값(코드 기본값)</th><th>위치 · 비고</th></tr></thead>
+          <tbody>
+            <tr><td>공정 단계(stage)</td><td class="mono">코드에서 완전히 삭제됨</td><td>2026-09-22 재설계 — <span class="mono">Zones.StagesOf</span>·<span class="mono">device.EventType</span> 기반 stage 계산이 빠지고 <span class="mono">event_type</span>(START·PROGRESS·COMPLETE)만 남았다</td></tr>
+            <tr><td>상태 주기</td><td class="mono">1초/대</td><td>cdc 문서 D1 기준. 컨플루언스 문서는 10분/대로 봄 — <span class="chip chip--warn">미확정</span></td></tr>
+            <tr><td>스캔 주기</td><td class="mono">1분/대</td><td>컨플루언스는 10분/대. 부하 시험용으로 줄여 둠</td></tr>
+            <tr><td>스캔당 세그먼트</td><td class="mono">10</td><td>5~20 가정의 중앙값</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---------- 8. 다운스트림 재해석 ---------- -->
+    <section class="sec" id="s8">
+      <h2><span class="n">08</span>참고 — 다운스트림이 TagId 를 다시 쪼개는 규칙</h2>
+      <p class="why">Agent 의 TagId 조립 규칙(§04)이 바뀌면 이 파싱이 그대로 깨진다. 계약이 암묵적으로 여기까지 이어진다.</p>
+      <p><span class="mono">nats-tag-stream</span>(§01 그림의 "범위 밖" WS 소비자 중 하나)이 Engine 이 실어 보낸
+        TagId 를 첫 <span class="mono">.</span> 과 마지막 <span class="mono">.</span> 기준으로 세 조각 내 되돌린다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:16%">필드</th><th style="width:34%">추출 규칙</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">device</td><td>첫 <span class="mono">.</span> 이전. 산출물이면 종류 접미사를 정규식으로 뗀다</td><td class="mono">^(.+-\d+)-([A-Z][A-Z_]+)$</td></tr>
+            <tr><td class="mono">artifactType</td><td>위 정규식이 매치될 때만: <span class="mono">REGISTERED_PCD</span>·<span class="mono">TRANSFORMATION_MATRIX</span>·<span class="mono">SEGMENTED_PCD</span></td><td>산출물 채널에만 존재</td></tr>
+            <tr><td class="mono">topicKey</td><td>첫 <span class="mono">.</span> 과 마지막 <span class="mono">.</span> 사이</td><td class="mono">ot_pipeline_assembly_artifact</td></tr>
+            <tr><td class="mono">channel</td><td><span class="mono">topicKey</span> 의 마지막 <span class="mono">_</span> 조각</td><td class="mono">status · actual · artifact</td></tr>
+            <tr><td class="mono">field</td><td>마지막 <span class="mono">.</span> 이후</td><td>항상 <span class="mono">raw_payload</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--info">
+        <p class="note__t">value 는 두 번 풀어야 원문이 나온다</p>
+        Engine 이 보내는 <span class="mono">value</span> 는 <span class="mono">raw_payload</span> 를 한 번 더 감싼
+        JSON 문자열이다(.NET 이 따옴표를 <span class="mono">"</span> 로 이스케이프한다). 소비자는 이걸 다시
+        파싱해서 객체로 돌린다 — Agent 단계의 <span class="mono">value</span> 자체는 문자열 그대로다(§04).
+      </div>
+    </section>
+
+    <!-- ---------- 9. 참고 자료 ---------- -->
+    <section class="sec" id="s9">
+      <h2><span class="n">09</span>참고 자료</h2>
+      <ol class="refs">
+        <li><span class="refs__n">1</span><span><span class="refs__src">LiDAR 필드 데이터가 소스 DB 에 닿기까지 — §03·§04</span>
+          <span class="refs__meta">doc · docs/cdc/lidar-source-pipeline.html (2026-09-16) — Engine 이후 경로는 §05부터</span></span></li>
+        <li><span class="refs__n">2</span><span><span class="refs__src">조립·선행의장 LiDAR 필드 데이터 발행기 — 계약 · 태그 등록 · 미확정</span>
+          <span class="refs__meta">code · util/mqtt-lidar-sim/README.md (확인 2026-09-22)</span></span></li>
+        <li><span class="refs__n">3</span><span><span class="refs__src">lidar-compare — 필드 카탈로그(A·B·C 세 경로 비교)</span>
+          <span class="refs__meta">code · src/lidar-compare/README.md (2026-09-21)</span></span></li>
+        <li><span class="refs__n">4</span><span><span class="refs__src">nats-tag-stream — TagId 재해석 · WebSocket 중계</span>
+          <span class="refs__meta">code · src/nats-tag-stream/README.md · src/main/java/dev/lidar/tagstream/tag/{Tag,TagParser}.java (확인 2026-09-22)</span></span></li>
+        <li><span class="refs__n">5</span><span><span class="refs__src">태그 등록 CSV 샘플 22개 (재설계 전 캡처 — §06 참고)</span>
+          <span class="refs__meta">data · docs/topic/mqtt-tags_*.csv · docs/cdc/mqtt-tags_..._wiring_actual.csv (확인 2026-09-22)</span></span></li>
+      </ol>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   HW Doc Kit - diagram engine (의존성 없음, 단일 파일 내장용)
+   drawio 느낌의 조작: 드래그 이동 / 연결 / 라벨 인라인 편집 /
+   팬·줌 / 톤 변경 / 삭제 / Ctrl+Z / JSON 내보내기(붙여넣기로 영구 반영)
+
+   마크업 (자세한 내용은 references/diagram.md):
+     div.dgm[data-edit=on] 안에
+     script[type=application/json][class=dgm-data] 로 노드·엣지 JSON 을 넣습니다.
+   ============================================================ */
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var GRID = 10;
+  var TONES = ['neutral', 'primary', 'accent', 'muted', 'ok', 'warn', 'risk', 'info'];
+
+  function s(n, a) {
+    var e = document.createElementNS(NS, n);
+    for (var k in (a || {})) e.setAttribute(k, a[k]);
+    return e;
+  }
+  function h(t, c, txt) {
+    var e = document.createElement(t);
+    if (c) e.className = c;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+  function btn(label, title) {
+    var b = h('button', 'dgm__btn', label);
+    b.type = 'button';
+    if (title) b.title = title;
+    return b;
+  }
+  function snap(v) { return Math.round(v / GRID) * GRID; }
+
+  function boxShape(n) {
+    var sh = n.shape || 'rect', w = n.w, ht = n.h;
+    if (sh === 'diamond')
+      return s('path', { 'class': 'box', d: 'M' + w / 2 + ',0 L' + w + ',' + ht / 2 + ' L' + w / 2 + ',' + ht + ' L0,' + ht / 2 + ' Z' });
+    if (sh === 'store') {
+      var r = Math.min(14, ht / 4);
+      var d = 'M0,' + r +
+        ' C0,' + (r * .45) + ' ' + (w * .22) + ',0 ' + (w / 2) + ',0' +
+        ' C' + (w * .78) + ',0 ' + w + ',' + (r * .45) + ' ' + w + ',' + r +
+        ' L' + w + ',' + (ht - r) +
+        ' C' + w + ',' + (ht - r * .45) + ' ' + (w * .78) + ',' + ht + ' ' + (w / 2) + ',' + ht +
+        ' C' + (w * .22) + ',' + ht + ' 0,' + (ht - r * .45) + ' 0,' + (ht - r) + ' Z';
+      return s('path', { 'class': 'box', d: d });
+    }
+    if (sh === 'note') {
+      var f = 14;
+      return s('path', { 'class': 'box', d: 'M0,0 L' + (w - f) + ',0 L' + w + ',' + f + ' L' + w + ',' + ht + ' L0,' + ht + ' Z' });
+    }
+    var rx = sh === 'pill' ? Math.min(ht / 2, 26) : (sh === 'round' ? 16 : 9);
+    return s('rect', { 'class': 'box', x: 0, y: 0, width: w, height: ht, rx: rx });
+  }
+
+  /* ---------- 선 그리기 ----------
+     직교(엘보) 경로다. 모서리는 둥글게 깎고, 가운데 줄기(lane)는 다른 박스를 뚫지 않는
+     자리로 옮긴다 — 자동 레이아웃이 없는 대신 선이 박스를 가로지르지 않게 한다. */
+  var OBS_PAD = 8;      /* 박스 둘레 여유 */
+  var CORNER = 12;      /* 모서리 반지름 */
+
+  function obstaclesOf(nodes, a, b) {
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n === a || n === b) continue;
+      out.push({ x0: n.x - OBS_PAD, y0: n.y - OBS_PAD, x1: n.x + n.w + OBS_PAD, y1: n.y + n.h + OBS_PAD });
+    }
+    return out;
+  }
+  function blockedV(obs, x, ya, yb) {
+    var y0 = Math.min(ya, yb), y1 = Math.max(ya, yb);
+    for (var i = 0; i < obs.length; i++) {
+      var o = obs[i];
+      if (x > o.x0 && x < o.x1 && y1 > o.y0 && y0 < o.y1) return true;
+    }
+    return false;
+  }
+  function blockedH(obs, y, xa, xb) {
+    var x0 = Math.min(xa, xb), x1 = Math.max(xa, xb);
+    for (var i = 0; i < obs.length; i++) {
+      var o = obs[i];
+      if (y > o.y0 && y < o.y1 && x1 > o.x0 && x0 < o.x1) return true;
+    }
+    return false;
+  }
+  /* 가운데 줄기를 놓을 자리. 한가운데가 막히면 좌우(위아래)로 10px 씩 벌려 본다. */
+  function pickLane(mid, ok) {
+    if (ok(mid)) return mid;
+    for (var d = 10; d <= 400; d += 10) {
+      if (ok(mid + d)) return mid + d;
+      if (ok(mid - d)) return mid - d;
+    }
+    return mid;
+  }
+  function dist(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
+  function toward(c, t, r) {
+    var dx = t.x - c.x, dy = t.y - c.y, L = Math.sqrt(dx * dx + dy * dy) || 1;
+    return { x: c.x + dx / L * r, y: c.y + dy / L * r };
+  }
+  /* 꺾이는 점마다 2차 베지어로 모서리를 깎은 폴리라인 */
+  function polyline(pts) {
+    var p = [pts[0]];
+    for (var i = 1; i < pts.length; i++) {
+      var q = p[p.length - 1];
+      if (Math.abs(pts[i].x - q.x) > 0.5 || Math.abs(pts[i].y - q.y) > 0.5) p.push(pts[i]);
+    }
+    if (p.length < 3) return 'M' + p[0].x + ',' + p[0].y + ' L' + p[p.length - 1].x + ',' + p[p.length - 1].y;
+    var d = 'M' + p[0].x + ',' + p[0].y;
+    for (var j = 1; j < p.length - 1; j++) {
+      var a = p[j - 1], c = p[j], b = p[j + 1];
+      var r = Math.min(CORNER, dist(a, c) / 2, dist(c, b) / 2);
+      var s1 = toward(c, a, r), s2 = toward(c, b, r);
+      d += ' L' + s1.x.toFixed(1) + ',' + s1.y.toFixed(1) +
+           ' Q' + c.x + ',' + c.y + ' ' + s2.x.toFixed(1) + ',' + s2.y.toFixed(1);
+    }
+    d += ' L' + p[p.length - 1].x + ',' + p[p.length - 1].y;
+    return d;
+  }
+
+  function route(a, b, obs) {
+    obs = obs || [];
+    var ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    var dx = bc.x - ac.x, dy = bc.y - ac.y, pts, mid;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      var p1 = { x: dx > 0 ? a.x + a.w : a.x, y: ac.y };
+      var p2 = { x: dx > 0 ? b.x : b.x + b.w, y: bc.y };
+      var lane = pickLane((p1.x + p2.x) / 2, function (v) {
+        return !blockedV(obs, v, p1.y, p2.y) &&
+               !blockedH(obs, p1.y, p1.x, v) && !blockedH(obs, p2.y, v, p2.x);
+      });
+      pts = [p1, { x: lane, y: p1.y }, { x: lane, y: p2.y }, p2];
+      mid = { x: lane, y: (p1.y + p2.y) / 2 };
+    } else {
+      var q1 = { x: ac.x, y: dy > 0 ? a.y + a.h : a.y };
+      var q2 = { x: bc.x, y: dy > 0 ? b.y : b.y + b.h };
+      var laneY = pickLane((q1.y + q2.y) / 2, function (v) {
+        return !blockedH(obs, v, q1.x, q2.x) &&
+               !blockedV(obs, q1.x, q1.y, v) && !blockedV(obs, q2.x, v, q2.y);
+      });
+      pts = [q1, { x: q1.x, y: laneY }, { x: q2.x, y: laneY }, q2];
+      mid = { x: (q1.x + q2.x) / 2, y: laneY };
+    }
+    return { d: polyline(pts), mid: mid };
+  }
+
+  /* 원본 JSON 이 바뀌었는지 보는 값. 문서를 고쳐 다시 배포하면 해시가 달라져
+     예전 편집본을 버린다 — 안 그러면 저자가 고친 그림이 영원히 안 보인다. */
+  function srcHash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) + h + s.charCodeAt(i)) | 0; }
+    return String(h);
+  }
+
+  function Diagram(root) {
+    this.root = root;
+    this.editable = root.getAttribute('data-edit') !== 'off';
+
+    /* 저장 키 — data-key 가 있으면 그것을, 없으면 문서 안에서의 순번을 쓴다.
+       순번은 그림을 추가·삭제하면 밀리지만, 그때는 해시도 함께 달라져 저장본이 버려진다. */
+    var all = document.querySelectorAll('.dgm');
+    this.key = 'hwdgm:' + (location.pathname.split('/').pop() || 'doc') + ':'
+      + (root.getAttribute('data-key') || Array.prototype.indexOf.call(all, root));
+
+    var tag = root.querySelector('script.dgm-data');
+    this.srcHash = srcHash(tag ? tag.textContent : '');
+
+    this.data = this.read();
+    var saved = this.loadSaved();
+    if (saved) this.data = saved;
+    this.view = { tx: 0, ty: 0, k: 1 };
+    this.sel = null;          /* {type:'node'|'edge'|'group', id} */
+    this.linkMode = false;
+    this.linkFrom = null;
+    this.undo = [];
+    this.build();
+    this.render();
+    this.autoHeight();
+    this.fit();
+    this.ready = true;
+    this.markSaved(!!this._restored);
+  }
+
+  Diagram.prototype.read = function () {
+    var tag = this.root.querySelector('script.dgm-data');
+    var d = { nodes: [], edges: [], groups: [] };
+    if (tag) { try { d = JSON.parse(tag.textContent); } catch (e) { console.warn('[dgm] JSON 파싱 실패', e); } }
+    d.nodes = d.nodes || []; d.edges = d.edges || []; d.groups = d.groups || [];
+    d.nodes.forEach(function (n) {
+      n.w = n.w || 170; n.h = n.h || 62;
+      n.shape = n.shape || 'rect'; n.tone = n.tone || 'neutral';
+      n.x = n.x || 0; n.y = n.y || 0;
+    });
+    return d;
+  };
+
+  Diagram.prototype.build = function () {
+    var self = this;
+    var bar = h('div', 'dgm__bar no-print');
+    var mk = function (label, title, fn) { var b = btn(label, title); b.addEventListener('click', fn); bar.appendChild(b); return b; };
+
+    mk('박스', '새 박스 추가', function () { self.addNode(); });
+    this.bLink = mk('연결', '두 박스를 차례로 클릭해 화살표 연결', function () { self.toggleLink(); });
+    mk('색', '선택 항목의 톤 변경', function () { self.cycleTone(); });
+    mk('모양', '선택 박스의 모양 변경', function () { self.cycleShape(); });
+    mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
+    bar.appendChild(h('span', 'dgm__sep'));
+    mk('−', '축소', function () { self.zoom(1 / 1.2); });
+    mk('+', '확대', function () { self.zoom(1.2); });
+    mk('맞춤', '화면에 맞추기', function () { self.autoHeight(); self.fit(); });
+    this.bMax = mk('넓게', '화면 가득 펼치기 (Esc 로 닫기)', function () { self.toggleMax(); });
+    bar.appendChild(h('span', 'dgm__sep'));
+    mk('JSON', '수정 결과를 JSON으로 복사해 원본 파일에 붙여넣기', function () { self.openJson(); });
+    this.bReset = mk('원래대로', '이 브라우저에 저장된 편집 내용을 지운다', function () { self.resetSaved(); });
+    bar.appendChild(h('span', 'sp'));
+    bar.appendChild(h('span', 'dgm__hint', '드래그로 이동 · 더블클릭으로 라벨 수정 · 휠로 확대'));
+
+    var svg = s('svg', { 'class': 'dgm__svg' });
+    var defs = s('defs');
+    [['ar-default', 'var(--ink3)'], ['ar-primary', 'var(--hw)'], ['ar-risk', 'var(--risk)'], ['ar-ok', 'var(--ok)']]
+      .forEach(function (m) {
+        var mk2 = s('marker', {
+          id: m[0] + '-' + Math.random().toString(36).slice(2, 7),
+          viewBox: '0 0 10 10', refX: 9, refY: 5,
+          markerWidth: 8, markerHeight: 8, orient: 'auto-start-reverse'
+        });
+        var p = s('path', { d: 'M0,0.5 L10,5 L0,9.5 L2.9,5 z' });
+        p.setAttribute('style', 'fill:' + m[1]);
+        mk2.appendChild(p); defs.appendChild(mk2);
+        self['mk_' + m[0].slice(3)] = mk2.getAttribute('id');
+      });
+    svg.appendChild(defs);
+
+    this.gRoot = s('g');
+    this.gGroups = s('g'); this.gEdges = s('g'); this.gNodes = s('g');
+    this.gRoot.appendChild(this.gGroups);
+    this.gRoot.appendChild(this.gEdges);
+    this.gRoot.appendChild(this.gNodes);
+    svg.appendChild(this.gRoot);
+
+    this.svg = svg;
+    this.root.insertBefore(svg, this.root.firstChild);
+    if (this.editable) this.root.insertBefore(bar, svg);
+
+    /* JSON 모달 */
+    var modal = h('div', 'dgm__modal no-print');
+    var pane = h('div', 'pane');
+    var head = h('div', 'head'); head.appendChild(h('b', null, '다이어그램 JSON'));
+    head.appendChild(h('span', 'sp'));
+    var closeB = btn('닫기'); head.appendChild(closeB);
+    var ta = h('textarea'); ta.spellcheck = false;
+    var foot = h('div', 'foot');
+    var copyB = btn('전체 복사'); var applyB = btn('붙여넣은 JSON 적용');
+    foot.appendChild(h('span', 'dgm__hint', '원본 HTML의 dgm-data 블록에 붙여넣으면 수정이 영구 반영됩니다'));
+    foot.appendChild(h('span', 'sp')); foot.appendChild(applyB); foot.appendChild(copyB);
+    pane.appendChild(head); pane.appendChild(ta); pane.appendChild(foot);
+    modal.appendChild(pane); this.root.appendChild(modal);
+    this.modal = modal; this.ta = ta;
+    closeB.addEventListener('click', function () { modal.classList.remove('is-open'); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('is-open'); });
+    copyB.addEventListener('click', function () {
+      ta.select(); ta.setSelectionRange(0, ta.value.length);
+      try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); }
+      copyB.textContent = '복사됨'; setTimeout(function () { copyB.textContent = '전체 복사'; }, 1200);
+    });
+    applyB.addEventListener('click', function () {
+      try {
+        var d = JSON.parse(ta.value);
+        self.push(); self.data = d; self.data.nodes = d.nodes || []; self.data.edges = d.edges || []; self.data.groups = d.groups || [];
+        self.render(); self.autoHeight(); self.fit(); modal.classList.remove('is-open');
+      } catch (e) { alert('JSON 형식이 올바르지 않습니다: ' + e.message); }
+    });
+
+    this.bind();
+  };
+
+  /* ---------- 렌더 ---------- */
+  Diagram.prototype.render = function () {
+    var self = this;
+    this.gGroups.textContent = ''; this.gEdges.textContent = ''; this.gNodes.textContent = '';
+    this.index = {};
+    this.data.nodes.forEach(function (n) { self.index[n.id] = n; });
+
+    this.data.groups.forEach(function (g) {
+      var el = s('g', { 'class': 'dgm-grp', 'data-id': g.id, transform: 'translate(' + g.x + ',' + g.y + ')' });
+      el.appendChild(s('rect', { 'class': 'box', x: 0, y: 0, width: g.w, height: g.h, rx: 10 }));
+      var t = s('text', { 'class': 'gl', x: 12, y: 20 }); t.textContent = g.label || '';
+      el.appendChild(t);
+      self.gGroups.appendChild(el);
+    });
+
+    this.data.edges.forEach(function (e, i) {
+      var a = self.index[e.from], b = self.index[e.to];
+      if (!a || !b) return;
+      var r = route(a, b, obstaclesOf(self.data.nodes, a, b));
+      var g = s('g', { 'class': 'dgm-edge', 'data-i': i });
+      if (e.tone) g.setAttribute('data-tone', e.tone);
+      if (e.style) g.setAttribute('data-style', e.style);
+      var wire = s('path', { 'class': 'wire', d: r.d });
+      var mid = e.tone === 'primary' ? self.mk_primary : e.tone === 'risk' ? self.mk_risk : e.tone === 'ok' ? self.mk_ok : self.mk_default;
+      if (e.arrow !== false) wire.setAttribute('marker-end', 'url(#' + mid + ')');
+      g.appendChild(s('path', { 'class': 'hit', d: r.d }));
+      g.appendChild(wire);
+      if (e.label) {
+        var txt = String(e.label), wpx = 0;
+        for (var ci = 0; ci < txt.length; ci++) wpx += txt.charCodeAt(ci) > 0x2E80 ? 12.5 : 7;
+        var w = Math.max(34, Math.ceil(wpx) + 22);
+        var fo = s('foreignObject', { x: r.mid.x - w / 2, y: r.mid.y - 11, width: w, height: 22 });
+        var div = h('div', 'elbl'); div.appendChild(h('span', null, e.label));
+        fo.appendChild(div); g.appendChild(fo);
+      }
+      self.gEdges.appendChild(g);
+    });
+
+    this.data.nodes.forEach(function (n) {
+      var g = s('g', { 'class': 'dgm-node', 'data-id': n.id, 'data-tone': n.tone, transform: 'translate(' + n.x + ',' + n.y + ')' });
+      g.appendChild(boxShape(n));
+      var pad = n.shape === 'diamond' ? Math.round(n.w * .18) : 0;
+      var fo = s('foreignObject', { x: pad, y: 0, width: n.w - pad * 2, height: n.h });
+      var lbl = h('div', 'lbl');
+      lbl.appendChild(h('span', 't', n.label || ''));
+      if (n.sub) lbl.appendChild(h('span', 'sub', n.sub));
+      fo.appendChild(lbl); g.appendChild(fo);
+      self.gNodes.appendChild(g);
+    });
+
+    this.paint();
+  };
+
+  /* render 는 모든 변경 뒤에 불린다 — 여기 한 곳만 잡으면 끌기·라벨 편집·추가·삭제가
+     모두 저장된다. 첫 그리기와 되돌리기 때는 건너뛴다. */
+  (function (orig) {
+    Diagram.prototype.render = function () {
+      orig.call(this);
+      if (this.ready && !this._skipSave) this.save();
+    };
+  })(Diagram.prototype.render);
+
+  Diagram.prototype.paint = function () {
+    var self = this;
+    this.gRoot.setAttribute('transform', 'translate(' + this.view.tx + ',' + this.view.ty + ') scale(' + this.view.k + ')');
+    Array.prototype.forEach.call(this.root.querySelectorAll('.is-sel'), function (e) { e.classList.remove('is-sel'); });
+    if (!this.sel) return;
+    var q = this.sel.type === 'edge' ? '.dgm-edge[data-i="' + this.sel.id + '"]'
+      : this.sel.type === 'group' ? '.dgm-grp[data-id="' + this.sel.id + '"]'
+        : '.dgm-node[data-id="' + this.sel.id + '"]';
+    var el = this.root.querySelector(q);
+    if (el) el.classList.add('is-sel');
+  };
+
+  /* ---------- 좌표 ---------- */
+  Diagram.prototype.world = function (ev) {
+    var r = this.svg.getBoundingClientRect();
+    return { x: (ev.clientX - r.left - this.view.tx) / this.view.k, y: (ev.clientY - r.top - this.view.ty) / this.view.k };
+  };
+
+  /* 화면 가득 펼치기. 다른 다이어그램이 펼쳐져 있으면 먼저 닫는다. */
+  Diagram.prototype.toggleMax = function (force) {
+    var self = this;
+    var on = (force == null) ? !this.root.classList.contains('is-max') : !!force;
+    if (on) {
+      var cur = document.querySelector('.dgm.is-max');
+      if (cur && cur !== this.root && cur.__dgm) cur.__dgm.toggleMax(false);
+    }
+    this.root.classList.toggle('is-max', on);
+    document.documentElement.classList.toggle('dgm-locked', on);
+    if (this.bMax) {
+      this.bMax.classList.toggle('is-on', on);
+      this.bMax.textContent = on ? '닫기' : '넓게';
+      this.bMax.title = on ? '원래 크기로 (Esc)' : '화면 가득 펼치기 (Esc 로 닫기)';
+    }
+    (window.requestAnimationFrame || setTimeout)(function () {
+      if (!on) self.autoHeight();
+      self.fit();
+    });
+  };
+
+  /* 캔버스 높이를 내용 비율에 맞춘다.
+     고정 높이를 쓰면 넓고 납작한 그림은 축소되어 글씨가 안 보이고, 좁은 그림은 빈 띠가 남는다.
+     슬라이드처럼 남는 공간을 채우는 자리(flex:1)와 data-autoheight="off" 는 건드리지 않는다. */
+  Diagram.prototype.autoHeight = function () {
+    if (this.root.classList.contains('is-max')) return;
+    if (this.root.getAttribute('data-autoheight') === 'off') return;
+    var cs = window.getComputedStyle(this.root);
+    if (cs.flexGrow !== '0') return;
+    var items = this.data.nodes.concat(this.data.groups);
+    if (!items.length) return;
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    items.forEach(function (n) {
+      x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+      x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h);
+    });
+    var W = this.svg.clientWidth || this.root.clientWidth || 900;
+    var pad = 28, bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
+    var k = Math.min(W / bw, 1);
+    var bar = this.root.querySelector('.dgm__bar');
+    var want = Math.round(bh * k) + (bar ? bar.offsetHeight : 0) + 2;
+    this.root.style.height = Math.max(220, Math.min(want, 720)) + 'px';
+  };
+
+  Diagram.prototype.fit = function () {
+    var items = this.data.nodes.concat(this.data.groups);
+    var r = this.svg.getBoundingClientRect();
+    // CSS transform:scale() 이 걸린 무대(발표용 .stage) 안에서는 getBoundingClientRect 가
+    // "화면에 보이는" 크기를 돌려준다. 그 값으로 배율을 잡으면 큰 화면에서 상한(1.6배)까지
+    // 확대돼 그림이 잘리고, 작은 화면에서는 필요 이상 줄어든다.
+    // clientWidth/Height 는 변환 전 레이아웃 크기라 무대 배율과 무관하다.
+    var W = this.svg.clientWidth || r.width || 800;
+    var H = this.svg.clientHeight || r.height || 420;
+    if (!items.length) { this.view = { tx: 20, ty: 20, k: 1 }; return this.paint(); }
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    items.forEach(function (n) {
+      x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+      x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h);
+    });
+    var pad = 24, bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
+    var k = Math.min(W / bw, H / bh, 1);
+    this.view.k = k;
+    this.view.tx = (W - bw * k) / 2 - (x0 - pad) * k;
+    this.view.ty = (H - bh * k) / 2 - (y0 - pad) * k;
+    this.paint();
+  };
+
+  Diagram.prototype.zoom = function (f, cx, cy) {
+    var r = this.svg.getBoundingClientRect();
+    cx = cx == null ? r.width / 2 : cx; cy = cy == null ? r.height / 2 : cy;
+    var k0 = this.view.k, k1 = Math.max(.25, Math.min(3, k0 * f));
+    this.view.tx = cx - (cx - this.view.tx) * (k1 / k0);
+    this.view.ty = cy - (cy - this.view.ty) * (k1 / k0);
+    this.view.k = k1; this.paint();
+  };
+
+  /* ---------- 편집 내용 보관 (브라우저 안에만) ----------
+     끌어 옮기고 라벨을 고친 결과가 새로고침에도 남는다. 저장 위치는 이 브라우저의
+     localStorage 라 다른 사람에게는 전달되지 않는다 — 문서 자체에 반영하려면
+     JSON 버튼으로 내보내 원본 파일에 붙여넣어야 한다. */
+  Diagram.prototype.save = function () {
+    if (!this.editable || !this.key) return;
+    var self = this;
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(function () {
+      try {
+        localStorage.setItem(self.key, JSON.stringify({ v: self.srcHash, d: self.data }));
+        self.markSaved(true);
+      } catch (e) { /* 사생활 보호 모드 등 — 저장만 안 될 뿐 편집은 된다 */ }
+    }, 250);
+  };
+
+  Diagram.prototype.loadSaved = function () {
+    try {
+      var raw = localStorage.getItem(this.key);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || o.v !== this.srcHash || !o.d) { localStorage.removeItem(this.key); return null; }
+      this._restored = true;
+      return o.d;
+    } catch (e) { return null; }
+  };
+
+  Diagram.prototype.resetSaved = function () {
+    try { localStorage.removeItem(this.key); } catch (e) { }
+    this.data = this.read();
+    this.sel = null;
+    this._skipSave = true;
+    this.render();
+    this._skipSave = false;
+    this.fit();
+    this.markSaved(false);
+  };
+
+  /* 저장됨 표시. 버튼 라벨만 잠깐 바꾼다 — 별도 알림창은 발표 중에 방해가 된다. */
+  Diagram.prototype.markSaved = function (on) {
+    if (!this.bReset) return;
+    this.bReset.classList.toggle('is-on', !!on);
+    this.bReset.title = on ? '이 브라우저에 저장된 편집 내용을 지우고 원래대로' : '원래대로 (저장된 편집 없음)';
+  };
+
+  /* ---------- 편집 ---------- */
+  Diagram.prototype.push = function () {
+    this.undo.push(JSON.stringify(this.data));
+    if (this.undo.length > 40) this.undo.shift();
+  };
+  Diagram.prototype.popUndo = function () {
+    if (!this.undo.length) return;
+    this.data = JSON.parse(this.undo.pop());
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.addNode = function () {
+    this.push();
+    var id = 'n' + Date.now().toString(36).slice(-5);
+    var r = this.svg.getBoundingClientRect();
+    var wx = snap((r.width / 2 - this.view.tx) / this.view.k - 85);
+    var wy = snap((r.height / 2 - this.view.ty) / this.view.k - 31);
+    this.data.nodes.push({ id: id, label: '새 단계', x: wx, y: wy, w: 170, h: 62, shape: 'rect', tone: 'neutral' });
+    this.sel = { type: 'node', id: id };
+    this.render();
+  };
+  Diagram.prototype.toggleLink = function () {
+    this.linkMode = !this.linkMode; this.linkFrom = null;
+    this.bLink.classList.toggle('is-on', this.linkMode);
+  };
+  Diagram.prototype.cycleTone = function () {
+    if (!this.sel) return;
+    this.push();
+    if (this.sel.type === 'node') {
+      var n = this.index[this.sel.id];
+      n.tone = TONES[(TONES.indexOf(n.tone) + 1) % TONES.length];
+    } else if (this.sel.type === 'edge') {
+      var order = [undefined, 'primary', 'ok', 'risk'];
+      var e = this.data.edges[this.sel.id];
+      e.tone = order[(order.indexOf(e.tone) + 1) % order.length];
+    }
+    this.render();
+  };
+  Diagram.prototype.cycleShape = function () {
+    if (!this.sel || this.sel.type !== 'node') return;
+    var SH = ['rect', 'round', 'pill', 'diamond', 'store', 'note'];
+    this.push();
+    var n = this.index[this.sel.id];
+    n.shape = SH[(SH.indexOf(n.shape) + 1) % SH.length];
+    this.render();
+  };
+  Diagram.prototype.remove = function () {
+    if (!this.sel) return;
+    this.push();
+    var self = this;
+    if (this.sel.type === 'node') {
+      this.data.nodes = this.data.nodes.filter(function (n) { return n.id !== self.sel.id; });
+      this.data.edges = this.data.edges.filter(function (e) { return e.from !== self.sel.id && e.to !== self.sel.id; });
+    } else if (this.sel.type === 'edge') {
+      this.data.edges.splice(this.sel.id, 1);
+    } else {
+      this.data.groups = this.data.groups.filter(function (g) { return g.id !== self.sel.id; });
+    }
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.openJson = function () {
+    this.ta.value = JSON.stringify(this.data, null, 2);
+    this.modal.classList.add('is-open');
+  };
+
+  /* ---------- 이벤트 ---------- */
+  Diagram.prototype.bind = function () {
+    var self = this, drag = null, pan = null;
+
+    this.svg.addEventListener('pointerdown', function (ev) {
+      if (ev.target.closest('[contenteditable="true"]')) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      var edgeEl = ev.target.closest('.dgm-edge');
+      var grpEl = ev.target.closest('.dgm-grp');
+
+      if (self.linkMode && nodeEl) {
+        var id = nodeEl.getAttribute('data-id');
+        if (!self.linkFrom) { self.linkFrom = id; self.sel = { type: 'node', id: id }; self.paint(); }
+        else if (self.linkFrom !== id) {
+          self.push();
+          self.data.edges.push({ from: self.linkFrom, to: id, label: '' });
+          self.linkFrom = null; self.toggleLink(); self.render();
+        }
+        return;
+      }
+      if (nodeEl && self.editable) {
+        self.sel = { type: 'node', id: nodeEl.getAttribute('data-id') };
+        var n = self.index[self.sel.id];
+        var w = self.world(ev);
+        drag = { kind: 'node', obj: n, dx: w.x - n.x, dy: w.y - n.y, moved: false };
+        self.push();
+      } else if (grpEl && self.editable) {
+        self.sel = { type: 'group', id: grpEl.getAttribute('data-id') };
+        var g = self.data.groups.filter(function (q) { return q.id === self.sel.id; })[0];
+        var w2 = self.world(ev);
+        drag = { kind: 'group', obj: g, dx: w2.x - g.x, dy: w2.y - g.y, moved: false };
+        self.push();
+      } else if (edgeEl) {
+        self.sel = { type: 'edge', id: +edgeEl.getAttribute('data-i') };
+      } else {
+        self.sel = null;
+        pan = { x: ev.clientX, y: ev.clientY, tx: self.view.tx, ty: self.view.ty };
+        self.svg.classList.add('is-panning');
+      }
+      self.svg.setPointerCapture(ev.pointerId);
+      self.paint();
+    });
+
+    this.svg.addEventListener('pointermove', function (ev) {
+      if (drag) {
+        var w = self.world(ev);
+        drag.obj.x = snap(w.x - drag.dx); drag.obj.y = snap(w.y - drag.dy);
+        drag.moved = true;
+        self.render();
+      } else if (pan) {
+        self.view.tx = pan.tx + (ev.clientX - pan.x);
+        self.view.ty = pan.ty + (ev.clientY - pan.y);
+        self.paint();
+      }
+    });
+
+    var end = function (ev) {
+      if (drag && !drag.moved) self.undo.pop();
+      drag = null; pan = null;
+      self.svg.classList.remove('is-panning');
+      try { self.svg.releasePointerCapture(ev.pointerId); } catch (e) { }
+    };
+    this.svg.addEventListener('pointerup', end);
+    this.svg.addEventListener('pointercancel', end);
+
+    this.svg.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      var r = self.svg.getBoundingClientRect();
+      self.zoom(ev.deltaY < 0 ? 1.12 : 1 / 1.12, ev.clientX - r.left, ev.clientY - r.top);
+    }, { passive: false });
+
+    this.svg.addEventListener('dblclick', function (ev) {
+      if (!self.editable) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      if (nodeEl) return self.edit(nodeEl.querySelector('.lbl .t'), function (v) {
+        self.index[nodeEl.getAttribute('data-id')].label = v;
+      });
+      var edgeEl = ev.target.closest('.dgm-edge');
+      if (edgeEl) {
+        var i = +edgeEl.getAttribute('data-i');
+        var v = prompt('연결 라벨', self.data.edges[i].label || '');
+        if (v !== null) { self.push(); self.data.edges[i].label = v; self.render(); }
+      }
+    });
+
+    this.root.addEventListener('keydown', function (ev) {
+      if (ev.target.getAttribute && ev.target.getAttribute('contenteditable') === 'true') return;
+      if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); self.remove(); }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); self.popUndo(); }
+    });
+    this.root.tabIndex = 0;
+
+    // 폭이 바뀌면 다시 그리는 것만으로는 부족하다 — 좁아진 칸에 옛 배율로 그리면 넘쳐서 잘린다.
+    // fit() 으로 배율까지 다시 잡아야 항상 전체가 보인다.
+    var ro = window.ResizeObserver ? new ResizeObserver(function () { self.fit(); }) : null;
+    if (ro) ro.observe(this.svg);
+  };
+
+  Diagram.prototype.edit = function (el, done) {
+    if (!el) return;
+    var self = this;
+    this.push();
+    el.parentNode.setAttribute('contenteditable', 'true');
+    el.parentNode.focus();
+    var save = function () {
+      el.parentNode.removeAttribute('contenteditable');
+      done(el.textContent.trim());
+      self.render();
+    };
+    el.parentNode.addEventListener('blur', save, { once: true });
+    el.parentNode.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); el.parentNode.blur(); }
+      if (ev.key === 'Escape') { el.parentNode.removeAttribute('contenteditable'); self.popUndo(); }
+      ev.stopPropagation();
+    });
+    var rg = document.createRange(); rg.selectNodeContents(el);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+  };
+
+  function initAll(scope) {
+    var list = (scope || document).querySelectorAll('.dgm');
+    Array.prototype.forEach.call(list, function (el) {
+      if (el.__dgm) return;
+      el.__dgm = new Diagram(el);
+    });
+  }
+  /* Esc 는 펼쳐 놓은 다이어그램을 닫는다. 라벨 편집 중의 Esc 는
+     edit() 안에서 stopPropagation 되므로 여기까지 오지 않는다. */
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var el = document.querySelector('.dgm.is-max');
+    if (el && el.__dgm) { ev.preventDefault(); el.__dgm.toggleMax(false); }
+  });
+
+  /* 창 폭이 바뀌면 높이와 배율을 다시 잡는다. 펼쳐 둔 그림은 건드리지 않는다. */
+  var rsT = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(rsT);
+    rsT = setTimeout(function () {
+      Array.prototype.forEach.call(document.querySelectorAll('.dgm'), function (el) {
+        if (!el.__dgm || el.classList.contains('is-max')) return;
+        el.__dgm.autoHeight(); el.__dgm.fit();
+      });
+    }, 160);
+  });
+
+  window.HWDiagram = { initAll: initAll, Diagram: Diagram };
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', function () { initAll(); });
+  else initAll();
+})();
+
+/* ============================================================
+   HW Doc Kit - flow engine (웹 스타일 워크플로우 그림, 의존성 없음)
+   카드(그리드 배치) 위치를 읽어 곡선 연결선 · 라벨 · 흐르는 점을 그리고,
+   `편집` 을 켜면 문서 안에서 바로 고칠 수 있다.
+
+   마크업 (자세한 내용은 references/flow.md):
+     div.flow > div.flow__head + div.flow__in(grid) > .fnode[data-id] ...
+              + script.flow-links (JSON 배열)
+     연결: {"from","to","kind":"flow|ok|risk|muted|plain","label","lane","port":"r>l"}
+
+   편집: 끌어 이동(10px 스냅) · 더블클릭 글자 수정 · 연결 · 색 · 아이콘 · 선 종류 · 방향 ·
+         삭제(Delete) · 되돌리기(Ctrl+Z) · 이 브라우저에 자동 저장 · 내보내기(HTML 붙여넣기로 영구 반영)
+   ============================================================ */
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var GRID = 10;
+  var ICONS = {
+    broker: '<circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49M7.76 16.24a6 6 0 0 1 0-8.49M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"/>',
+    chip: '<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M19 9h3M19 15h3M2 9h3M2 15h3"/>',
+    server: '<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01"/>',
+    layers: '<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
+    stream: '<path d="M3 6h13M3 12h18M3 18h9"/><circle cx="19" cy="6" r="1.6"/><circle cx="15" cy="18" r="1.6"/>',
+    code: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
+    db: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/>',
+    filter: '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>',
+    split: '<path d="M16 3h5v5M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.17-2.83L3 3M15 9l6-6"/>',
+    send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>',
+    inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+    tag: '<path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><path d="M7 7h.01"/>',
+    check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>',
+    alert: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/>',
+    retry: '<path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+    archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>',
+    trash: '<path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/>',
+    chart: '<path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-5"/>',
+    gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+    terminal: '<path d="m4 17 6-6-6-6M12 19h8"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/>',
+    lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+    cloud: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>'
+  };
+  var ICON_KEYS = Object.keys(ICONS);
+  var ROLES = ['', 'isl', 'new', 'src', 'store', 'ok', 'warn', 'risk', 'dim', 'decide'];
+  var ROLE_NAMES = { '': '기본', isl: '기존', 'new': '신규', src: '입력', store: '저장소', ok: '완료', warn: '주의', risk: '위험', dim: '버림', decide: '판정' };
+  var KINDS = ['flow', 'ok', 'risk', 'muted', 'plain'];
+  var KIND_NAMES = { flow: '데이터 흐름', ok: '저장 · 확정', risk: '실패', muted: '버림 · 보류', plain: '기본' };
+  var PORTS = ['', 'r>l', 'b>t', 't>b', 'l>r', 'r>t', 'b>l', 'r>b', 'b>r', 't>l', 'l>t'];
+  var DIR = { r: [1, 0], l: [-1, 0], b: [0, 1], t: [0, -1] };
+  var TEXT_SEL = '.fnode__t, .fnode__s, .fnode__tag, .fnode__badge, .fnode__no, .flane__n, .flane__k, .flane__m span, .fbypass__t, .flow__title, .flow__hint';
+
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function btn(label, title) { var b = el('button', 'dgm__btn', label); b.type = 'button'; if (title) b.title = title; return b; }
+  function snap(v) { return Math.round(v / GRID) * GRID; }
+  function hash(s) { var h = 5381; for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h); }
+
+  function paintIcons(root) {
+    root.querySelectorAll('[data-ic]').forEach(function (e) {
+      var name = e.getAttribute('data-ic');
+      e.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || ICONS.code) + '</svg>';
+    });
+  }
+
+  function portOf(r, side) {
+    if (side === 'r') return [r.right, r.top + r.height / 2];
+    if (side === 'l') return [r.left, r.top + r.height / 2];
+    if (side === 'b') return [r.left + r.width / 2, r.bottom];
+    return [r.left + r.width / 2, r.top];
+  }
+  function autoPort(a, b) {
+    if (b.left >= a.right - 6) return 'r>l';
+    if (b.right <= a.left + 6) return 'l>r';
+    if (b.top >= a.bottom - 6) return 'b>t';
+    return 't>b';
+  }
+  function rel(e, base) {
+    var r = e.getBoundingClientRect();
+    return { left: r.left - base.left, right: r.right - base.left, top: r.top - base.top, bottom: r.bottom - base.top, width: r.width, height: r.height };
+  }
+  function translateOf(e) {
+    var t = (e.style.translate || '').trim().split(/\s+/);
+    return [parseFloat(t[0]) || 0, parseFloat(t[1]) || 0];
+  }
+
+  /* ─────────────────────────────────────────────────────────── */
+  function Flow(root, index) {
+    this.root = root;
+    this.fid = index;
+    this.inner = root.querySelector('.flow__in');
+    this.spec = root.querySelector('script.flow-links');
+    if (!this.inner) return;
+    if (!this.spec) { this.spec = el('script', 'flow-links'); this.spec.type = 'application/json'; this.spec.textContent = '[]'; root.appendChild(this.spec); }
+    this.links = JSON.parse(this.spec.textContent || '[]');
+    this.editable = root.getAttribute('data-edit') !== 'off';
+    this.key = 'hwflow:' + (location.pathname.split('/').pop() || 'doc') + ':' + (root.getAttribute('data-key') || index);
+    this.orig = this.snapshot();
+    this.origHash = hash(this.orig.html + JSON.stringify(this.orig.links) + this.orig.head);
+    this.undo = [];
+    this.sel = null;            /* {type:'node', id} | {type:'link', idx} */
+    this.linkMode = false;
+    this.linkFrom = null;
+    this.restore();
+    paintIcons(this.root);
+    if (this.editable) this.buildUi();
+    this.bind();
+    this.draw();
+    var self = this;
+    if (window.ResizeObserver) new ResizeObserver(function () { self.draw(); }).observe(this.inner);
+  }
+
+  /* 편집 흔적을 뺀 깨끗한 상태 — 저장 · 되돌리기 · 내보내기가 모두 이것을 쓴다 */
+  Flow.prototype.snapshot = function () {
+    var clone = this.inner.cloneNode(true);
+    clone.querySelectorAll('.flow__links, .flow__lbls').forEach(function (e) { e.remove(); });
+    clone.querySelectorAll('[data-ic]').forEach(function (e) { e.innerHTML = ''; });
+    clone.querySelectorAll('.is-sel, .is-from').forEach(function (e) { e.classList.remove('is-sel', 'is-from'); });
+    clone.querySelectorAll('[contenteditable]').forEach(function (e) { e.removeAttribute('contenteditable'); });
+    var head = this.root.querySelector('.flow__head');
+    var hclone = head ? head.cloneNode(true) : null;
+    if (hclone) hclone.querySelectorAll('.flow__edit').forEach(function (e) { e.remove(); });
+    return { html: clone.innerHTML.trim(), links: JSON.parse(JSON.stringify(this.links)), head: hclone ? hclone.innerHTML.trim() : '' };
+  };
+  Flow.prototype.apply = function (snap) {
+    this.inner.innerHTML = snap.html;
+    this.links = JSON.parse(JSON.stringify(snap.links));
+    var head = this.root.querySelector('.flow__head');
+    if (head && snap.head != null) {
+      var tools = head.querySelector('.flow__edit');
+      head.innerHTML = snap.head;
+      if (tools) head.appendChild(tools);
+      this.bindSeg();
+    }
+    paintIcons(this.inner);
+    this.sel = null;
+    this.draw();
+  };
+  Flow.prototype.push = function () {
+    this.undo.push(this.snapshot());
+    if (this.undo.length > 40) this.undo.shift();
+  };
+  Flow.prototype.doUndo = function () {
+    var s = this.undo.pop();
+    if (s) { this.apply(s); this.save(); }
+  };
+  Flow.prototype.save = function () {
+    this.spec.textContent = JSON.stringify(this.links);
+    if (!this.editable) return;
+    try {
+      var s = this.snapshot();
+      localStorage.setItem(this.key, JSON.stringify({ hash: this.origHash, snap: s }));
+      this.markSaved(true);
+    } catch (e) { /* 저장 불가 환경 — 무시 */ }
+  };
+  Flow.prototype.restore = function () {
+    try {
+      var raw = localStorage.getItem(this.key);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (d.hash !== this.origHash) { localStorage.removeItem(this.key); return; }
+      this.apply(d.snap);
+      this._restored = true;
+    } catch (e) { /* 무시 */ }
+  };
+  Flow.prototype.resetSaved = function () {
+    try { localStorage.removeItem(this.key); } catch (e) { /* 무시 */ }
+    this.push();
+    this.apply(this.orig);
+    this.markSaved(false);
+  };
+  Flow.prototype.markSaved = function (on) {
+    if (this.bReset) this.bReset.style.display = on ? '' : 'none';
+  };
+
+  /* ── UI ─────────────────────────────────────────────────── */
+  Flow.prototype.buildUi = function () {
+    var self = this;
+    var head = this.root.querySelector('.flow__head');
+    if (!head) { head = el('div', 'flow__head'); this.root.insertBefore(head, this.root.firstChild); }
+    var wrap = el('span', 'flow__edit no-print');
+    this.bEdit = btn('편집', '카드 · 연결 · 글자를 이 자리에서 고친다');
+    this.bEdit.addEventListener('click', function () { self.toggleEdit(); });
+    wrap.appendChild(this.bEdit);
+    head.appendChild(wrap);
+
+    var bar = el('div', 'dgm__bar flow__bar no-print');
+    var mk = function (label, title, fn) { var b = btn(label, title); b.addEventListener('click', fn); bar.appendChild(b); return b; };
+    mk('카드', '새 카드 추가', function () { self.addNode(); });
+    this.bLink = mk('연결', '시작 카드 → 도착 카드를 차례로 클릭', function () { self.toggleLink(); });
+    mk('색', '카드 역할 · 선 종류를 바꾼다', function () { self.cycleTone(); });
+    mk('아이콘', '선택 카드의 아이콘을 바꾼다', function () { self.cycleIcon(); });
+    mk('방향', '선택 선이 붙는 면을 바꾼다 (자동 → 오른쪽>왼쪽 → …)', function () { self.cyclePort(); });
+    mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
+    bar.appendChild(el('span', 'dgm__sep'));
+    mk('되돌리기', 'Ctrl+Z', function () { self.doUndo(); });
+    this.bReset = mk('원래대로', '이 브라우저에 저장된 편집을 지우고 문서 원본으로', function () { self.resetSaved(); });
+    bar.appendChild(el('span', 'sp'));
+    this.hint = el('span', 'dgm__hint flow__status', '끌어 이동 · 더블클릭 글자 수정 · 선 더블클릭 라벨 수정');
+    bar.appendChild(this.hint);
+    mk('내보내기', '수정한 그림 HTML 을 복사해 원본 파일에 붙여넣기', function () { self.openExport(); });
+    head.parentNode.insertBefore(bar, head.nextSibling);
+    this.bar = bar;
+    this.markSaved(!!this._restored);
+
+    var modal = el('div', 'dgm__modal no-print');
+    var pane = el('div', 'pane');
+    var mh = el('div', 'head'); mh.appendChild(el('b', null, '그림 HTML 내보내기')); mh.appendChild(el('span', 'sp'));
+    var closeB = btn('닫기'); mh.appendChild(closeB);
+    var ta = el('textarea'); ta.spellcheck = false;
+    var foot = el('div', 'foot');
+    var applyB = btn('붙여넣은 HTML 적용'); var copyB = btn('전체 복사');
+    foot.appendChild(el('span', 'dgm__hint', '원본 파일에서 이 그림의 <div class="flow"> 블록 전체를 이 내용으로 바꾸면 영구 반영됩니다'));
+    foot.appendChild(el('span', 'sp')); foot.appendChild(applyB); foot.appendChild(copyB);
+    pane.appendChild(mh); pane.appendChild(ta); pane.appendChild(foot); modal.appendChild(pane);
+    this.root.appendChild(modal);
+    this.modal = modal; this.ta = ta;
+    closeB.addEventListener('click', function () { modal.classList.remove('is-open'); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('is-open'); });
+    copyB.addEventListener('click', function () {
+      ta.select();
+      try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); }
+      copyB.textContent = '복사됨'; setTimeout(function () { copyB.textContent = '전체 복사'; }, 1200);
+    });
+    applyB.addEventListener('click', function () {
+      var tmp = el('div'); tmp.innerHTML = ta.value;
+      var f = tmp.querySelector('.flow');
+      var inn = f && f.querySelector('.flow__in');
+      if (!inn) { alert('<div class="flow"> 블록을 찾지 못했습니다.'); return; }
+      var sp = f.querySelector('script.flow-links');
+      var hd = f.querySelector('.flow__head');
+      try {
+        self.push();
+        self.apply({ html: inn.innerHTML, links: sp ? JSON.parse(sp.textContent) : [], head: hd ? hd.innerHTML : null });
+        var style = inn.getAttribute('style'); if (style) self.inner.setAttribute('style', style);
+        self.save(); modal.classList.remove('is-open');
+      } catch (e) { alert('연결 JSON 이 올바르지 않습니다: ' + e.message); }
+    });
+  };
+
+  Flow.prototype.toggleEdit = function (force) {
+    var on = force != null ? force : !this.root.classList.contains('is-edit');
+    this.root.classList.toggle('is-edit', on);
+    this.bEdit.classList.toggle('is-on', on);
+    this.bEdit.textContent = on ? '편집 끝' : '편집';
+    if (!on) { this.select(null); this.setLinkMode(false); }
+    this.draw();
+  };
+  Flow.prototype.editing = function () { return this.root.classList.contains('is-edit'); };
+  Flow.prototype.status = function (t) { if (this.hint) this.hint.textContent = t; };
+
+  Flow.prototype.select = function (s) {
+    this.sel = s;
+    this.root.querySelectorAll('.is-sel').forEach(function (e) { e.classList.remove('is-sel'); });
+    if (!s) { this.status('끌어 이동 · 더블클릭 글자 수정 · 선 더블클릭 라벨 수정'); return; }
+    if (s.type === 'node') {
+      var n = this.inner.querySelector('[data-id="' + s.id + '"]');
+      if (n) n.classList.add('is-sel');
+      var role = this.roleOf(n);
+      this.status('카드 ' + s.id + ' · 역할 ' + ROLE_NAMES[role] + ' · 아이콘 ' + ((n && n.querySelector('.fnode__ic')) ? n.querySelector('.fnode__ic').getAttribute('data-ic') : '-'));
+    } else {
+      this.root.querySelectorAll('[data-li="' + s.idx + '"]').forEach(function (e) { e.classList.add('is-sel'); });
+      var ln = this.links[s.idx];
+      if (ln) this.status('선 ' + ln.from + ' → ' + ln.to + ' · ' + KIND_NAMES[ln.kind || 'plain'] + ' · 방향 ' + (ln.port || '자동'));
+    }
+  };
+  Flow.prototype.roleOf = function (n) {
+    if (!n) return '';
+    for (var i = 1; i < ROLES.length; i++) if (n.classList.contains('fnode--' + ROLES[i])) return ROLES[i];
+    return '';
+  };
+
+  Flow.prototype.setLinkMode = function (on) {
+    this.linkMode = on; this.linkFrom = null;
+    if (this.bLink) this.bLink.classList.toggle('is-on', on);
+    this.root.querySelectorAll('.is-from').forEach(function (e) { e.classList.remove('is-from'); });
+    this.status(on ? '연결: 시작 카드를 클릭하세요 (Esc 취소)' : '끌어 이동 · 더블클릭 글자 수정 · 선 더블클릭 라벨 수정');
+  };
+  Flow.prototype.toggleLink = function () { if (!this.editing()) this.toggleEdit(true); this.setLinkMode(!this.linkMode); };
+
+  Flow.prototype.addNode = function () {
+    if (!this.editing()) this.toggleEdit(true);
+    this.push();
+    var id = 'n' + Date.now().toString(36);
+    var n = el('div', 'fnode fnode--new');
+    n.setAttribute('data-id', id);
+    n.setAttribute('style', 'position:absolute;left:24px;top:24px;width:210px');
+    n.innerHTML = '<span class="fnode__ic" data-ic="code"></span><div class="fnode__body"><div class="fnode__t">새 단계</div><div class="fnode__s">설명을 더블클릭해 고치세요</div><span class="fnode__tag">tag</span></div>';
+    this.inner.appendChild(n);
+    paintIcons(n);
+    this.select({ type: 'node', id: id });
+    this.save(); this.draw();
+  };
+  Flow.prototype.cycleTone = function () {
+    if (!this.sel) return;
+    this.push();
+    if (this.sel.type === 'node') {
+      var n = this.inner.querySelector('[data-id="' + this.sel.id + '"]');
+      if (!n || !n.classList.contains('fnode')) return;
+      var cur = this.roleOf(n), next = ROLES[(ROLES.indexOf(cur) + 1) % ROLES.length];
+      if (cur) n.classList.remove('fnode--' + cur);
+      if (next) n.classList.add('fnode--' + next);
+    } else {
+      var ln = this.links[this.sel.idx];
+      ln.kind = KINDS[(KINDS.indexOf(ln.kind || 'plain') + 1) % KINDS.length];
+    }
+    this.save(); this.draw(); this.select(this.sel);
+  };
+  Flow.prototype.cycleIcon = function () {
+    if (!this.sel || this.sel.type !== 'node') return;
+    var n = this.inner.querySelector('[data-id="' + this.sel.id + '"]');
+    var ic = n && n.querySelector('.fnode__ic');
+    if (!ic) return;
+    this.push();
+    var next = ICON_KEYS[(ICON_KEYS.indexOf(ic.getAttribute('data-ic')) + 1) % ICON_KEYS.length];
+    ic.setAttribute('data-ic', next); paintIcons(n);
+    this.save(); this.select(this.sel);
+  };
+  Flow.prototype.cyclePort = function () {
+    if (!this.sel || this.sel.type !== 'link') return;
+    this.push();
+    var ln = this.links[this.sel.idx];
+    var next = PORTS[(PORTS.indexOf(ln.port || '') + 1) % PORTS.length];
+    if (next) ln.port = next; else delete ln.port;
+    this.save(); this.draw(); this.select(this.sel);
+  };
+  Flow.prototype.remove = function () {
+    if (!this.sel) return;
+    this.push();
+    if (this.sel.type === 'node') {
+      var id = this.sel.id;
+      var n = this.inner.querySelector('[data-id="' + id + '"]');
+      if (n) n.remove();
+      this.links = this.links.filter(function (l) { return l.from !== id && l.to !== id; });
+    } else {
+      this.links.splice(this.sel.idx, 1);
+    }
+    this.select(null); this.save(); this.draw();
+  };
+
+  /* 글자 인라인 수정 */
+  Flow.prototype.editText = function (target, onCommit) {
+    var self = this, before = target.textContent;
+    var undoSnap = this.snapshot();
+    target.setAttribute('contenteditable', 'true');
+    target.focus();
+    var range = document.createRange(); range.selectNodeContents(target);
+    var selx = window.getSelection(); selx.removeAllRanges(); selx.addRange(range);
+    var done = false;
+    var finish = function (commit) {
+      if (done) return; done = true;
+      target.removeAttribute('contenteditable');
+      target.removeEventListener('keydown', onKey);
+      if (!commit) { target.textContent = before; return; }
+      var after = target.textContent.replace(/\s+/g, ' ').trim();
+      target.textContent = after;
+      if (after !== before) {
+        self.undo.push(undoSnap);
+        if (onCommit) onCommit(after);
+        self.save(); self.draw();
+      }
+    };
+    var onKey = function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); target.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); target.blur(); }
+      e.stopPropagation();
+    };
+    target.addEventListener('keydown', onKey);
+    target.addEventListener('blur', function () { finish(true); }, { once: true });
+  };
+
+  /* ── 이벤트 ─────────────────────────────────────────────── */
+  Flow.prototype.bindSeg = function () {
+    var root = this.root;
+    root.querySelectorAll('.flow__seg button').forEach(function (b) {
+      if (b.__bound) return; b.__bound = true;
+      b.addEventListener('click', function () {
+        root.querySelectorAll('.flow__seg button').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        root.setAttribute('data-focus', b.getAttribute('data-focus'));
+      });
+    });
+  };
+
+  Flow.prototype.bind = function () {
+    var self = this, root = this.root, inner = this.inner;
+    this.bindSeg();
+
+    /* 호버: 연결된 선만 남긴다 (편집 중에는 끈다) */
+    inner.addEventListener('mouseover', function (e) {
+      if (self.editing()) return;
+      var n = e.target.closest('[data-id]'); if (!n || !inner.contains(n)) return;
+      var id = n.getAttribute('data-id');
+      root.classList.add('is-hover');
+      root.querySelectorAll('[data-li]').forEach(function (x) {
+        var l = self.links[+x.getAttribute('data-li')];
+        x.classList.toggle('hot', !!l && (l.from === id || l.to === id));
+      });
+    });
+    inner.addEventListener('mouseout', function (e) {
+      var n = e.target.closest('[data-id]'); if (!n) return;
+      if (e.relatedTarget && n.contains(e.relatedTarget)) return;
+      root.classList.remove('is-hover');
+    });
+
+    /* 선택 · 연결 · 끌기 */
+    inner.addEventListener('pointerdown', function (e) {
+      if (!self.editing()) return;
+      if (e.target.closest('[contenteditable="true"]')) return;
+      var hit = e.target.closest('[data-li]');
+      if (hit) { self.select({ type: 'link', idx: +hit.getAttribute('data-li') }); e.preventDefault(); return; }
+      var n = e.target.closest('[data-id]');
+      if (!n || !inner.contains(n)) { self.select(null); return; }
+      var id = n.getAttribute('data-id');
+      if (self.linkMode) {
+        if (!self.linkFrom) { self.linkFrom = id; n.classList.add('is-from'); self.status('연결: 도착 카드를 클릭하세요'); }
+        else if (self.linkFrom !== id) {
+          self.push();
+          self.links.push({ from: self.linkFrom, to: id, kind: 'flow' });
+          self.save(); self.setLinkMode(false); self.draw();
+          self.select({ type: 'link', idx: self.links.length - 1 });
+        }
+        e.preventDefault(); return;
+      }
+      self.select({ type: 'node', id: id });
+      var start = [e.clientX, e.clientY], t0 = translateOf(n), moved = false, snap0 = null, raf = 0;
+      var move = function (ev) {
+        var dx = snap(ev.clientX - start[0]), dy = snap(ev.clientY - start[1]);
+        if (!moved && Math.abs(dx) + Math.abs(dy) < GRID) return;
+        if (!moved) { moved = true; snap0 = self.snapshot(); n.classList.add('is-drag'); }
+        n.style.translate = (t0[0] + dx) + 'px ' + (t0[1] + dy) + 'px';
+        if (!raf) raf = requestAnimationFrame(function () { raf = 0; self.draw(); });
+      };
+      var up = function () {
+        window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+        n.classList.remove('is-drag');
+        if (moved) { self.undo.push(snap0); self.save(); self.draw(); }
+      };
+      /* 캡처 대신 window 에서 받는다 — 카드 밖으로 빨리 끌어도 놓치지 않는다 */
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+      e.preventDefault();
+    });
+
+    /* 더블클릭: 글자 · 선 라벨 수정 */
+    root.addEventListener('dblclick', function (e) {
+      if (!self.editing()) return;
+      var li = e.target.closest('[data-li]');
+      if (li) {
+        var idx = +li.getAttribute('data-li');
+        var lbl = root.querySelector('.flbl[data-li="' + idx + '"]');
+        if (!lbl) {
+          self.push(); self.links[idx].label = '라벨'; self.draw();
+          lbl = root.querySelector('.flbl[data-li="' + idx + '"]');
+          self.undo.pop();
+        }
+        self.editText(lbl, function (v) { if (v) self.links[idx].label = v; else delete self.links[idx].label; });
+        e.preventDefault(); return;
+      }
+      var t = e.target.closest(TEXT_SEL);
+      if (t && root.contains(t)) { self.editText(t); e.preventDefault(); }
+    });
+  };
+
+  document.addEventListener('keydown', function (e) {
+    var f = Flow.active;
+    if (!f || !f.editing()) return;
+    if (document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('contenteditable') === 'true') return;
+    if (/^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '')) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); f.doUndo(); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { if (f.sel) { e.preventDefault(); f.remove(); } }
+    else if (e.key === 'Escape') { f.setLinkMode(false); f.select(null); }
+  });
+  document.addEventListener('pointerdown', function (e) {
+    var r = e.target.closest && e.target.closest('.flow');
+    if (r && r.__flow) Flow.active = r.__flow;
+  }, true);
+
+  /* ── 그리기 ─────────────────────────────────────────────── */
+  Flow.prototype.draw = function () {
+    var self = this, inner = this.inner, root = this.root;
+    if (!inner) return;
+    var svg = inner.querySelector('svg.flow__links');
+    var lbls = inner.querySelector('.flow__lbls');
+    if (!svg) { svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'flow__links'); inner.insertBefore(svg, inner.firstChild); }
+    if (!lbls) { lbls = el('div', 'flow__lbls'); inner.appendChild(lbls); }
+    svg.innerHTML = ''; lbls.innerHTML = '';
+    var base = inner.getBoundingClientRect();
+    svg.setAttribute('width', inner.scrollWidth); svg.setAttribute('height', inner.scrollHeight);
+    var editing = this.editing();
+
+    var defs = document.createElementNS(NS, 'defs');
+    [['flow', 'var(--hw)'], ['ok', 'var(--ok)'], ['risk', 'var(--risk)'], ['muted', 'var(--ink4)']].forEach(function (m) {
+      var mk = document.createElementNS(NS, 'marker');
+      mk.setAttribute('id', 'fa-' + m[0] + '-' + self.fid);
+      mk.setAttribute('viewBox', '0 0 10 10'); mk.setAttribute('refX', '8.5'); mk.setAttribute('refY', '5');
+      mk.setAttribute('markerWidth', '7'); mk.setAttribute('markerHeight', '7'); mk.setAttribute('orient', 'auto-start-reverse');
+      var p = document.createElementNS(NS, 'path'); p.setAttribute('d', 'M0 1 L9 5 L0 9 z'); p.setAttribute('style', 'fill:' + m[1]);
+      mk.appendChild(p); defs.appendChild(mk);
+    });
+    svg.appendChild(defs);
+
+    this.links.forEach(function (ln, idx) {
+      var a = inner.querySelector('[data-id="' + ln.from + '"]');
+      var b = inner.querySelector('[data-id="' + ln.to + '"]');
+      if (!a || !b) return;
+      var ra = rel(a, base), rb = rel(b, base);
+      var port = (ln.port || autoPort(ra, rb)).split('>');
+      var p1 = portOf(ra, port[0]), p2 = portOf(rb, port[1]);
+      var d1 = DIR[port[0]], d2 = DIR[port[1]];
+      var dist = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+      var k = Math.max(28, Math.min(dist * 0.45, 140));
+      var s = [p1[0] + d1[0] * 5, p1[1] + d1[1] * 5];
+      var e = [p2[0] + d2[0] * 7, p2[1] + d2[1] * 7];
+      var dPath = 'M' + s[0] + ' ' + s[1] + ' C' + (s[0] + d1[0] * k) + ' ' + (s[1] + d1[1] * k) + ' ' + (e[0] + d2[0] * k) + ' ' + (e[1] + d2[1] * k) + ' ' + e[0] + ' ' + e[1];
+      var kind = ln.kind || 'plain';
+      var path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', dPath);
+      path.setAttribute('class', 'ln' + (kind !== 'plain' ? ' ln--' + kind : ''));
+      path.setAttribute('marker-end', 'url(#fa-' + (kind === 'plain' ? 'muted' : kind) + '-' + self.fid + ')');
+      path.setAttribute('data-li', idx);
+      if (ln.lane) path.setAttribute('data-lane', ln.lane);
+      svg.appendChild(path);
+      if (editing) {
+        var hit = document.createElementNS(NS, 'path');
+        hit.setAttribute('d', dPath); hit.setAttribute('class', 'ln-hit'); hit.setAttribute('data-li', idx);
+        svg.appendChild(hit);
+      }
+      var len = path.getTotalLength();
+      if ((kind === 'flow' || kind === 'ok') && !editing) {
+        var n = len > 220 ? 3 : 2, dur = Math.max(1.6, len / 85);
+        for (var i = 0; i < n; i++) {
+          var c = document.createElementNS(NS, 'circle');
+          c.setAttribute('r', '3.4'); c.setAttribute('class', 'dot' + (kind === 'ok' ? ' dot--ok' : ''));
+          c.setAttribute('data-li', idx);
+          if (ln.lane) c.setAttribute('data-lane', ln.lane);
+          var am = document.createElementNS(NS, 'animateMotion');
+          am.setAttribute('dur', dur.toFixed(2) + 's'); am.setAttribute('repeatCount', 'indefinite');
+          am.setAttribute('begin', (-(dur / n) * i).toFixed(2) + 's'); am.setAttribute('path', dPath);
+          c.appendChild(am); svg.appendChild(c);
+        }
+      }
+      if (ln.label) {
+        var mid = path.getPointAtLength(len / 2);
+        var t = el('span', 'flbl' + (kind !== 'plain' && kind !== 'muted' ? ' flbl--' + kind : ''), ln.label);
+        t.style.left = mid.x + 'px'; t.style.top = mid.y + 'px';
+        t.setAttribute('data-li', idx);
+        if (ln.lane) t.setAttribute('data-lane', ln.lane);
+        lbls.appendChild(t);
+      }
+    });
+    if (this.sel && this.sel.type === 'link') this.root.querySelectorAll('[data-li="' + this.sel.idx + '"]').forEach(function (x) { x.classList.add('is-sel'); });
+    this.spec.textContent = JSON.stringify(this.links);
+  };
+
+  Flow.prototype.openExport = function () {
+    var s = this.snapshot();
+    var style = this.inner.getAttribute('style') || '';
+    var attrs = '';
+    ['data-key', 'data-edit'].forEach(function (a) { if (this.root.hasAttribute(a)) attrs += ' ' + a + '="' + this.root.getAttribute(a) + '"'; }, this);
+    var legend = this.root.querySelector('.flow__legend');
+    var html = '<div class="flow"' + attrs + '>\n'
+      + '  <div class="flow__head">' + s.head + '</div>\n'
+      + '  <div class="flow__in" style="' + style + '">\n' + s.html + '\n  </div>\n'
+      + (legend ? '  ' + legend.outerHTML + '\n' : '')
+      + '  <' + 'script type="application/json" class="flow-links">' + JSON.stringify(s.links, null, 1).replace(/<\//g, '<\\/') + '<' + '/script>\n'
+      + '</div>';
+    this.ta.value = html;
+    this.modal.classList.add('is-open');
+  };
+
+  function init() {
+    var flows = [];
+    document.querySelectorAll('.flow').forEach(function (root, i) {
+      if (root.__flow) return;
+      root.__flow = new Flow(root, i);
+      flows.push(root.__flow);
+    });
+    window.addEventListener('beforeprint', function () { flows.forEach(function (f) { f.draw(); }); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { flows.forEach(function (f) { f.draw(); }); });
+  }
+  window.HWFlow = { init: init, icons: ICON_KEYS };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 런타임 (TOC 스크롤스파이 / 체크 상태 / 복사)
+   ============================================================ */
+(function () {
+  'use strict';
+  var KEY = 'hwdoc:' + (document.title || location.pathname);
+
+  /* --- TOC 자동 생성 (비어 있을 때만) --- */
+  var toc = document.querySelector('.toc');
+  if (toc && !toc.children.length) {
+    document.querySelectorAll('.sec').forEach(function (sec) {
+      if (!sec.id) return;
+      var h = sec.querySelector('h2');
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + sec.id;
+      a.textContent = h
+        ? Array.prototype.map.call(h.childNodes, function (x) { return x.textContent.trim(); })
+          .filter(Boolean).join(' ')
+        : sec.id;
+      li.appendChild(a); toc.appendChild(li);
+    });
+  }
+
+  /* --- 스크롤스파이 --- */
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var secs = links.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  if (window.IntersectionObserver && secs.length) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (a) { a.classList.toggle('is-cur', a.getAttribute('href') === '#' + e.target.id); });
+      });
+    }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
+    secs.forEach(function (s) { io.observe(s); });
+  }
+
+  /* --- 체크리스트 상태 저장 --- */
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { }
+  document.querySelectorAll('.chk input[type="checkbox"]').forEach(function (cb, i) {
+    var id = cb.id || ('chk' + i); cb.id = id;
+    if (saved[id]) cb.checked = true;
+    var sync = function () {
+      cb.closest('li').classList.toggle('is-done', cb.checked);
+      saved[id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) { }
+      count();
+    };
+    cb.addEventListener('change', sync);
+    cb.closest('li').classList.toggle('is-done', cb.checked);
+  });
+  function count() {
+    document.querySelectorAll('.chk').forEach(function (ul) {
+      var all = ul.querySelectorAll('input[type="checkbox"]');
+      var done = ul.querySelectorAll('input[type="checkbox"]:checked');
+      var badge = ul.previousElementSibling && ul.previousElementSibling.querySelector('.chk-count');
+      if (badge) badge.textContent = done.length + ' / ' + all.length;
+    });
+  }
+  count();
+
+  /* --- 코드 복사 --- */
+  document.querySelectorAll('.code__copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var pre = b.closest('.code').querySelector('pre');
+      try { navigator.clipboard.writeText(pre.innerText); } catch (e) { }
+      var t = b.textContent; b.textContent = '복사됨';
+      setTimeout(function () { b.textContent = t; }, 1200);
+    });
+  });
+
+  /* --- 사이드 버튼 --- */
+  function bind(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+  bind('bTheme', function () {
+    var r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  bind('bPrint', function () { window.print(); });
+  bind('bReset', function () {
+    if (!confirm('체크 상태를 모두 초기화할까요?')) return;
+    try { localStorage.removeItem(KEY); } catch (e) { }
+    location.reload();
+  });
+})();
+</script>
+</body>
+</html>
