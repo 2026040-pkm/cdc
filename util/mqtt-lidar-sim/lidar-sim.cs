@@ -18,10 +18,14 @@ using MQTTnet.Protocol;
 // 세 채널 모두 tagMode=raw 로 구독하는 것을 전제한다 —
 // raw_payload 통째가 {id}.{topic}.raw_payload 태그 하나의 값이 된다.
 //
-//   ① 장비 상태   ot/device/{zone}/lidar/status           1건 / 1초  (--status-interval)
-//   ② 실적 결과   ot/sensor/{stage}/actual                1건 / 1분  (--interval)
-//   ③ 산출물 메타 ot/pipeline/{zone}/{shop}/{bay}/artifact 12건 / 1분 (--interval)
+//   ① 장비 상태   ot/device/{zone}/status                 1건 / 1초  (--status-interval)
+//   ② 실적 결과   ot/sensor/{zone}/actual                 1건 / 1분  (--interval)
+//   ③ 산출물 메타 ot/pipeline/{zone}/artifact             12건 / 1분 (--interval)
 //                 (정합 PCD 1 + 변환행렬 1 + 세그먼트 10)
+//
+// device_role·device_id·shop·bay·stage 는 토픽이 아니라 payload/등록 CSV 로 옮긴다 —
+// 자세한 근거는 latest/docs/message.md Design B. stage 는 v0.3 에서 payload 에서도 뺐다:
+// LiDAR 는 형상 대조로 진척률만 낼 뿐 공정 단계를 판별하지 못한다.
 //
 // 상태와 스캔은 박자가 달라 장비마다 루프가 둘이다.
 //
@@ -38,6 +42,30 @@ if (opt is null)
 Console.OutputEncoding = Encoding.UTF8;
 
 var fleet = Fleet.Build(opt);
+var specs = TagCatalog.Topics(fleet, opt);
+
+int UniqueIdCount(string topicMarker) => specs
+    .Where(s => s.Topic.Contains(topicMarker, StringComparison.Ordinal))
+    .SelectMany(s => s.Ids)
+    .Distinct(StringComparer.Ordinal)
+    .Count();
+
+var statusCount = UniqueIdCount("/device/");
+var actualCount = UniqueIdCount("/sensor/");
+var artifactCount = UniqueIdCount("/pipeline/");
+var expectedArtifact = fleet.Length * TopicNames.ArtifactTypes.Length;
+
+if (statusCount != fleet.Length || actualCount != fleet.Length || artifactCount != expectedArtifact)
+{
+    Console.Error.WriteLine(
+        $"id 검증 실패: 상태 {statusCount}/{fleet.Length} · 실적 {actualCount}/{fleet.Length} · 산출물 {artifactCount}/{expectedArtifact}");
+    return 1;
+}
+
+Console.WriteLine($"id 검증     : 상태   {statusCount,5:N0}개  device.Id                   장비별      (조립 {opt.AssemblyDevices} + 의장 {opt.OutfittingDevices})");
+Console.WriteLine($"              실적   {actualCount,5:N0}개  device.Id                   장비별");
+Console.WriteLine($"              산출물 {artifactCount,5:N0}개  {{device.Id}}-{{artifactType}}  장비+종류별  ({fleet.Length} × {TopicNames.ArtifactTypes.Length}종)");
+Console.WriteLine($"              합계   {statusCount + actualCount + artifactCount,5:N0}개");
 
 if (opt.ExportTagsDir is { } exportDir)
 {
@@ -281,11 +309,6 @@ static class Zones
     public const string Assembly = "ASSEMBLY";
     public const string Outfitting = "OUTFITTING";
 
-    /// <summary>조립 4종 · 의장 2종. 필드 정의서에 이름이 확정되면 이 배열만 바꾸면 된다.</summary>
-    public static string[] StagesOf(string zone) => zone == Assembly
-        ? ["ARRANGEMENT", "FITTING", "WELDING", "INSPECTION"]
-        : ["WIRING", "PIPING"];
-
     public static string SlugOf(string zone) => zone == Assembly ? "assembly" : "outfitting";
 }
 
@@ -347,7 +370,6 @@ sealed class Device
 {
     // 장비별로 다른 시드를 줘야 350대가 한 몸처럼 똑같이 오르내리지 않는다.
     private readonly Random _rng;
-    private readonly string[] _stages;
 
     private static readonly string[] ErrorCodes =
     [
@@ -372,7 +394,6 @@ sealed class Device
         PanTilt = panTilt;
         EdgePc = edgePc;
         InferenceWs = inferenceWs;
-        _stages = Zones.StagesOf(zone);
         _rng = new Random(id.GetHashCode(StringComparison.Ordinal));
 
         TemperatureC = 34 + _rng.NextDouble() * 8;      // 34-42 도
@@ -404,9 +425,6 @@ sealed class Device
     public double ProgressRate { get; private set; }
     public DateTimeOffset LastHeartbeatAt { get; private set; }
     public int Cycle { get; private set; }
-
-    /// <summary>스캔마다 공정이 달라진다 — 한 장비의 태그가 stage 토픽 전부에 걸친다.</summary>
-    public string Stage => _stages[Cycle % _stages.Length];
 
     public string EventType => EventTypes[Cycle % EventTypes.Length];
 
@@ -528,12 +546,11 @@ static class TopicNames
 
     public static readonly string[] ArtifactTypes = [RegisteredPcd, TransformationMatrix, SegmentedPcd];
 
-    public static string Status(string zone) => $"ot/device/{Zones.SlugOf(zone)}/lidar/status";
+    public static string Status(string zone) => $"ot/device/{Zones.SlugOf(zone)}/status";
 
-    public static string Actual(string stage) => $"ot/sensor/{stage.ToLowerInvariant()}/actual";
+    public static string Actual(string zone) => $"ot/sensor/{Zones.SlugOf(zone)}/actual";
 
-    public static string Artifact(string zone, string shop, string bay)
-        => $"ot/pipeline/{Zones.SlugOf(zone)}/{shop}/{bay}/artifact";
+    public static string Artifact(string zone) => $"ot/pipeline/{Zones.SlugOf(zone)}/artifact";
 
     /// <summary>산출물은 장비 하나가 종류마다 다른 id 로 발행한다 - 태그가 종류별로 갈린다.</summary>
     public static string ArtifactId(string deviceId, string artifactType) => $"{deviceId}-{artifactType}";
@@ -559,9 +576,9 @@ sealed class ScanContext(Device device, DateTimeOffset at, int segments)
 
     public IEnumerable<OutMessage> Messages()
     {
-        yield return new OutMessage(TopicNames.Actual(device.Stage), ActualPayload());
+        yield return new OutMessage(TopicNames.Actual(device.Zone), ActualPayload());
 
-        var artifactTopic = TopicNames.Artifact(device.Zone, device.Shop, device.Bay);
+        var artifactTopic = TopicNames.Artifact(device.Zone);
         yield return new OutMessage(artifactTopic, RegisteredPcdPayload());
         yield return new OutMessage(artifactTopic, TransformationMatrixPayload());
 
@@ -601,7 +618,6 @@ sealed class ScanContext(Device device, DateTimeOffset at, int segments)
         writer.WriteString("site", device.Site);
         writer.WriteString("shop", device.Shop);
         writer.WriteString("bay", device.Bay);
-        writer.WriteString("stage", device.Stage);
         writer.WriteString("record_type", "ACTUAL");
         writer.WriteString("input_method", "AUTO");
         writer.WriteString("source_system", device.SourceSystem);
@@ -616,7 +632,7 @@ sealed class ScanContext(Device device, DateTimeOffset at, int segments)
         writer.WriteString("event_type", device.EventType);
         writer.WriteString("occurred_at", Iso(at));
         writer.WriteString("ingested_at", Iso(at.AddMilliseconds(device.Next(200, 1400))));
-        writer.WriteString("idempotency_key", $"{Short(_scanId)}:{device.Stage}:{device.EventType}");
+        writer.WriteString("idempotency_key", $"{Short(_scanId)}:{device.EventType}");
         writer.WriteNumber("block_progress_rate", Math.Round(device.ProgressRate, 1));
         writer.WriteString("reference_cad_id", $"CAD-{device.HullNo}-{device.BlockId}");
         writer.WriteNumber("match_confidence", Math.Round(device.MatchConfidence, 2));
@@ -679,6 +695,11 @@ sealed class ScanContext(Device device, DateTimeOffset at, int segments)
 
     private void WriteArtifactHead(Utf8JsonWriter writer, string artifactType)
     {
+        // 토픽이 zone 까지만 있어 shop/bay 는 여기서 payload 로 실어야 한다 (Design B).
+        writer.WriteString("zone", device.Zone);
+        writer.WriteString("site", device.Site);
+        writer.WriteString("shop", device.Shop);
+        writer.WriteString("bay", device.Bay);
         writer.WriteString("scan_id", _scanId);
         writer.WriteString("artifact_type", artifactType);
         writer.WriteString("hull_no", device.HullNo);
@@ -766,22 +787,15 @@ static class TagCatalog
                 o.Qos,
                 [.. zoneDevices.Select(d => d.Id)]));
 
-            // 스캔마다 stage 가 바뀌므로 한 장비의 태그가 그 구역의 stage 토픽 전부에 걸린다.
-            foreach (var stage in Zones.StagesOf(zone))
-            {
-                specs.Add(new TopicSpec(
-                    TopicNames.Actual(stage),
-                    o.Qos,
-                    [.. zoneDevices.Select(d => d.Id)]));
-            }
+            specs.Add(new TopicSpec(
+                TopicNames.Actual(zone),
+                o.Qos,
+                [.. zoneDevices.Select(d => d.Id)]));
 
-            foreach (var group in zoneDevices.GroupBy(d => (d.Shop, d.Bay)))
-            {
-                specs.Add(new TopicSpec(
-                    TopicNames.Artifact(zone, group.Key.Shop, group.Key.Bay),
-                    o.Qos,
-                    [.. group.SelectMany(d => TopicNames.ArtifactTypes.Select(t => TopicNames.ArtifactId(d.Id, t)))]));
-            }
+            specs.Add(new TopicSpec(
+                TopicNames.Artifact(zone),
+                o.Qos,
+                [.. zoneDevices.SelectMany(d => TopicNames.ArtifactTypes.Select(t => TopicNames.ArtifactId(d.Id, t)))]));
         }
 
         return specs;
@@ -1003,8 +1017,8 @@ sealed record Options(
           --export-tags <dir>     발행하지 않고 태그 정의 CSV 만 생성
 
         채널 (장비 1대 기준)
-          ot/device/{zone}/lidar/status              상태          1건 / 상태 주기
-          ot/sensor/{stage}/actual                   실적          1건 / 스캔 주기
-          ot/pipeline/{zone}/{shop}/{bay}/artifact   산출물 메타  12건 / 스캔 주기
+          ot/device/{zone}/status     상태          1건 / 상태 주기
+          ot/sensor/{zone}/actual     실적          1건 / 스캔 주기
+          ot/pipeline/{zone}/artifact 산출물 메타  12건 / 스캔 주기
         """);
 }
