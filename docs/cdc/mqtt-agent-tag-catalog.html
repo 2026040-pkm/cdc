@@ -206,6 +206,7 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}
 .jx2__e{display:flex;align-items:center;gap:8px;padding:0 12px;min-width:0;font-size:13px}
 .jx2__n{font-weight:700;white-space:nowrap}
 .jx2__tag{font-size:10.5px;line-height:1.5;padding:0 7px;border-radius:9px;background:var(--hw-tint);color:var(--hw-dp);font-weight:700;white-space:nowrap}
+.jx2__tag--warn{background:var(--warn-bg);color:var(--warn)}
 .jx2__v{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .jx2__v b{color:var(--ink)} .jx2__v .chip{font-size:11px}
 .jx2 .jk{color:var(--ink3)} .jx2 .js{color:var(--ink)} .jx2 .jn{color:var(--info);font-weight:700} .jx2 .jz{color:var(--ink4);font-style:italic}
@@ -364,6 +365,7 @@ body{ background:var(--bg2) }
 
 .doc{
   display:grid; grid-template-columns:270px minmax(0,1fr); align-items:start;
+  max-width:1600px; margin:0 auto;
   transition:grid-template-columns .18s ease;
 }
 .doc.side-collapsed{ grid-template-columns:0px minmax(0,1fr) }
@@ -474,10 +476,12 @@ body{ background:var(--bg2) }
 /* 높이는 diagram.js 의 autoHeight 가 내용 비율에 맞춰 인라인으로 잡는다.
    아래 값은 스크립트가 돌기 전의 자리 잡기용이다. */
 .dgm{ margin:0 0 16px; height:420px }
-/* 다이어그램은 본문 글줄 폭에 갇히지 않고 사이드바 오른쪽을 전부 쓴다.
-   270px 사이드바 + 본문 좌우 패딩 88px + 스크롤바 여유 18px 를 뺀 값. */
+/* 다이어그램은 본문 글줄 폭에 갇히지 않고 사이드바 오른쪽을 쓰되, .doc 자체가
+   가운데 정렬 + 최대 1600px 로 잡혀 있으니(위 .doc) 그 안쪽 여유만큼만 넓힌다 —
+   1600 - (270 사이드바 + 본문 좌우 패딩 88 + 스크롤바 여유 18) = 1224.
+   좁은 화면에서는 100vw 쪽이 더 작아 그대로 반응형으로 줄어든다. */
 @media (min-width:1001px){
-  .dgm{ width:min(calc(100vw - 376px), 1700px); max-width:none }
+  .dgm{ width:min(calc(100vw - 376px), 1224px); max-width:none }
 }
 .tbl-wrap{ margin-bottom:14px }
 .note{ margin-bottom:12px }
@@ -518,9 +522,11 @@ body{ background:var(--bg2) }
   box-shadow:0 12px 48px rgba(20,20,20,.28); border-color:var(--line2);
 }
 html.flow-locked, html.flow-locked body{ overflow:hidden }
-/* 개발 문서: 본문 글줄 폭을 넘어 사이드바 오른쪽 전체를 쓴다 (.dgm 과 같은 규칙) */
+/* 개발 문서: 본문 글줄 폭을 넘어서되 .doc 의 가운데 정렬 + 최대 1600px 안쪽에서만
+   넓힌다(.dgm 과 같은 규칙 — 1600 - 376 = 1224). 카드 사이 간격이 늘어져 연결선이
+   흐릿해 보이는 것을 막는 상한이기도 하다. */
 @media (min-width: 1200px){
-  .main .flow{ width:min(calc(100vw - 376px), 1560px); max-width:none }
+  .main .flow{ width:min(calc(100vw - 376px), 1224px); max-width:none }
 }
 /* 슬라이드: 무대 안에 들어가도록 최소 폭을 풀고 카드를 줄인다 */
 .slide .flow{ margin:6px 0; padding:12px 14px 10px; overflow:visible; display:flex; flex-direction:column }
@@ -816,14 +822,18 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         <span class="mono">raw_payload</span> 한 겹뿐이다. 필드 정의서의 중첩 객체(<span class="mono">device_ids</span> 등)는
         브로커로 나갈 때 <b>평탄화한다</b> — 중첩을 두면 나중에 <span class="mono">tagMode=fields</span> 로 바꿨을 때
         키 이름이 달라지기 때문이다.</p>
+      <p class="small muted">아래 각 줄의 뜻은 <b>실제 동작</b>과 <b>스펙</b> 둘 다 적었다 —
+        <span class="jx2__tag jx2__tag--warn">스펙과 다름</span> 이 붙은 줄에 마우스를 올리면 발치에 "실제 동작: … / 스펙: …"
+        형태로 뜬다. 스펙 원문은 <span class="mono">ocean-inshop-process/docs/필드인터페이스정의서.md</span> §6.2~§6.4 다(§09
+        참고자료).</p>
       <div class="code jx2">
         <div class="code__bar"><span>ot/device/assembly/status — LIDAR</span><button class="code__copy" type="button">복사</button></div>
         <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
         <div class="jx2__scroll">
           <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
-          <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id" data-d="Agent 봉투 최상위 필드 — TagId 첫 마디로 쓴다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id</span><span class="jx2__tag">장비 축</span><span class="jx2__v"><b>LDR-GJ-A1B3-07</b></span></div></div>
-          <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span></div></div>
-          <div class="jx2__r jx2__r--k" data-k="device_role" data-n="장비 역할" data-d="지금은 LIDAR 하나만 시뮬레이션한다. 토픽에는 없고 payload에만 있다"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;device_role&quot;</span>: <span class="js">&quot;LIDAR&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 역할</span><span class="jx2__v"><b>LIDAR</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id" data-d="실제 동작: Agent 봉투 최상위 필드 — TagId 첫 마디로 쓴다 / 스펙(필드인터페이스정의서 §6.2): 이 이름이 아니라 device_id 이고, 토픽에도 ot/device/{zone}/{device_role}/{device_id}/status 로 device_role·device_id 세그먼트가 더 있다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id</span><span class="jx2__tag">장비 축</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span><span class="jx2__v"><b>LDR-GJ-A1B3-07</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="실제 동작: tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다 / 스펙(§6.2): 이런 감싸는 필드가 없다 — envelope의 다른 필드(zone·status 등)와 같은 층에 나란히 있고, 역할별 raw_payload 는 그 옆의 서브 객체일 뿐이다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="device_role" data-n="장비 역할" data-d="실제 동작: 지금은 LIDAR 하나만 시뮬레이션한다. 토픽에는 없고 payload에만 있다 / 스펙(§6.2): LIDAR·PAN_TILT·EDGE_PC·INFERENCE_WS·VISION_OCR 5종을 정의하고 역할마다 raw_payload 모양이 다르다 — cdc는 LIDAR 모양 하나만 구현했다"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;device_role&quot;</span>: <span class="js">&quot;LIDAR&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 역할</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span><span class="jx2__v"><b>LIDAR</b></span></div></div>
           <div class="jx2__r jx2__r--k" data-k="site" data-n="사업장" data-d="거제 고정값"><span class="jx2__ln">5</span><code class="jx2__c">    <span class="jk">&quot;site&quot;</span>: <span class="js">&quot;geoje&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">사업장</span><span class="jx2__v"><b>geoje</b></span></div></div>
           <div class="jx2__r jx2__r--k" data-k="zone" data-n="구역" data-d="ASSEMBLY 또는 OUTFITTING. 토픽의 zone은 소문자, payload는 대문자다"><span class="jx2__ln">6</span><code class="jx2__c">    <span class="jk">&quot;zone&quot;</span>: <span class="js">&quot;ASSEMBLY&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">구역</span><span class="jx2__v"><b>ASSEMBLY</b></span></div></div>
           <div class="jx2__r jx2__r--k" data-k="shop" data-n="작업장" data-d="토픽에는 없고 payload로만 전달된다(Design B, §02)"><span class="jx2__ln">7</span><code class="jx2__c">    <span class="jk">&quot;shop&quot;</span>: <span class="js">&quot;assembly1&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">작업장</span><span class="jx2__v"><b>assembly1</b></span></div></div>
@@ -854,8 +864,8 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
         <div class="jx2__scroll">
           <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
-          <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id" data-d="shop/bay 채널 태그가 아니라 여전히 장비 id 그대로다 — §07②"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id</span><span class="jx2__tag">장비 축(그레인 그대로)</span><span class="jx2__v"><b>LDR-GJ-A1B3-07</b></span></div></div>
-          <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id" data-d="실제 동작: shop/bay 채널 태그가 아니라 여전히 장비 id 그대로다 — §07② / 스펙(필드인터페이스정의서 §6.3): 이 필드 자체가 없다 — 장비 추적은 device_ids 객체가 대신한다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id</span><span class="jx2__tag">장비 축(그레인 그대로)</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span><span class="jx2__v"><b>LDR-GJ-A1B3-07</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="실제 동작: tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다 / 스펙(§6.3): raw_payload 는 block_progress_rate·reference_cad_id·match_confidence·model_version 딱 4개만 감싸고, 나머지(zone·hull_no·device_ids 등)는 envelope 최상위에 나란히 있다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span></div></div>
           <div class="jx2__r jx2__r--k" data-k="zone" data-n="구역" data-d="ASSEMBLY·OUTFITTING"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;zone&quot;</span>: <span class="js">&quot;ASSEMBLY&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">구역</span><span class="jx2__v"><b>ASSEMBLY</b></span></div></div>
           <div class="jx2__r jx2__r--k" data-k="site" data-n="사업장" data-d="거제 고정값"><span class="jx2__ln">5</span><code class="jx2__c">    <span class="jk">&quot;site&quot;</span>: <span class="js">&quot;geoje&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">사업장</span><span class="jx2__v"><b>geoje</b></span></div></div>
           <div class="jx2__r jx2__r--k" data-k="shop" data-n="작업장" data-d="토픽에는 없고 payload로만 전달된다(Design B, §02)"><span class="jx2__ln">6</span><code class="jx2__c">    <span class="jk">&quot;shop&quot;</span>: <span class="js">&quot;assembly1&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">작업장</span><span class="jx2__v"><b>assembly1</b></span></div></div>
@@ -867,10 +877,10 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
           <div class="jx2__r jx2__r--k" data-k="block_id" data-n="블록" data-d="호선 안의 블록 식별자"><span class="jx2__ln">12</span><code class="jx2__c">    <span class="jk">&quot;block_id&quot;</span>: <span class="js">&quot;B107P&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">블록</span><span class="jx2__v"><b>B107P</b></span></div></div>
           <div class="jx2__r jx2__r--k" data-k="scan_id" data-n="스캔 id" data-d="스캔 한 번의 식별자 — §3.3 산출물과 이어지는 유일한 조인 키"><span class="jx2__ln">13</span><code class="jx2__c">    <span class="jk">&quot;scan_id&quot;</span>: <span class="js">&quot;3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">스캔 id</span><span class="jx2__tag">조인 키</span><span class="jx2__v"><b>3f9a2b7e-…</b></span></div></div>
           <div class="jx2__r jx2__r--k" data-k="scanned_at" data-n="스캔 시각" data-d="지금 발행기에서는 occurred_at 과 같은 값이다"><span class="jx2__ln">14</span><code class="jx2__c">    <span class="jk">&quot;scanned_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:00.1123456+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">스캔 시각</span><span class="jx2__v"><b>13:00:00.112</b></span></div></div>
-          <div class="jx2__r jx2__r--k" data-k="pan_tilt" data-n="팬틸트" data-d="device_ids 중첩 객체 대신 최상위로 평탄화된 필드 중 하나"><span class="jx2__ln">15</span><code class="jx2__c">    <span class="jk">&quot;pan_tilt&quot;</span>: <span class="js">&quot;PTZ-GJ-A1B3-07&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">팬틸트</span><span class="jx2__v"><b>PTZ-GJ-A1B3-07</b></span></div></div>
-          <div class="jx2__r jx2__r--k" data-k="edge_pc" data-n="엣지 PC" data-d="현장 수집 PC"><span class="jx2__ln">16</span><code class="jx2__c">    <span class="jk">&quot;edge_pc&quot;</span>: <span class="js">&quot;EDG-GJ-A1-03&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">엣지 PC</span><span class="jx2__v"><b>EDG-GJ-A1-03</b></span></div></div>
-          <div class="jx2__r jx2__r--k" data-k="inference_ws" data-n="추론 워크스테이션" data-d="정합·진척 계산을 한 서버"><span class="jx2__ln">17</span><code class="jx2__c">    <span class="jk">&quot;inference_ws&quot;</span>: <span class="js">&quot;INF-GJ-A1-01&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">추론 워크스테이션</span><span class="jx2__v"><b>INF-GJ-A1-01</b></span></div></div>
-          <div class="jx2__r jx2__r--k" data-k="vision_ocr" data-n="비전 OCR" data-d="OCR 이 개입한 스캔에만 채워진다 — 7대 중 1대꼴, 대부분 null"><span class="jx2__ln">18</span><code class="jx2__c">    <span class="jk">&quot;vision_ocr&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">비전 OCR</span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="pan_tilt" data-n="팬틸트" data-d="실제 동작: device_ids 중첩 객체 대신 최상위로 평탄화된 필드 중 하나 / 스펙(§6.3): device_ids.pan_tilt 로 중첩돼 있다"><span class="jx2__ln">15</span><code class="jx2__c">    <span class="jk">&quot;pan_tilt&quot;</span>: <span class="js">&quot;PTZ-GJ-A1B3-07&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">팬틸트</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span><span class="jx2__v"><b>PTZ-GJ-A1B3-07</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="edge_pc" data-n="엣지 PC" data-d="실제 동작: 현장 수집 PC / 스펙(§6.3): device_ids.edge_pc 로 중첩돼 있다"><span class="jx2__ln">16</span><code class="jx2__c">    <span class="jk">&quot;edge_pc&quot;</span>: <span class="js">&quot;EDG-GJ-A1-03&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">엣지 PC</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span><span class="jx2__v"><b>EDG-GJ-A1-03</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="inference_ws" data-n="추론 워크스테이션" data-d="실제 동작: 정합·진척 계산을 한 서버 / 스펙(§6.3): device_ids.inference_ws 로 중첩돼 있다"><span class="jx2__ln">17</span><code class="jx2__c">    <span class="jk">&quot;inference_ws&quot;</span>: <span class="js">&quot;INF-GJ-A1-01&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">추론 워크스테이션</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span><span class="jx2__v"><b>INF-GJ-A1-01</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="vision_ocr" data-n="비전 OCR" data-d="실제 동작: OCR 이 개입한 스캔에만 채워진다 — 7대 중 1대꼴, 대부분 null / 스펙(§6.3): device_ids.vision_ocr 로 중첩돼 있다"><span class="jx2__ln">18</span><code class="jx2__c">    <span class="jk">&quot;vision_ocr&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">비전 OCR</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span></div></div>
           <div class="jx2__r jx2__r--k" data-k="event_type" data-n="이벤트" data-d="START·PROGRESS·COMPLETE 3종"><span class="jx2__ln">19</span><code class="jx2__c">    <span class="jk">&quot;event_type&quot;</span>: <span class="js">&quot;PROGRESS&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">이벤트</span><span class="jx2__v"><b>PROGRESS</b></span></div></div>
           <div class="jx2__r jx2__r--k" data-k="occurred_at" data-n="발생 시각" data-d="태그의 changedAt 이 된다"><span class="jx2__ln">20</span><code class="jx2__c">    <span class="jk">&quot;occurred_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:00.1123456+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">발생 시각</span><span class="jx2__tag">changedAt</span><span class="jx2__v"><b>13:00:00.112</b></span></div></div>
           <div class="jx2__r jx2__r--k" data-k="ingested_at" data-n="수집 시각" data-d="Agent 는 쓰지 않는다"><span class="jx2__ln">21</span><code class="jx2__c">    <span class="jk">&quot;ingested_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:01.0456789+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">수집 시각</span><span class="jx2__v"><b>13:00:01.046</b></span></div></div>
@@ -901,8 +911,8 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
             <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
             <div class="jx2__scroll">
               <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
-              <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id + 산출물 종류" data-d="{device.Id}-{artifactType} — 장비 하나가 스캔마다 종류별로 다른 id 를 쓴다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07-REGISTERED_PCD&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id + 산출물 종류</span><span class="jx2__tag">장비+종류 축</span><span class="jx2__v"><b>…-REGISTERED_PCD</b></span></div></div>
-              <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id + 산출물 종류" data-d="실제 동작: {device.Id}-{artifactType} — 장비 하나가 스캔마다 종류별로 다른 id 를 쓴다 / 스펙(필드인터페이스정의서 §6.4): 이 필드가 없다 — produced_by_device_id 하나로만 장비를 표기한다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07-REGISTERED_PCD&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id + 산출물 종류</span><span class="jx2__tag">장비+종류 축</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span><span class="jx2__v"><b>…-REGISTERED_PCD</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="실제 동작: tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다 / 스펙(§6.4): raw_payload 는 빈 객체({})로 정의돼 있다 — 모든 필드가 envelope 최상위에 나란히 있다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span></div></div>
               <div class="jx2__r jx2__r--k" data-k="zone" data-n="구역" data-d="ASSEMBLY·OUTFITTING"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;zone&quot;</span>: <span class="js">&quot;ASSEMBLY&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">구역</span><span class="jx2__v"><b>ASSEMBLY</b></span></div></div>
               <div class="jx2__r jx2__r--k" data-k="site" data-n="사업장" data-d="거제 고정값"><span class="jx2__ln">5</span><code class="jx2__c">    <span class="jk">&quot;site&quot;</span>: <span class="js">&quot;geoje&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">사업장</span><span class="jx2__v"><b>geoje</b></span></div></div>
               <div class="jx2__r jx2__r--k" data-k="shop" data-n="작업장" data-d="토픽에는 없고 payload로만 전달된다"><span class="jx2__ln">6</span><code class="jx2__c">    <span class="jk">&quot;shop&quot;</span>: <span class="js">&quot;assembly1&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">작업장</span><span class="jx2__v"><b>assembly1</b></span></div></div>
@@ -932,8 +942,8 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
             <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
             <div class="jx2__scroll">
               <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
-              <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id + 산출물 종류" data-d="{device.Id}-{artifactType}"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07-TRANSFORMATION_MATRIX&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id + 산출물 종류</span><span class="jx2__tag">장비+종류 축</span><span class="jx2__v"><b>…-TRANSFORMATION_MATRIX</b></span></div></div>
-              <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id + 산출물 종류" data-d="실제 동작: {device.Id}-{artifactType} / 스펙(필드인터페이스정의서 §6.4): 이 필드가 없다 — produced_by_device_id 하나로만 장비를 표기한다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07-TRANSFORMATION_MATRIX&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id + 산출물 종류</span><span class="jx2__tag">장비+종류 축</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span><span class="jx2__v"><b>…-TRANSFORMATION_MATRIX</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="실제 동작: tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다 / 스펙(§6.4): raw_payload 는 빈 객체({})로 정의돼 있다 — 모든 필드가 envelope 최상위에 나란히 있다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span></div></div>
               <div class="jx2__r jx2__r--k" data-k="zone" data-n="구역" data-d="ASSEMBLY·OUTFITTING"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;zone&quot;</span>: <span class="js">&quot;ASSEMBLY&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">구역</span><span class="jx2__v"><b>ASSEMBLY</b></span></div></div>
               <div class="jx2__r jx2__r--k" data-k="site" data-n="사업장" data-d="거제 고정값"><span class="jx2__ln">5</span><code class="jx2__c">    <span class="jk">&quot;site&quot;</span>: <span class="js">&quot;geoje&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">사업장</span><span class="jx2__v"><b>geoje</b></span></div></div>
               <div class="jx2__r jx2__r--k" data-k="shop" data-n="작업장" data-d="토픽에는 없고 payload로만 전달된다"><span class="jx2__ln">6</span><code class="jx2__c">    <span class="jk">&quot;shop&quot;</span>: <span class="js">&quot;assembly1&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">작업장</span><span class="jx2__v"><b>assembly1</b></span></div></div>
@@ -963,8 +973,8 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
             <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
             <div class="jx2__scroll">
               <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
-              <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id + 산출물 종류" data-d="{device.Id}-{artifactType} — 스캔마다 이 종류로 10건이 연달아 온다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07-SEGMENTED_PCD&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id + 산출물 종류</span><span class="jx2__tag">장비+종류 축</span><span class="jx2__v"><b>…-SEGMENTED_PCD</b></span></div></div>
-              <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id + 산출물 종류" data-d="실제 동작: {device.Id}-{artifactType} — 스캔마다 이 종류로 10건이 연달아 온다 / 스펙(필드인터페이스정의서 §6.4): 이 필드가 없다 — produced_by_device_id 하나로만 장비를 표기한다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07-SEGMENTED_PCD&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id + 산출물 종류</span><span class="jx2__tag">장비+종류 축</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span><span class="jx2__v"><b>…-SEGMENTED_PCD</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="실제 동작: tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다 / 스펙(§6.4): raw_payload 는 빈 객체({})로 정의돼 있다 — 모든 필드가 envelope 최상위에 나란히 있다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span><span class="jx2__tag jx2__tag--warn">스펙과 다름</span></div></div>
               <div class="jx2__r jx2__r--k" data-k="zone" data-n="구역" data-d="ASSEMBLY·OUTFITTING"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;zone&quot;</span>: <span class="js">&quot;ASSEMBLY&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">구역</span><span class="jx2__v"><b>ASSEMBLY</b></span></div></div>
               <div class="jx2__r jx2__r--k" data-k="site" data-n="사업장" data-d="거제 고정값"><span class="jx2__ln">5</span><code class="jx2__c">    <span class="jk">&quot;site&quot;</span>: <span class="js">&quot;geoje&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">사업장</span><span class="jx2__v"><b>geoje</b></span></div></div>
               <div class="jx2__r jx2__r--k" data-k="shop" data-n="작업장" data-d="토픽에는 없고 payload로만 전달된다"><span class="jx2__ln">6</span><code class="jx2__c">    <span class="jk">&quot;shop&quot;</span>: <span class="js">&quot;assembly1&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">작업장</span><span class="jx2__v"><b>assembly1</b></span></div></div>
@@ -1192,6 +1202,9 @@ ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STR
         <li><span class="refs__n">5</span><span><span class="refs__src">태그 등록 CSV 샘플 22개 (재설계 전 캡처 — §06 참고) — 2026-09-23 재설계 정리로 삭제됨</span>
           <span class="refs__meta">data · docs/topic/mqtt-tags_*.csv (삭제됨, git 이력 986b34c 이전 커밋에서 확인 가능) ·
           현재 등록부는 docs/mqtt-tags/mqtt-tags_*.csv (6개·1,750행, §02·§06 참고)</span></span></li>
+        <li><span class="refs__n">6</span><span><span class="refs__src">필드 인터페이스 정의서 — §6.2~§6.4 제안 규격 원문(§03의 "스펙과 다름" 대조 근거)</span>
+          <span class="refs__meta">doc · ocean-inshop-process/docs/필드인터페이스정의서.md v0.2, 2026-09-02 (별도 저장소 —
+          D:/git/ocean-inshop-process, 확인 2026-09-23)</span></span></li>
       </ol>
     </section>
 
