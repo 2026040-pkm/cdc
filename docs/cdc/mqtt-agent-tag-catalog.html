@@ -178,6 +178,7 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .g-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.g-1-2{display:grid;grid-template-columns:1fr 2fr;gap:16px}
 .stack{display:flex;flex-direction:column;gap:12px}
 
 /* 탭 (.tabs) */
@@ -416,11 +417,18 @@ body{ background:var(--bg2) }
 .side__foot button:hover{ border-color:var(--hw); color:var(--hw-dk) }
 
 /* 본문 */
-.main{ padding:34px 44px 100px; max-width:1040px; }
+/* 넓게 잡고(1220) 가운데 정렬한다 — margin:auto 가 핵심: 사이드바를 접어 이 칸이
+   넓어져도(grid-template-columns 가 0px ...로 바뀌어도) 본문은 그 안에서 계속
+   가운데에 남는다. 정작 산문(.sec > p 등)은 아래에서 다시 좁혀 읽기 좋은 길이를
+   유지하고, 흐름도·표·나란히 비교(.g2 계열)만 이 넓은 폭을 그대로 쓴다 —
+   6~7칸짜리 흐름도가 좁은 폭에 갇혀 카드가 잘려 나가는 것을 막는 값이다. */
+.main{ padding:34px 44px 100px; max-width:1220px; margin:0 auto; }
 .doc-head{ border-bottom:2px solid var(--hw); padding-bottom:18px; margin-bottom:26px }
 .doc-head h1{ font-size:32px; letter-spacing:-.025em; margin:6px 0 8px }
 .doc-head .sub{ font-size:15px; color:var(--ink2); max-width:80ch }
 .doc-head .meta{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px }
+/* 산문만 좁게. 흐름도·다이어그램·표·코드·나란히 비교는 .main 의 넓은 폭 그대로 쓴다. */
+.sec > p, .sec > .why, .sec > ul, .sec > ol{ max-width:860px }
 
 .sec{ margin:0 0 44px; scroll-margin-top:18px }
 .sec > h2{
@@ -476,13 +484,10 @@ body{ background:var(--bg2) }
 /* 높이는 diagram.js 의 autoHeight 가 내용 비율에 맞춰 인라인으로 잡는다.
    아래 값은 스크립트가 돌기 전의 자리 잡기용이다. */
 .dgm{ margin:0 0 16px; height:420px }
-/* 다이어그램은 본문 글줄 폭에 갇히지 않고 사이드바 오른쪽을 쓰되, .doc 자체가
-   가운데 정렬 + 최대 1600px 로 잡혀 있으니(위 .doc) 그 안쪽 여유만큼만 넓힌다 —
-   1600 - (270 사이드바 + 본문 좌우 패딩 88 + 스크롤바 여유 18) = 1224.
-   좁은 화면에서는 100vw 쪽이 더 작아 그대로 반응형으로 줄어든다. */
-@media (min-width:1001px){
-  .dgm{ width:min(calc(100vw - 376px), 1224px); max-width:none }
-}
+/* 예전엔 사이드바 오른쪽 전체로 폭을 늘렸지만(100vw 기준), 그러면 사이드바를
+   접었을 때 본문(.main)만 가운데 남고 다이어그램은 화면 가장자리까지 벌어져
+   버린다 — 카드 사이도 성겨 보였다. .main 폭(위 .main margin:auto) 그대로
+   쓰는 쪽이 사이드바 상태와 무관하게 항상 가운데 · 컴팩트하다. */
 .tbl-wrap{ margin-bottom:14px }
 .note{ margin-bottom:12px }
 .code{ margin-bottom:14px }
@@ -522,12 +527,11 @@ body{ background:var(--bg2) }
   box-shadow:0 12px 48px rgba(20,20,20,.28); border-color:var(--line2);
 }
 html.flow-locked, html.flow-locked body{ overflow:hidden }
-/* 개발 문서: 본문 글줄 폭을 넘어서되 .doc 의 가운데 정렬 + 최대 1600px 안쪽에서만
-   넓힌다(.dgm 과 같은 규칙 — 1600 - 376 = 1224). 카드 사이 간격이 늘어져 연결선이
-   흐릿해 보이는 것을 막는 상한이기도 하다. */
-@media (min-width: 1200px){
-  .main .flow{ width:min(calc(100vw - 376px), 1224px); max-width:none }
-}
+/* 예전엔 사이드바 오른쪽 전체로 폭을 늘렸지만, 그러면 사이드바를 접었을 때
+   본문(.main)만 가운데 남고 흐름도는 화면 가장자리까지 벌어져 카드 사이가
+   성겨 보였다. .main 폭(위 .main margin:auto) 을 그대로 쓰는 쪽이
+   사이드바 상태와 무관하게 항상 가운데·컴팩트하다 — 카드가 더 필요하면
+   .flow 자체의 overflow-x:auto 로 옆으로 스크롤한다. */
 /* 슬라이드: 무대 안에 들어가도록 최소 폭을 풀고 카드를 줄인다 */
 .slide .flow{ margin:6px 0; padding:12px 14px 10px; overflow:visible; display:flex; flex-direction:column }
 .slide .flow__in{ flex:1; align-content:center }
@@ -552,7 +556,7 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
 .fnode{
   position:relative; z-index:1; display:flex; gap:10px; align-items:flex-start;
   background:var(--bg); border:1px solid var(--line); border-radius:14px;
-  padding:11px 12px 11px 11px; min-height:58px;
+  padding:11px 12px 11px 11px; min-height:58px; min-width:0;
   box-shadow:0 1px 2px rgba(20,20,20,.04), 0 8px 22px -12px rgba(20,20,20,.18);
   transition:transform .18s ease, box-shadow .18s ease, opacity .25s ease, border-color .18s ease;
 }
@@ -563,11 +567,15 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
 }
 .fnode__ic svg{ width:18px; height:18px }
 .fnode__body{ min-width:0 }
-.fnode__t{ font-weight:700; font-size:13.5px; line-height:1.3; color:var(--ink) }
-.fnode__s{ font-size:11.8px; line-height:1.45; color:var(--ink3); margin-top:2px }
+/* min-width:0 만으로는 부족하다 — 칸이 줄어도 점(.)으로만 이어진 긴 문자열
+   (토픽·호스트명 등, 띄어쓰기가 없어 줄바꿈할 곳이 없다)은 안 줄어들고 카드
+   폭 전체를, 나아가 grid 트랙 전체를 억지로 넓힌다. 어디서든 끊기게 한다. */
+.fnode__t{ font-weight:700; font-size:13.5px; line-height:1.3; color:var(--ink); overflow-wrap:anywhere }
+.fnode__s{ font-size:11.8px; line-height:1.45; color:var(--ink3); margin-top:2px; overflow-wrap:anywhere }
 .fnode__tag{
   display:inline-block; margin-top:6px; font-family:var(--mono); font-size:10.8px; color:var(--ink3);
   background:var(--bg2); border:1px solid var(--line); border-radius:6px; padding:1px 6px;
+  max-width:100%; overflow-wrap:anywhere;
 }
 .fnode__no{
   position:absolute; top:-9px; left:-9px; width:22px; height:22px; border-radius:50%;
@@ -826,8 +834,33 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         <span class="jx2__tag jx2__tag--warn">스펙과 다름</span> 이 붙은 줄에 마우스를 올리면 발치에 "실제 동작: … / 스펙: …"
         형태로 뜬다. 스펙 원문은 <span class="mono">ocean-inshop-process/docs/필드인터페이스정의서.md</span> §6.2~§6.4 다(§09
         참고자료).</p>
+      <div class="g-1-2">
+        <div class="code">
+          <div class="code__bar"><span>필드인터페이스정의서 §6.2 — 공통 Envelope + LIDAR raw_payload (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
+          <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/device/{zone}/{device_role}/{device_id}/status</b></div>
+<pre>{
+  "device_id": "LDR-GJ-A1B3-07",
+  "device_role": "LIDAR",
+  "site": "geoje",
+  "zone": "ASSEMBLY",
+  "shop": "assembly1",
+  "bay": "bay3",
+  "status": "ONLINE",
+  "last_heartbeat_at": "2026-09-10T12:59:23.353+09:00",
+  "error_code": null,
+  "occurred_at": "2026-09-10T12:59:23.360+09:00",
+  "ingested_at": "2026-09-10T12:59:24.530+09:00",
+  "idempotency_key": "<span class="cm">string</span>",
+  "raw_payload": {
+    "scan_rate_pts_per_sec": <span class="cm">number</span>,
+    "temperature_c": <span class="cm">number</span>,
+    "connectivity_rssi": <span class="cm">number</span>,
+    "fov_mode": "<span class="cm">string</span>"
+  }
+}</pre>
+        </div>
       <div class="code jx2">
-        <div class="code__bar"><span>ot/device/assembly/status — LIDAR</span><button class="code__copy" type="button">복사</button></div>
+        <div class="code__bar"><span>ot/device/assembly/status — LIDAR (실제 발행 기준)</span><button class="code__copy" type="button">복사</button></div>
         <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
         <div class="jx2__scroll">
           <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
@@ -853,14 +886,54 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         </div>
         <div class="jx2__foot"><span class="jx2__pos">-</span><span class="jx2__fd">줄에 마우스를 올리면 그 필드의 설명이 여기에 나옵니다</span></div>
       </div>
+      </div>
+      <p class="small muted">왼쪽이 스펙 원문 그대로(타입만 적힌 제안 규격), 오른쪽이 실제 lidar-sim 발행값이다.
+        <span class="mono">device_id</span>→<span class="mono">id</span>처럼 이름이 다르거나 아예 없는 필드는
+        오른쪽의 <span class="jx2__tag jx2__tag--warn">스펙과 다름</span> 태그로 표시했다.</p>
 
       <p style="margin-top:18px">나머지 두 채널도 봉투 모양(<span class="mono">id</span> + <span class="mono">raw_payload</span>)은
         같고 <span class="mono">raw_payload</span> 안쪽 필드만 다르다. 장비는 위와 같은
         <span class="mono">LDR-GJ-A1B3-07</span>, 스캔 하나를 기준으로 실적과 산출물이
         <span class="mono">scan_id</span> 를 공유한다(§07).</p>
 
+      <div class="g-1-2">
+        <div class="code">
+          <div class="code__bar"><span>필드인터페이스정의서 §6.3 — stage · device_ids 있음 (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
+          <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/sensor/{zone}/{shop}/{bay}/{stage}/actual</b></div>
+<pre>{
+  "zone": "ASSEMBLY",
+  "site": "geoje",
+  "shop": "assembly1",
+  "bay": "bay3",
+  "stage": "<span class="hl">ARRANGEMENT</span>",
+  "record_type": "ACTUAL",
+  "input_method": "AUTO",
+  "source_system": "AI Inference Service",
+  "hull_no": "H1207",
+  "block_id": "B107P",
+  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",
+  "scanned_at": "2026-09-10T13:00:00.112+09:00",
+  "device_ids": {
+    <span class="hl">"lidar": "LDR-GJ-A1B3-07",
+    "pan_tilt": "PTZ-GJ-A1B3-07",
+    "edge_pc": "EDG-GJ-A1-03",
+    "inference_ws": "INF-GJ-A1-01",
+    "vision_ocr": null</span>
+  },
+  "event_type": "PROGRESS",
+  "occurred_at": "2026-09-10T13:00:00.112+09:00",
+  "ingested_at": "2026-09-10T13:00:01.046+09:00",
+  "idempotency_key": "<span class="cm">string</span>",
+  "raw_payload": {
+    "block_progress_rate": 47.8,
+    "reference_cad_id": "CAD-H1207-B107P",
+    "match_confidence": 0.94,
+    "model_version": "seg-v1.4.2"
+  }
+}</pre>
+        </div>
       <div class="code jx2">
-        <div class="code__bar"><span>ot/sensor/assembly/actual — stage 없음, device_ids 평탄화</span><button class="code__copy" type="button">복사</button></div>
+        <div class="code__bar"><span>ot/sensor/assembly/actual — stage 없음, device_ids 평탄화 (실제 발행 기준)</span><button class="code__copy" type="button">복사</button></div>
         <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
         <div class="jx2__scroll">
           <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
@@ -894,6 +967,10 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         </div>
         <div class="jx2__foot"><span class="jx2__pos">-</span><span class="jx2__fd">줄에 마우스를 올리면 그 필드의 설명이 여기에 나옵니다</span></div>
       </div>
+      </div>
+      <p class="small muted">왼쪽 스펙엔 있고 오른쪽 실제 발행엔 없는 것 — <span class="mono">stage</span>(공정 단계, 강조 표시)와
+        <span class="mono">device_ids</span> 중첩(마찬가지로 강조 표시, 실제로는 4개 필드로 평탄화됨). 나머지는 이름·자리만
+        다를 뿐 값의 뜻은 같다.</p>
       <p><span class="mono">scan_id</span> 가 이 실적과 아래 산출물을 잇는 조인 키다. <span class="mono">id</span> 는
         <b>장비 id 그대로</b>다 — shop/bay 단위 채널 태그가 아니라 여전히 장비별 태그가 된다.</p>
 
