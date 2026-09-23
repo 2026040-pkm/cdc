@@ -782,6 +782,114 @@ body{ background:var(--bg2) }
           </div>
         </div>
       </div>
+
+      <p style="margin-top:18px">나머지 두 채널도 봉투 모양(<span class="mono">id</span> + <span class="mono">raw_payload</span>)은
+        같고 <span class="mono">raw_payload</span> 안쪽 필드만 다르다. 장비는 위와 같은
+        <span class="mono">LDR-GJ-A1B3-07</span>, 스캔 하나를 기준으로 실적과 산출물이
+        <span class="mono">scan_id</span> 를 공유한다(§07).</p>
+      <div class="g2">
+        <div class="code">
+          <div class="code__bar"><span>ot/sensor/assembly/actual — 메시지 1건</span><button class="code__copy" type="button">복사</button></div>
+<pre>{
+  "id": "<span class="hl">LDR-GJ-A1B3-07</span>",
+  "raw_payload": {
+    "zone": "ASSEMBLY",
+    "site": "geoje",
+    "shop": "assembly1",
+    "bay": "bay3",
+    "record_type": "ACTUAL",
+    "input_method": "AUTO",
+    "source_system": "AI Inference Service",
+    "hull_no": "H1207",
+    "block_id": "B107P",
+    "scan_id": "<span class="hl">3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11</span>",   <span class="cm">// 산출물과 공유하는 조인 키</span>
+    "scanned_at": "2026-09-10T13:00:00.1123456+09:00",
+    "pan_tilt": "PTZ-GJ-A1B3-07",
+    "edge_pc": "EDG-GJ-A1-03",
+    "inference_ws": "INF-GJ-A1-01",
+    "vision_ocr": null,
+    "event_type": "PROGRESS",
+    "occurred_at": "2026-09-10T13:00:00.1123456+09:00",
+    "ingested_at": "2026-09-10T13:00:01.0456789+09:00",
+    "idempotency_key": "3f9a2b7e:PROGRESS",
+    "block_progress_rate": 47.8,
+    "reference_cad_id": "CAD-H1207-B107P",
+    "match_confidence": 0.94,
+    "model_version": "seg-v1.4.2"
+  }
+}</pre>
+        </div>
+        <div class="ui">
+          <div class="ui__bar">
+            <span class="ui__dot"></span><span class="ui__dot"></span><span class="ui__dot"></span>
+            <span class="ui__addr">localhost:56441/monitoring</span>
+          </div>
+          <div class="ui__body" style="padding:0">
+            <div class="ui-row" style="font-weight:700;color:var(--ink3);font-size:11.5px">
+              <span style="flex:2">Tag ID</span><span style="flex:3">Value</span><span style="flex:1.2">changedAt</span>
+            </div>
+            <div class="ui-row">
+              <span class="mono" style="flex:2;font-size:11.5px;word-break:break-all">LDR-GJ-A1B3-07.ot_sensor_<wbr>assembly_actual.raw_payload</span>
+              <span class="mono" style="flex:3;font-size:11.5px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{"zone":"ASSEMBLY","site":"geoje","record_type":"ACTUAL",…}</span>
+              <span class="mono" style="flex:1.2;font-size:11.5px">13:00:00.112</span>
+            </div>
+          </div>
+          <div class="ui__body" style="padding:8px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink3)">
+            상태 채널과 TagId 마디 수는 같고 가운데 토픽 마디만 <span class="mono">ot_sensor_assembly_actual</span> 로 바뀐다.
+          </div>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="code">
+          <div class="code__bar"><span>ot/pipeline/assembly/artifact — SEGMENTED_PCD 1건</span><button class="code__copy" type="button">복사</button></div>
+<pre>{
+  "id": "<span class="hl">LDR-GJ-A1B3-07-SEGMENTED_PCD</span>",
+  "raw_payload": {
+    "zone": "ASSEMBLY",
+    "site": "geoje",
+    "shop": "assembly1",
+    "bay": "bay3",
+    "scan_id": "<span class="hl">3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11</span>",   <span class="cm">// 실적과 같은 스캔</span>
+    "artifact_type": "SEGMENTED_PCD",
+    "hull_no": "H1207",
+    "block_id": "B107P",
+    "segment_id": "SEG-004",
+    "storage_uri": "file://ot-a/pcd/2026/09/10/3f9a2b7e/seg-004.pcd",
+    "file_size_bytes": 18452193,
+    "checksum": "sha256:7c1a9de3f0b2456a",
+    "transformation_matrix": null,
+    "produced_by_device_id": "INF-GJ-A1-01",
+    "model_version": "seg-v1.4.2",
+    "occurred_at": "2026-09-10T13:00:03.4456789+09:00",
+    "ingested_at": "2026-09-10T13:00:04.1123456+09:00"
+  }
+}</pre>
+        </div>
+        <div class="ui">
+          <div class="ui__bar">
+            <span class="ui__dot"></span><span class="ui__dot"></span><span class="ui__dot"></span>
+            <span class="ui__addr">localhost:56441/monitoring</span>
+          </div>
+          <div class="ui__body" style="padding:0">
+            <div class="ui-row" style="font-weight:700;color:var(--ink3);font-size:11.5px">
+              <span style="flex:2">Tag ID</span><span style="flex:3">Value</span><span style="flex:1.2">changedAt</span>
+            </div>
+            <div class="ui-row">
+              <span class="mono" style="flex:2;font-size:11.5px;word-break:break-all">LDR-GJ-A1B3-07-SEGMENTED_PCD<wbr>.ot_pipeline_assembly_artifact.raw_payload</span>
+              <span class="mono" style="flex:3;font-size:11.5px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{"zone":"ASSEMBLY","artifact_type":"SEGMENTED_PCD",…}</span>
+              <span class="mono" style="flex:1.2;font-size:11.5px">13:00:03.445</span>
+            </div>
+          </div>
+          <div class="ui__body" style="padding:8px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink3)">
+            <span class="mono">id</span> 에 종류 접미사가 붙어 TagId 첫 마디부터 달라진다 — 같은 장비라도 산출물 종류마다
+            (<span class="mono">REGISTERED_PCD</span>·<span class="mono">TRANSFORMATION_MATRIX</span>·<span class="mono">SEGMENTED_PCD</span>)
+            화면에 별도 행 3~12개로 갈라져 보인다. 셋은 <span class="mono">segment_id</span>·<span class="mono">storage_uri</span>·
+            <span class="mono">transformation_matrix</span> 세 필드만 서로 다르게 채워진다(§02 표).
+          </div>
+        </div>
+      </div>
+
       <div class="note note--warn">
         <p class="note__t">프로토콜 3.1.1 고정</p>
         <span class="mono">MqttNetSession.BuildOptions</span> 와 같은 조건으로 붙기 위해서다. v5 로 붙으면
