@@ -626,7 +626,7 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
 .flow__links path.ln--flow{ stroke:var(--hw); stroke-width:2.2; stroke-opacity:.55 }
 .flow__links path.ln--ok{ stroke:var(--ok); stroke-width:2.2; stroke-opacity:.6 }
 .flow__links path.ln--risk{ stroke:var(--risk); stroke-dasharray:6 6; animation:flow-dash 1.2s linear infinite; stroke-opacity:.8 }
-.flow__links path.ln--muted{ stroke:var(--ink4); stroke-dasharray:2.5 3.5; stroke-opacity:.85 }
+.flow__links path.ln--muted{ stroke:var(--ink3); stroke-dasharray:2.5 3.5; stroke-opacity:.85 }
 .flow__links circle.dot{ fill:var(--hw) }
 .flow__links circle.dot--ok{ fill:var(--ok) }
 @keyframes flow-dash{ to{ stroke-dashoffset:-24 } }
@@ -649,7 +649,7 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
 .flow__legend i{ display:inline-block; vertical-align:middle; width:26px; height:0; margin-right:6px; border-top:2.2px solid var(--hw) }
 .flow__legend i.ok{ border-top-color:var(--ok) }
 .flow__legend i.risk{ border-top:2px dashed var(--risk) }
-.flow__legend i.muted{ border-top:2px dashed var(--ink4) }
+.flow__legend i.muted{ border-top:2px dashed var(--ink3) }
 .flow__legend b.nw{ display:inline-block; width:14px; height:4px; border-radius:2px; background:var(--hw); vertical-align:middle; margin-right:6px }
 
 /* ── 편집 모드 ───────────────────────────────────────── */
@@ -2431,7 +2431,7 @@ ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STR
     var editing = this.editing();
 
     var defs = document.createElementNS(NS, 'defs');
-    [['flow', 'var(--hw)'], ['ok', 'var(--ok)'], ['risk', 'var(--risk)'], ['muted', 'var(--ink4)']].forEach(function (m) {
+    [['flow', 'var(--hw)'], ['ok', 'var(--ok)'], ['risk', 'var(--risk)'], ['muted', 'var(--ink3)']].forEach(function (m) {
       var mk = document.createElementNS(NS, 'marker');
       mk.setAttribute('id', 'fa-' + m[0] + '-' + self.fid);
       mk.setAttribute('viewBox', '0 0 10 10'); mk.setAttribute('refX', '8.5'); mk.setAttribute('refY', '5');
