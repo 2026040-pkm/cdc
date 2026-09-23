@@ -6,9 +6,9 @@ InterSysLink 의 Agent + EES Kafka Provider 가 하던 일을 그대로 한다. 
 올리는 세 채널을 구독해, **ISL Provider 가 내보내는 것과 같은 레코드**로 바꿔 이 스택의
 Kafka 에 넣는다. 수신 측(`src/timescaledb` 의 lidar-ingest)은 원본과 이것을 구분하지 못한다.
 
-  ot/device/{zone}/lidar/status            (1건/1초·대)  → ot.lidar.status
-  ot/sensor/{stage}/actual                 (1건/1분·대)  → ot.lidar.actual
-  ot/pipeline/{zone}/{shop}/{bay}/artifact (12건/1분·대) → ot.lidar.artifact
+  ot/device/{zone}/status    (1건/1초·대)  → ot.lidar.status
+  ot/sensor/{zone}/actual    (1건/1분·대)  → ot.lidar.actual
+  ot/pipeline/{zone}/artifact (12건/1분·대) → ot.lidar.artifact
 
 ─ 레코드 모양 (EES Kafka Provider · data_type=value · V1.0) ─────────────────
 Value 는 항목 배열이다. 항목 하나가 태그 하나의 값 하나다.
@@ -42,9 +42,11 @@ Provider 는 태그를 실을 때 문자열 TagId 를 버리고 등록부의 Par
                            /state/auto-tags.sql 에 lidar_tag_catalog 에 넣을 INSERT 도 쓴다.
   AUTO_REGISTER_TAGS=false 버리고 센다 (지금 ISL 이 하는 그대로).
 
-지금 등록부에는 `ot/sensor/fitting/actual` 이 없다 — 조립 stage 4종 중 FITTING 만
-등록이 빠져 있어 210대분이 ISL 에서는 조용히 버려진다. 기본값(auto)이면 여기서는 살아서
-나가고 그 사실이 지표(ees_bridge_tag_unregistered_total)와 로그에 남는다.
+지금 등록부(tags/tag-catalog.json 의 원본 03-tag-catalog.sql)는 stage·shop/bay 를 토픽에
+싣던 재설계 이전 ISL 스냅샷이라 새 6토픽(ot/device/{zone}/status 등) 태그가 하나도 없다.
+기본값(auto)이면 전부 여기서 새 번호를 받아 살아서 나가고, 그 사실이
+지표(ees_bridge_tag_unregistered_total)와 로그에 남는다 — 등록부가 새 스냅샷으로
+갱신되기 전까지는 정상적인 동작이다.
 
 ─ 배치 ────────────────────────────────────────────────────────────────────
 항목 N개 또는 M ms 중 먼저 오는 쪽에서 레코드 하나로 묶어 보낸다. 채널마다 따로 묶는다 —
@@ -95,10 +97,10 @@ MQTT_QOS = int(os.environ.get("MQTT_QOS", "1"))
 # 세션을 새로 시작한다. false 로 두면 브리지가 죽어 있는 동안 브로커가 QoS1 을 쌓아 두지만
 # 초당 426건이라 큐 한도(EMQX 기본 1000)를 금방 넘긴다 — 쌓지 않고 흘려보내는 쪽이 정직하다.
 MQTT_CLEAN_SESSION = os.environ.get("MQTT_CLEAN_SESSION", "true").lower() != "false"
-# 구독 패턴. 발행기의 22개 토픽을 세 패턴으로 덮는다.
+# 구독 패턴. 발행기의 6개 토픽(zone 당 3채널)을 세 패턴으로 덮는다.
 MQTT_TOPICS = os.environ.get(
     "MQTT_TOPICS",
-    "ot/device/+/lidar/status,ot/sensor/+/actual,ot/pipeline/+/+/+/artifact",
+    "ot/device/+/status,ot/sensor/+/actual,ot/pipeline/+/artifact",
 )
 
 KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "kafka:9093")

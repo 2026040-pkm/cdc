@@ -9,7 +9,7 @@ Aspire(InterSysLink) 를 띄우지 않아도 `ot.lidar.*` 세 토픽이 같은 �
 
 ```
  lidar-sim.cs        EMQX          이 스택                       수신 측
- 350대 · 22토픽  →  :1884  →  ees-bridge → Kafka :61092  →  lidar-ingest → TimescaleDB
+ 350대 · 6토픽   →  :1884  →  ees-bridge → Kafka :61092  →  lidar-ingest → TimescaleDB
  (util/mqtt-lidar-sim)        (형식 변환)   + Kafka UI :61080     (src/timescaledb)
 ```
 
@@ -43,7 +43,7 @@ podman exec ees-bridge python check_contract.py
 MQTT 메시지 하나가 EES **항목** 하나가 되고, 항목 여럿이 레코드 하나로 묶인다.
 
 ```jsonc
-// MQTT  ot/device/assembly/lidar/status
+// MQTT  ot/device/assembly/status
 {"id": "LDR-GJ-A1B3-07", "raw_payload": {"device_role": "LIDAR", "status": "ONLINE", ...}}
 
 // Kafka  ot.lidar.status   (Key = "ot.lidar.status")
@@ -68,9 +68,9 @@ MQTT 메시지 하나가 EES **항목** 하나가 되고, 항목 여럿이 레�
 
 | 채널 | MQTT 토픽 | Kafka 토픽 | 발행 주기 | Kafka 레코드 |
 |---|---|---|---|---|
-| 장비 상태 | `ot/device/{zone}/lidar/status` | `ot.lidar.status` | 1건/1초·대 | 1개/초 · 350항목 |
-| 실적 결과 | `ot/sensor/{stage}/actual` | `ot.lidar.actual` | 1건/1분·대 | 1개/초 · 6항목 |
-| 산출물 메타 | `ot/pipeline/{zone}/{shop}/{bay}/artifact` | `ot.lidar.artifact` | 12건/1분·대 | 1개/초 · 70항목 |
+| 장비 상태 | `ot/device/{zone}/status` | `ot.lidar.status` | 1건/1초·대 | 1개/초 · 350항목 |
+| 실적 결과 | `ot/sensor/{zone}/actual` | `ot.lidar.actual` | 1건/1분·대 | 1개/초 · 6항목 |
+| 산출물 메타 | `ot/pipeline/{zone}/artifact` | `ot.lidar.artifact` | 12건/1분·대 | 1개/초 · 70항목 |
 
 **MQTT 메시지 하나가 Kafka 레코드 하나가 아니다.** 채널마다 따로 묶어 `BATCH_MAX_ITEMS`
 (500) 또는 `BATCH_MAX_WAIT_MS`(1000) 중 먼저 오는 쪽에서 끊는데, 지금 유량에서는 늘 시간
@@ -112,8 +112,8 @@ Provider 는 태그를 실을 때 문자열 TagId 를 버리고 등록부의 **P
 그래서 이 브리지도 숫자를 지어내지 않는다. ISL 등록부에서 뽑은 표를 그대로 쓴다.
 
 ```
-MQTT  {"id": "LDR-GJ-A1B3-07"}  on  ot/device/assembly/lidar/status
-  → TagId  LDR-GJ-A1B3-07.ot_device_assembly_lidar_status.raw_payload
+MQTT  {"id": "LDR-GJ-A1B3-07"}  on  ot/device/assembly/status
+  → TagId  LDR-GJ-A1B3-07.ot_device_assembly_status.raw_payload
   → 조회표 ("ot.lidar.status", 1)
   → tid    "1"
 ```
@@ -141,11 +141,10 @@ podman exec ees-bridge cat /state/auto-tags.sql | podman exec -i tsdb-lidar-pg p
 
 `false` 면 버리고 센다 — 지금 ISL 이 하는 그대로다.
 
-> **지금 등록부에는 `ot/sensor/fitting/actual` 이 없다.** 조립 stage 4종(ARRANGEMENT ·
-> FITTING · WELDING · INSPECTION) 중 FITTING 만 태그 등록이 빠져 있어, 조립 210대의 FITTING
-> 실적이 ISL 에서는 조용히 사라진다. 등록은 2,310개(상태 350 + 실적 910 + 산출물 1,050)인데,
-> 실적은 조립 210×4 + 의장 140×2 = 1,120 이어야 한다 — 차이 210 이 그대로 FITTING 이다.
-> 기본값이면 여기서는 살아서 나가고, 그 사실이
+> **지금 등록부(`tags/tag-catalog.json`, 원본 `03-tag-catalog.sql`)는 토픽 재설계
+> 이전 ISL 스냅샷이다.** stage·shop/bay 를 토픽에 싣던 옛 체계라 새 6토픽
+> (`ot/device/{zone}/status` 등) 태그가 하나도 없다. 등록부가 새 스냅샷으로 갱신되기
+> 전까지는 기본값(auto)에서 전부 자동 번호를 받아 나가고, 그 사실이
 > `ees_bridge_tag_unregistered_total` 과 로그에 남는다.
 
 ## 수신 측을 이쪽 Kafka 로 돌리기
@@ -172,7 +171,7 @@ scripts\up.ps1 -Tsdb
 | 변수 | 기본값 | |
 |---|---|---|
 | `MQTT_HOST` · `MQTT_PORT` | `host.docker.internal` · `1884` | EMQX. 브로커 스택 네트워크에 넣는 대신 호스트 포트로 붙는다 |
-| `MQTT_TOPICS` | 세 패턴 | 22개 토픽을 `+` 로 덮는다 |
+| `MQTT_TOPICS` | 세 패턴 | 6개 토픽(zone 당 3채널)을 `+` 로 덮는다 |
 | `MQTT_QOS` | `1` | 발행기와 같게 |
 | `BATCH_MAX_ITEMS` · `BATCH_MAX_WAIT_MS` | `500` · `1000` | 먼저 오는 쪽에서 레코드를 끊는다. 아래 참고 |
 | `AUTO_REGISTER_TAGS` | `true` | 위 참고 |

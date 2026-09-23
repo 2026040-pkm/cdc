@@ -131,7 +131,7 @@ services:
       MQTT_PORT: ${MQTT_PORT:-1884}
       MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-ees-bridge}
       MQTT_QOS: ${MQTT_QOS:-1}
-      MQTT_TOPICS: ${MQTT_TOPICS:-ot/device/+/lidar/status,ot/sensor/+/actual,ot/pipeline/+/+/+/artifact}
+      MQTT_TOPICS: ${MQTT_TOPICS:-ot/device/+/status,ot/sensor/+/actual,ot/pipeline/+/artifact}
       KAFKA_BOOTSTRAP: kafka:9093
       KAFKA_CLIENT_ID: isl-engine
       # 항목 N개 또는 M ms 중 먼저 오는 쪽에서 레코드 하나로 묶는다. 묶음은 채널마다 따로다 —

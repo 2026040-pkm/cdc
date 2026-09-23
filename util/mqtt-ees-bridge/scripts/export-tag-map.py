@@ -7,8 +7,8 @@
 같은 장비가 ISL 이 보낼 때와 브리지가 보낼 때 서로 다른 tid 로 나가고, 수신 측
 `lidar_tag_catalog` 가 통째로 어긋난다.
 
-    MQTT  {"id": "LDR-GJ-A1B3-07", "raw_payload": {...}}  on ot/device/assembly/lidar/status
-      → TagId  LDR-GJ-A1B3-07.ot_device_assembly_lidar_status.raw_payload
+    MQTT  {"id": "LDR-GJ-A1B3-07", "raw_payload": {...}}  on ot/device/assembly/status
+      → TagId  LDR-GJ-A1B3-07.ot_device_assembly_status.raw_payload
       → 이 표  ("ot.lidar.status", 1)
       → EES   {"content": {"timestamp": …, "tid": "1", "value": "{…}", "pm_mode": false}}
 
