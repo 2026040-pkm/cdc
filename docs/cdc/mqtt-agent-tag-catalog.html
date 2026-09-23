@@ -180,6 +180,51 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}
 .g-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
 .stack{display:flex;flex-direction:column;gap:12px}
 
+/* 탭 (.tabs) */
+.tabs{margin:10px 0 16px}
+.tabs__bar{display:flex;gap:4px;flex-wrap:wrap;padding:4px;background:var(--bg3);border-radius:10px;width:fit-content;max-width:100%;margin-bottom:12px}
+.tabs__b{border:0;background:transparent;padding:6px 14px;border-radius:7px;font:inherit;font-size:13.5px;font-weight:700;color:var(--ink3);
+  cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;line-height:1.3}
+.tabs__b small{font-family:var(--mono);font-size:10.5px;font-weight:400;color:var(--ink4)}
+.tabs__b:hover{color:var(--ink)}
+.tabs__b.on{background:var(--bg);color:var(--hw-dk);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.tabs__p{display:none}
+.tabs__p.on{display:block}
+
+/* JSON 한 줄 = 설명 한 줄 (.jx2) */
+.code.jx2{margin-bottom:6px}
+.jx2__meta{margin-left:auto;font-family:inherit;font-size:11.5px;color:var(--ink3);display:flex;align-items:center;gap:6px}
+.jx2__head,.jx2__r{display:grid;grid-template-columns:40px minmax(0,1.15fr) minmax(0,1fr)}
+.jx2__head{font-size:11px;font-weight:800;color:var(--ink3);background:var(--bg2);border-bottom:1px solid var(--line)}
+.jx2__head span{padding:5px 12px}
+.jx2__scroll{max-height:460px;overflow:auto;overscroll-behavior:contain}
+.jx2__r{min-height:28px;align-items:stretch}
+.jx2__r--k{cursor:default}
+.jx2__ln{font-family:var(--mono);font-size:11px;color:var(--ink4);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;
+  background:var(--bg2);border-right:1px solid var(--line)}
+.jx2__c{display:block;line-height:28px;white-space:pre;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;padding:0 12px;border-right:1px dashed var(--line);background:transparent}
+.jx2__e{display:flex;align-items:center;gap:8px;padding:0 12px;min-width:0;font-size:13px}
+.jx2__n{font-weight:700;white-space:nowrap}
+.jx2__tag{font-size:10.5px;line-height:1.5;padding:0 7px;border-radius:9px;background:var(--hw-tint);color:var(--hw-dp);font-weight:700;white-space:nowrap}
+.jx2__v{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.jx2__v b{color:var(--ink)} .jx2__v .chip{font-size:11px}
+.jx2 .jk{color:var(--ink3)} .jx2 .js{color:var(--ink)} .jx2 .jn{color:var(--info);font-weight:700} .jx2 .jz{color:var(--ink4);font-style:italic}
+.jx2__r--k:hover,.jx2__r.on{background:var(--hw-pale)}
+.jx2__r--k:hover .jx2__ln,.jx2__r.on .jx2__ln{background:var(--hw);color:#fff;font-weight:800}
+.jx2__r--k:hover .jx2__c,.jx2__r.on .jx2__c{box-shadow:inset 3px 0 0 var(--hw)}
+.jx2__foot{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border-top:1px solid var(--line);background:var(--bg2);font-size:12.5px;min-height:40px;color:var(--ink3)}
+.jx2__pos{font-family:var(--mono);font-size:11.5px;color:#fff;background:var(--ink4);border-radius:4px;padding:1px 7px;white-space:nowrap}
+.jx2.act .jx2__pos{background:var(--hw)}
+.jx2__fd b{color:var(--ink)} .jx2__fd code{font-size:11.5px;color:var(--ink4);margin:0 6px}
+@media (max-width:760px){
+  .jx2__head,.jx2__r{grid-template-columns:32px minmax(0,1fr)}
+  .jx2__head span:last-child,.jx2__e{display:none}
+}
+@media print{
+  .tabs__bar{display:none} .tabs__p{display:block!important;margin-bottom:18px}
+  .jx2__scroll{max-height:none}
+}
+
 /* ---------- 다이어그램 캔버스 ---------- */
 .dgm{
   position:relative;border:1px solid var(--line);border-radius:12px;
@@ -317,18 +362,42 @@ h1, h2, h3, h4, p, li, td, th, dt, dd,
    ============================================================ */
 body{ background:var(--bg2) }
 
-.doc{ display:grid; grid-template-columns:270px minmax(0,1fr); align-items:start; }
+.doc{
+  display:grid; grid-template-columns:270px minmax(0,1fr); align-items:start;
+  transition:grid-template-columns .18s ease;
+}
+.doc.side-collapsed{ grid-template-columns:0px minmax(0,1fr) }
 
 /* 사이드바 */
 .side{
   position:sticky; top:0; height:100vh; overflow:auto;
   background:var(--bg); border-right:1px solid var(--line); padding:20px 16px 40px;
+  transition:opacity .15s ease;
 }
+.doc.side-collapsed .side{ opacity:0; pointer-events:none; overflow:hidden; padding:20px 0 40px }
+.side-reopen{
+  display:none; position:fixed; top:16px; left:16px; z-index:60;
+  border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:8px;
+  padding:7px 12px; font-size:12.5px; font-weight:700; cursor:pointer; box-shadow:var(--shadow);
+  font-family:var(--font);
+}
+.side-reopen:hover{ border-color:var(--hw); color:var(--hw-dk) }
+.side-reopen.is-shown{ display:inline-flex; align-items:center }
 .side__brand{ display:flex; align-items:center; gap:9px; margin-bottom:6px }
 .side__brand .bar{ width:5px; height:26px; background:var(--hw); border-radius:2px }
 .side__brand b{ font-size:14.5px; letter-spacing:-.01em }
 .side__meta{ font-size:11.5px; color:var(--ink4); margin:0 0 16px; font-family:var(--mono) }
-.toc{ list-style:none; margin:0; padding:0; font-size:13.5px }
+.side__toch{
+  display:flex; align-items:center; justify-content:space-between; margin:0 0 6px;
+  font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--ink4);
+}
+.side__toch button{
+  border:0; background:transparent; color:var(--ink3); font-size:11px; font-weight:700;
+  cursor:pointer; padding:2px 4px; font-family:var(--font); text-transform:none; letter-spacing:0;
+}
+.side__toch button:hover{ color:var(--hw-dk) }
+.toc{ list-style:none; margin:0; padding:0; font-size:13.5px; overflow:hidden }
+.toc.is-collapsed{ display:none }
 .toc li{ margin:1px 0 }
 .toc a{
   display:block; padding:5px 10px; border-radius:6px; color:var(--ink2);
@@ -442,6 +511,13 @@ body{ background:var(--bg2) }
   border:1px solid var(--line); border-radius:18px;
   padding:18px 22px 16px; overflow-x:auto;
 }
+/* 화면 가득 펼치기 — 툴바의 "넓게" 버튼 / Esc 로 닫는다 (.dgm.is-max 와 같은 규칙) */
+.flow.is-max{
+  position:fixed; inset:14px; z-index:80; overflow:auto;
+  width:auto !important; max-width:none !important; height:auto !important;
+  box-shadow:0 12px 48px rgba(20,20,20,.28); border-color:var(--line2);
+}
+html.flow-locked, html.flow-locked body{ overflow:hidden }
 /* 개발 문서: 본문 글줄 폭을 넘어 사이드바 오른쪽 전체를 쓴다 (.dgm 과 같은 규칙) */
 @media (min-width: 1200px){
   .main .flow{ width:min(calc(100vw - 376px), 1560px); max-width:none }
@@ -544,7 +620,7 @@ body{ background:var(--bg2) }
 .flow__links path.ln--flow{ stroke:var(--hw); stroke-width:2.2; stroke-opacity:.55 }
 .flow__links path.ln--ok{ stroke:var(--ok); stroke-width:2.2; stroke-opacity:.6 }
 .flow__links path.ln--risk{ stroke:var(--risk); stroke-dasharray:6 6; animation:flow-dash 1.2s linear infinite; stroke-opacity:.8 }
-.flow__links path.ln--muted{ stroke:var(--ink4); stroke-dasharray:4 5; stroke-opacity:.7 }
+.flow__links path.ln--muted{ stroke:var(--ink4); stroke-dasharray:2.5 3.5; stroke-opacity:.85 }
 .flow__links circle.dot{ fill:var(--hw) }
 .flow__links circle.dot--ok{ fill:var(--ok) }
 @keyframes flow-dash{ to{ stroke-dashoffset:-24 } }
@@ -593,6 +669,7 @@ body{ background:var(--bg2) }
   .flow{ width:auto; overflow:visible; background:var(--bg); page-break-inside:avoid }
   .flow__seg, .flow__edit, .flow__bar{ display:none }
   .flow__links circle.dot{ display:none }
+  .flow.is-max{ position:static; inset:auto; box-shadow:none }
 }
 </style>
 </head>
@@ -603,6 +680,7 @@ body{ background:var(--bg2) }
   <aside class="side no-print">
   <div class="side__brand"><span class="bar"></span><b>MQTT→Agent 태그 카탈로그</b></div>
     <p class="side__meta">v1 · 2026-09-22 · 데이터 정리</p>
+    <div class="side__toch"><span>목차</span><button id="bToc" type="button" aria-expanded="true">접기</button></div>
     <ul class="toc"></ul>
     <div class="side__foot">
       <button id="bTheme" type="button">테마</button>
@@ -738,157 +816,184 @@ body{ background:var(--bg2) }
         <span class="mono">raw_payload</span> 한 겹뿐이다. 필드 정의서의 중첩 객체(<span class="mono">device_ids</span> 등)는
         브로커로 나갈 때 <b>평탄화한다</b> — 중첩을 두면 나중에 <span class="mono">tagMode=fields</span> 로 바꿨을 때
         키 이름이 달라지기 때문이다.</p>
-      <div class="g2">
-        <div class="code">
-          <div class="code__bar"><span>ot/device/assembly/status — 메시지 1건</span><button class="code__copy" type="button">복사</button></div>
-<pre>{
-  "id": "<span class="hl">LDR-GJ-A1B3-07</span>",
-  "raw_payload": {
-    "device_role": "LIDAR",
-    "site": "geoje",
-    "zone": "ASSEMBLY",
-    "shop": "assembly1",
-    "bay": "bay3",
-    "status": "ONLINE",
-    "last_heartbeat_at": "2026-09-10T12:59:23.3532050+09:00",
-    "error_code": null,
-    "occurred_at": "<span class="hl">2026-09-10T12:59:23.3603189+09:00</span>",   <span class="cm">// 태그의 changedAt 이 된다</span>
-    "ingested_at": "2026-09-10T12:59:24.5303189+09:00",                          <span class="cm">// 버려진다</span>
-    "idempotency_key": "LDR-GJ-A1B3-07:20260910T125923",
-    "scan_rate_pts_per_sec": 229866,
-    "temperature_c": 40.9,
-    "connectivity_rssi": -52,
-    "fov_mode": "wide"
-  }
-}</pre>
+      <div class="code jx2">
+        <div class="code__bar"><span>ot/device/assembly/status — LIDAR</span><button class="code__copy" type="button">복사</button></div>
+        <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
+        <div class="jx2__scroll">
+          <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
+          <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id" data-d="Agent 봉투 최상위 필드 — TagId 첫 마디로 쓴다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id</span><span class="jx2__tag">장비 축</span><span class="jx2__v"><b>LDR-GJ-A1B3-07</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="device_role" data-n="장비 역할" data-d="지금은 LIDAR 하나만 시뮬레이션한다. 토픽에는 없고 payload에만 있다"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;device_role&quot;</span>: <span class="js">&quot;LIDAR&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 역할</span><span class="jx2__v"><b>LIDAR</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="site" data-n="사업장" data-d="거제 고정값"><span class="jx2__ln">5</span><code class="jx2__c">    <span class="jk">&quot;site&quot;</span>: <span class="js">&quot;geoje&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">사업장</span><span class="jx2__v"><b>geoje</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="zone" data-n="구역" data-d="ASSEMBLY 또는 OUTFITTING. 토픽의 zone은 소문자, payload는 대문자다"><span class="jx2__ln">6</span><code class="jx2__c">    <span class="jk">&quot;zone&quot;</span>: <span class="js">&quot;ASSEMBLY&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">구역</span><span class="jx2__v"><b>ASSEMBLY</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="shop" data-n="작업장" data-d="토픽에는 없고 payload로만 전달된다(Design B, §02)"><span class="jx2__ln">7</span><code class="jx2__c">    <span class="jk">&quot;shop&quot;</span>: <span class="js">&quot;assembly1&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">작업장</span><span class="jx2__v"><b>assembly1</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="bay" data-n="베이" data-d="shop 내 세부 구역, bay1~bay7"><span class="jx2__ln">8</span><code class="jx2__c">    <span class="jk">&quot;bay&quot;</span>: <span class="js">&quot;bay3&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">베이</span><span class="jx2__v"><b>bay3</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="status" data-n="상태" data-d="ONLINE·OFFLINE·ERROR·CALIBRATING 4종. OFFLINE 이면 heartbeat 도 멈춘다"><span class="jx2__ln">9</span><code class="jx2__c">    <span class="jk">&quot;status&quot;</span>: <span class="js">&quot;ONLINE&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">상태</span><span class="jx2__tag">4종 enum</span><span class="jx2__v"><b>ONLINE</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="last_heartbeat_at" data-n="마지막 통신" data-d="OFFLINE 상태면 이 값이 갱신을 멈춘다 — 죽은 장비를 구분하는 신호"><span class="jx2__ln">10</span><code class="jx2__c">    <span class="jk">&quot;last_heartbeat_at&quot;</span>: <span class="js">&quot;2026-09-10T12:59:23.3532050+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">마지막 통신</span><span class="jx2__v"><b>12:59:23.353</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="error_code" data-n="오류 코드" data-d="ERROR 상태일 때만 값이 채워진다"><span class="jx2__ln">11</span><code class="jx2__c">    <span class="jk">&quot;error_code&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">오류 코드</span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="occurred_at" data-n="발생 시각" data-d="이 값이 태그의 changedAt 이 된다 — Agent 가 받은 시각이 아니다"><span class="jx2__ln">12</span><code class="jx2__c">    <span class="jk">&quot;occurred_at&quot;</span>: <span class="js">&quot;2026-09-10T12:59:23.3603189+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">발생 시각</span><span class="jx2__tag">changedAt</span><span class="jx2__v"><b>12:59:23.360</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="ingested_at" data-n="발행기 수집 시각" data-d="발행기가 계산해 넣지만 Agent 는 쓰지 않는다 — 그냥 버려진다"><span class="jx2__ln">13</span><code class="jx2__c">    <span class="jk">&quot;ingested_at&quot;</span>: <span class="js">&quot;2026-09-10T12:59:24.5303189+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">발행기 수집 시각</span><span class="jx2__v"><b>12:59:24.530</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="idempotency_key" data-n="멱등 키" data-d="{장비id}:{시각} 형태. 상태 채널은 멱등 처리할 레코드가 없어 사실상 참고용이다"><span class="jx2__ln">14</span><code class="jx2__c">    <span class="jk">&quot;idempotency_key&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07:20260910T125923&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">멱등 키</span><span class="jx2__v"><b>LDR-GJ-A1B3-07:20260910T125923</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="scan_rate_pts_per_sec" data-n="스캔 속도" data-d="초당 포인트 수. OFFLINE 이면 0이 된다"><span class="jx2__ln">15</span><code class="jx2__c">    <span class="jk">&quot;scan_rate_pts_per_sec&quot;</span>: <span class="jn">229866</span>,</code><div class="jx2__e"><span class="jx2__n">스캔 속도</span><span class="jx2__v"><b>229866</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="temperature_c" data-n="내부 온도" data-d="섭씨. 30~78 범위로 제한돼 흔들린다"><span class="jx2__ln">16</span><code class="jx2__c">    <span class="jk">&quot;temperature_c&quot;</span>: <span class="jn">40.9</span>,</code><div class="jx2__e"><span class="jx2__n">내부 온도</span><span class="jx2__v"><b>40.9</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="connectivity_rssi" data-n="무선 신호 세기" data-d="dBm. 음수이며 0에 가까울수록 강하다"><span class="jx2__ln">17</span><code class="jx2__c">    <span class="jk">&quot;connectivity_rssi&quot;</span>: <span class="jn">-52</span>,</code><div class="jx2__e"><span class="jx2__n">무선 신호 세기</span><span class="jx2__v"><b>-52</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="fov_mode" data-n="시야각 모드" data-d="wide 또는 narrow 중 하나"><span class="jx2__ln">18</span><code class="jx2__c">    <span class="jk">&quot;fov_mode&quot;</span>: <span class="js">&quot;wide&quot;</span></code><div class="jx2__e"><span class="jx2__n">시야각 모드</span><span class="jx2__v"><b>wide</b></span></div></div>
+          <div class="jx2__r"><span class="jx2__ln">19</span><code class="jx2__c">  }</code><div class="jx2__e"></div></div>
+          <div class="jx2__r"><span class="jx2__ln">20</span><code class="jx2__c">}</code><div class="jx2__e"></div></div>
         </div>
-        <div class="ui">
-          <div class="ui__bar">
-            <span class="ui__dot"></span><span class="ui__dot"></span><span class="ui__dot"></span>
-            <span class="ui__addr">localhost:56441/monitoring</span>
-          </div>
-          <div class="ui__body" style="padding:0">
-            <div class="ui-row" style="font-weight:700;color:var(--ink3);font-size:11.5px">
-              <span style="flex:2">Tag ID</span><span style="flex:3">Value</span><span style="flex:1.2">changedAt</span>
-            </div>
-            <div class="ui-row">
-              <span class="mono" style="flex:2;font-size:11.5px;word-break:break-all">LDR-GJ-A1B3-07.ot_device_<wbr>assembly_status.raw_payload</span>
-              <span class="mono" style="flex:3;font-size:11.5px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{"device_role":"LIDAR","site":"geoje","zone":"ASSEMBLY",…}</span>
-              <span class="mono" style="flex:1.2;font-size:11.5px">12:59:23.360</span>
-            </div>
-          </div>
-          <div class="ui__body" style="padding:8px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink3)">
-            화면 표에서는 왼쪽 §04의 규칙대로 조립된 TagId 한 줄과, 실제 값은 옆으로 잘려 보인다 — 전체 값은 표 셀을 눌러야 펼쳐진다.
-          </div>
-        </div>
+        <div class="jx2__foot"><span class="jx2__pos">-</span><span class="jx2__fd">줄에 마우스를 올리면 그 필드의 설명이 여기에 나옵니다</span></div>
       </div>
 
       <p style="margin-top:18px">나머지 두 채널도 봉투 모양(<span class="mono">id</span> + <span class="mono">raw_payload</span>)은
         같고 <span class="mono">raw_payload</span> 안쪽 필드만 다르다. 장비는 위와 같은
         <span class="mono">LDR-GJ-A1B3-07</span>, 스캔 하나를 기준으로 실적과 산출물이
         <span class="mono">scan_id</span> 를 공유한다(§07).</p>
-      <div class="g2">
-        <div class="code">
-          <div class="code__bar"><span>ot/sensor/assembly/actual — 메시지 1건</span><button class="code__copy" type="button">복사</button></div>
-<pre>{
-  "id": "<span class="hl">LDR-GJ-A1B3-07</span>",
-  "raw_payload": {
-    "zone": "ASSEMBLY",
-    "site": "geoje",
-    "shop": "assembly1",
-    "bay": "bay3",
-    "record_type": "ACTUAL",
-    "input_method": "AUTO",
-    "source_system": "AI Inference Service",
-    "hull_no": "H1207",
-    "block_id": "B107P",
-    "scan_id": "<span class="hl">3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11</span>",   <span class="cm">// 산출물과 공유하는 조인 키</span>
-    "scanned_at": "2026-09-10T13:00:00.1123456+09:00",
-    "pan_tilt": "PTZ-GJ-A1B3-07",
-    "edge_pc": "EDG-GJ-A1-03",
-    "inference_ws": "INF-GJ-A1-01",
-    "vision_ocr": null,
-    "event_type": "PROGRESS",
-    "occurred_at": "2026-09-10T13:00:00.1123456+09:00",
-    "ingested_at": "2026-09-10T13:00:01.0456789+09:00",
-    "idempotency_key": "3f9a2b7e:PROGRESS",
-    "block_progress_rate": 47.8,
-    "reference_cad_id": "CAD-H1207-B107P",
-    "match_confidence": 0.94,
-    "model_version": "seg-v1.4.2"
-  }
-}</pre>
-        </div>
-        <div class="ui">
-          <div class="ui__bar">
-            <span class="ui__dot"></span><span class="ui__dot"></span><span class="ui__dot"></span>
-            <span class="ui__addr">localhost:56441/monitoring</span>
-          </div>
-          <div class="ui__body" style="padding:0">
-            <div class="ui-row" style="font-weight:700;color:var(--ink3);font-size:11.5px">
-              <span style="flex:2">Tag ID</span><span style="flex:3">Value</span><span style="flex:1.2">changedAt</span>
-            </div>
-            <div class="ui-row">
-              <span class="mono" style="flex:2;font-size:11.5px;word-break:break-all">LDR-GJ-A1B3-07.ot_sensor_<wbr>assembly_actual.raw_payload</span>
-              <span class="mono" style="flex:3;font-size:11.5px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{"zone":"ASSEMBLY","site":"geoje","record_type":"ACTUAL",…}</span>
-              <span class="mono" style="flex:1.2;font-size:11.5px">13:00:00.112</span>
-            </div>
-          </div>
-          <div class="ui__body" style="padding:8px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink3)">
-            상태 채널과 TagId 마디 수는 같고 가운데 토픽 마디만 <span class="mono">ot_sensor_assembly_actual</span> 로 바뀐다.
-          </div>
-        </div>
-      </div>
 
-      <div class="g2">
-        <div class="code">
-          <div class="code__bar"><span>ot/pipeline/assembly/artifact — SEGMENTED_PCD 1건</span><button class="code__copy" type="button">복사</button></div>
-<pre>{
-  "id": "<span class="hl">LDR-GJ-A1B3-07-SEGMENTED_PCD</span>",
-  "raw_payload": {
-    "zone": "ASSEMBLY",
-    "site": "geoje",
-    "shop": "assembly1",
-    "bay": "bay3",
-    "scan_id": "<span class="hl">3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11</span>",   <span class="cm">// 실적과 같은 스캔</span>
-    "artifact_type": "SEGMENTED_PCD",
-    "hull_no": "H1207",
-    "block_id": "B107P",
-    "segment_id": "SEG-004",
-    "storage_uri": "file://ot-a/pcd/2026/09/10/3f9a2b7e/seg-004.pcd",
-    "file_size_bytes": 18452193,
-    "checksum": "sha256:7c1a9de3f0b2456a",
-    "transformation_matrix": null,
-    "produced_by_device_id": "INF-GJ-A1-01",
-    "model_version": "seg-v1.4.2",
-    "occurred_at": "2026-09-10T13:00:03.4456789+09:00",
-    "ingested_at": "2026-09-10T13:00:04.1123456+09:00"
-  }
-}</pre>
+      <div class="code jx2">
+        <div class="code__bar"><span>ot/sensor/assembly/actual — stage 없음, device_ids 평탄화</span><button class="code__copy" type="button">복사</button></div>
+        <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
+        <div class="jx2__scroll">
+          <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
+          <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id" data-d="shop/bay 채널 태그가 아니라 여전히 장비 id 그대로다 — §07②"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id</span><span class="jx2__tag">장비 축(그레인 그대로)</span><span class="jx2__v"><b>LDR-GJ-A1B3-07</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="zone" data-n="구역" data-d="ASSEMBLY·OUTFITTING"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;zone&quot;</span>: <span class="js">&quot;ASSEMBLY&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">구역</span><span class="jx2__v"><b>ASSEMBLY</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="site" data-n="사업장" data-d="거제 고정값"><span class="jx2__ln">5</span><code class="jx2__c">    <span class="jk">&quot;site&quot;</span>: <span class="js">&quot;geoje&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">사업장</span><span class="jx2__v"><b>geoje</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="shop" data-n="작업장" data-d="토픽에는 없고 payload로만 전달된다(Design B, §02)"><span class="jx2__ln">6</span><code class="jx2__c">    <span class="jk">&quot;shop&quot;</span>: <span class="js">&quot;assembly1&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">작업장</span><span class="jx2__v"><b>assembly1</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="bay" data-n="베이" data-d="토픽에는 없고 payload로만 전달된다"><span class="jx2__ln">7</span><code class="jx2__c">    <span class="jk">&quot;bay&quot;</span>: <span class="js">&quot;bay3&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">베이</span><span class="jx2__v"><b>bay3</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="record_type" data-n="레코드 종류" data-d="ACTUAL 고정값"><span class="jx2__ln">8</span><code class="jx2__c">    <span class="jk">&quot;record_type&quot;</span>: <span class="js">&quot;ACTUAL&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">레코드 종류</span><span class="jx2__v"><b>ACTUAL</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="input_method" data-n="입력 방식" data-d="AUTO 고정값 — 자동 인식 결과임을 표시"><span class="jx2__ln">9</span><code class="jx2__c">    <span class="jk">&quot;input_method&quot;</span>: <span class="js">&quot;AUTO&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">입력 방식</span><span class="jx2__v"><b>AUTO</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="source_system" data-n="원천 시스템" data-d="조립은 AI Inference Service, 의장은 LiDAR Edge Service"><span class="jx2__ln">10</span><code class="jx2__c">    <span class="jk">&quot;source_system&quot;</span>: <span class="js">&quot;AI Inference Service&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">원천 시스템</span><span class="jx2__v"><b>AI Inference Service</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="hull_no" data-n="호선" data-d="선박 번호"><span class="jx2__ln">11</span><code class="jx2__c">    <span class="jk">&quot;hull_no&quot;</span>: <span class="js">&quot;H1207&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">호선</span><span class="jx2__v"><b>H1207</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="block_id" data-n="블록" data-d="호선 안의 블록 식별자"><span class="jx2__ln">12</span><code class="jx2__c">    <span class="jk">&quot;block_id&quot;</span>: <span class="js">&quot;B107P&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">블록</span><span class="jx2__v"><b>B107P</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="scan_id" data-n="스캔 id" data-d="스캔 한 번의 식별자 — §3.3 산출물과 이어지는 유일한 조인 키"><span class="jx2__ln">13</span><code class="jx2__c">    <span class="jk">&quot;scan_id&quot;</span>: <span class="js">&quot;3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">스캔 id</span><span class="jx2__tag">조인 키</span><span class="jx2__v"><b>3f9a2b7e-…</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="scanned_at" data-n="스캔 시각" data-d="지금 발행기에서는 occurred_at 과 같은 값이다"><span class="jx2__ln">14</span><code class="jx2__c">    <span class="jk">&quot;scanned_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:00.1123456+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">스캔 시각</span><span class="jx2__v"><b>13:00:00.112</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="pan_tilt" data-n="팬틸트" data-d="device_ids 중첩 객체 대신 최상위로 평탄화된 필드 중 하나"><span class="jx2__ln">15</span><code class="jx2__c">    <span class="jk">&quot;pan_tilt&quot;</span>: <span class="js">&quot;PTZ-GJ-A1B3-07&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">팬틸트</span><span class="jx2__v"><b>PTZ-GJ-A1B3-07</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="edge_pc" data-n="엣지 PC" data-d="현장 수집 PC"><span class="jx2__ln">16</span><code class="jx2__c">    <span class="jk">&quot;edge_pc&quot;</span>: <span class="js">&quot;EDG-GJ-A1-03&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">엣지 PC</span><span class="jx2__v"><b>EDG-GJ-A1-03</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="inference_ws" data-n="추론 워크스테이션" data-d="정합·진척 계산을 한 서버"><span class="jx2__ln">17</span><code class="jx2__c">    <span class="jk">&quot;inference_ws&quot;</span>: <span class="js">&quot;INF-GJ-A1-01&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">추론 워크스테이션</span><span class="jx2__v"><b>INF-GJ-A1-01</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="vision_ocr" data-n="비전 OCR" data-d="OCR 이 개입한 스캔에만 채워진다 — 7대 중 1대꼴, 대부분 null"><span class="jx2__ln">18</span><code class="jx2__c">    <span class="jk">&quot;vision_ocr&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">비전 OCR</span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="event_type" data-n="이벤트" data-d="START·PROGRESS·COMPLETE 3종"><span class="jx2__ln">19</span><code class="jx2__c">    <span class="jk">&quot;event_type&quot;</span>: <span class="js">&quot;PROGRESS&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">이벤트</span><span class="jx2__v"><b>PROGRESS</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="occurred_at" data-n="발생 시각" data-d="태그의 changedAt 이 된다"><span class="jx2__ln">20</span><code class="jx2__c">    <span class="jk">&quot;occurred_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:00.1123456+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">발생 시각</span><span class="jx2__tag">changedAt</span><span class="jx2__v"><b>13:00:00.112</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="ingested_at" data-n="수집 시각" data-d="Agent 는 쓰지 않는다"><span class="jx2__ln">21</span><code class="jx2__c">    <span class="jk">&quot;ingested_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:01.0456789+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">수집 시각</span><span class="jx2__v"><b>13:00:01.046</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="idempotency_key" data-n="멱등 키" data-d="{scanId 앞 8자}:{event_type} 형태"><span class="jx2__ln">22</span><code class="jx2__c">    <span class="jk">&quot;idempotency_key&quot;</span>: <span class="js">&quot;3f9a2b7e:PROGRESS&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">멱등 키</span><span class="jx2__v"><b>3f9a2b7e:PROGRESS</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="block_progress_rate" data-n="블록 진척률" data-d="COMPLETE 를 지나면 0부터 다시 오른다 — 되돌아가지 않는다"><span class="jx2__ln">23</span><code class="jx2__c">    <span class="jk">&quot;block_progress_rate&quot;</span>: <span class="jn">47.8</span>,</code><div class="jx2__e"><span class="jx2__n">블록 진척률</span><span class="jx2__v"><b>47.8</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="reference_cad_id" data-n="기준 CAD" data-d="정합에 쓴 CAD 모델 id"><span class="jx2__ln">24</span><code class="jx2__c">    <span class="jk">&quot;reference_cad_id&quot;</span>: <span class="js">&quot;CAD-H1207-B107P&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">기준 CAD</span><span class="jx2__v"><b>CAD-H1207-B107P</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="match_confidence" data-n="정합 신뢰도" data-d="0~1 사이"><span class="jx2__ln">25</span><code class="jx2__c">    <span class="jk">&quot;match_confidence&quot;</span>: <span class="jn">0.94</span>,</code><div class="jx2__e"><span class="jx2__n">정합 신뢰도</span><span class="jx2__v"><b>0.94</b></span></div></div>
+          <div class="jx2__r jx2__r--k" data-k="model_version" data-n="모델 버전" data-d="추론 모델 버전"><span class="jx2__ln">26</span><code class="jx2__c">    <span class="jk">&quot;model_version&quot;</span>: <span class="js">&quot;seg-v1.4.2&quot;</span></code><div class="jx2__e"><span class="jx2__n">모델 버전</span><span class="jx2__v"><b>seg-v1.4.2</b></span></div></div>
+          <div class="jx2__r"><span class="jx2__ln">27</span><code class="jx2__c">  }</code><div class="jx2__e"></div></div>
+          <div class="jx2__r"><span class="jx2__ln">28</span><code class="jx2__c">}</code><div class="jx2__e"></div></div>
         </div>
-        <div class="ui">
-          <div class="ui__bar">
-            <span class="ui__dot"></span><span class="ui__dot"></span><span class="ui__dot"></span>
-            <span class="ui__addr">localhost:56441/monitoring</span>
-          </div>
-          <div class="ui__body" style="padding:0">
-            <div class="ui-row" style="font-weight:700;color:var(--ink3);font-size:11.5px">
-              <span style="flex:2">Tag ID</span><span style="flex:3">Value</span><span style="flex:1.2">changedAt</span>
+        <div class="jx2__foot"><span class="jx2__pos">-</span><span class="jx2__fd">줄에 마우스를 올리면 그 필드의 설명이 여기에 나옵니다</span></div>
+      </div>
+      <p><span class="mono">scan_id</span> 가 이 실적과 아래 산출물을 잇는 조인 키다. <span class="mono">id</span> 는
+        <b>장비 id 그대로</b>다 — shop/bay 단위 채널 태그가 아니라 여전히 장비별 태그가 된다.</p>
+
+      <h3 style="font-size:14px;margin:20px 0 8px;color:var(--ink2)">산출물 — <span class="mono">ot/pipeline/assembly/artifact</span>, 스캔마다 3종</h3>
+      <p>장비 하나가 스캔마다 <b>3가지 종류</b>를 각각 다른 <span class="mono">id</span> 로 보낸다 — 탭으로 셋을 비교한다.</p>
+      <div class="tabs">
+        <div class="tabs__bar" role="tablist">
+          <button type="button" class="tabs__b on" data-t="reg">정합 PCD<small>REGISTERED_PCD</small></button>
+          <button type="button" class="tabs__b" data-t="tm">변환 행렬<small>TRANSFORMATION_MATRIX</small></button>
+          <button type="button" class="tabs__b" data-t="seg">세그먼트 PCD<small>SEGMENTED_PCD × 10</small></button>
+        </div>
+        <div class="tabs__p on" data-p="reg">
+          <div class="code jx2">
+            <div class="code__bar"><span>REGISTERED_PCD</span><button class="code__copy" type="button">복사</button></div>
+            <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
+            <div class="jx2__scroll">
+              <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
+              <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id + 산출물 종류" data-d="{device.Id}-{artifactType} — 장비 하나가 스캔마다 종류별로 다른 id 를 쓴다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07-REGISTERED_PCD&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id + 산출물 종류</span><span class="jx2__tag">장비+종류 축</span><span class="jx2__v"><b>…-REGISTERED_PCD</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="zone" data-n="구역" data-d="ASSEMBLY·OUTFITTING"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;zone&quot;</span>: <span class="js">&quot;ASSEMBLY&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">구역</span><span class="jx2__v"><b>ASSEMBLY</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="site" data-n="사업장" data-d="거제 고정값"><span class="jx2__ln">5</span><code class="jx2__c">    <span class="jk">&quot;site&quot;</span>: <span class="js">&quot;geoje&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">사업장</span><span class="jx2__v"><b>geoje</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="shop" data-n="작업장" data-d="토픽에는 없고 payload로만 전달된다"><span class="jx2__ln">6</span><code class="jx2__c">    <span class="jk">&quot;shop&quot;</span>: <span class="js">&quot;assembly1&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">작업장</span><span class="jx2__v"><b>assembly1</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="bay" data-n="베이" data-d="토픽에는 없고 payload로만 전달된다"><span class="jx2__ln">7</span><code class="jx2__c">    <span class="jk">&quot;bay&quot;</span>: <span class="js">&quot;bay3&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">베이</span><span class="jx2__v"><b>bay3</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="scan_id" data-n="스캔 id" data-d="§3.2 실적과 같은 값 — 이 키로 실적↔산출물을 잇는다"><span class="jx2__ln">8</span><code class="jx2__c">    <span class="jk">&quot;scan_id&quot;</span>: <span class="js">&quot;3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">스캔 id</span><span class="jx2__tag">조인 키</span><span class="jx2__v"><b>3f9a2b7e-…</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="artifact_type" data-n="산출물 종류" data-d="REGISTERED_PCD·TRANSFORMATION_MATRIX·SEGMENTED_PCD 3종 — id 접미사와 같은 값"><span class="jx2__ln">9</span><code class="jx2__c">    <span class="jk">&quot;artifact_type&quot;</span>: <span class="js">&quot;REGISTERED_PCD&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">산출물 종류</span><span class="jx2__tag">3종 중 하나</span><span class="jx2__v"><b>REGISTERED_PCD</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="hull_no" data-n="호선" data-d="선박 번호"><span class="jx2__ln">10</span><code class="jx2__c">    <span class="jk">&quot;hull_no&quot;</span>: <span class="js">&quot;H1207&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">호선</span><span class="jx2__v"><b>H1207</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="block_id" data-n="블록" data-d="호선 안의 블록 식별자"><span class="jx2__ln">11</span><code class="jx2__c">    <span class="jk">&quot;block_id&quot;</span>: <span class="js">&quot;B107P&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">블록</span><span class="jx2__v"><b>B107P</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="segment_id" data-n="세그먼트 id" data-d="SEGMENTED_PCD 일 때만 값이 있다"><span class="jx2__ln">12</span><code class="jx2__c">    <span class="jk">&quot;segment_id&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">세그먼트 id</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="storage_uri" data-n="저장 위치" data-d="PCD 파일 본체는 여기 안 싣고 위치만 참조한다"><span class="jx2__ln">13</span><code class="jx2__c">    <span class="jk">&quot;storage_uri&quot;</span>: <span class="js">&quot;file://ot-a/pcd/2026/09/10/3f9a2b7e/registered.pcd&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">저장 위치</span><span class="jx2__v"><b>…/registered.pcd</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="file_size_bytes" data-n="파일 크기" data-d="바이트 단위"><span class="jx2__ln">14</span><code class="jx2__c">    <span class="jk">&quot;file_size_bytes&quot;</span>: <span class="jn">187654321</span>,</code><div class="jx2__e"><span class="jx2__n">파일 크기</span><span class="jx2__v"><b>187654321</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="checksum" data-n="체크섬" data-d="파일 무결성 검증용"><span class="jx2__ln">15</span><code class="jx2__c">    <span class="jk">&quot;checksum&quot;</span>: <span class="js">&quot;sha256:7c1a9de3f0b2456a&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">체크섬</span><span class="jx2__v"><b>sha256:7c1a…</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="transformation_matrix" data-n="변환 행렬" data-d="TRANSFORMATION_MATRIX 일 때만 값이 있다"><span class="jx2__ln">16</span><code class="jx2__c">    <span class="jk">&quot;transformation_matrix&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">변환 행렬</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="produced_by_device_id" data-n="산출 장비" data-d="이 산출물을 만든 장비 — 주로 inference_ws"><span class="jx2__ln">17</span><code class="jx2__c">    <span class="jk">&quot;produced_by_device_id&quot;</span>: <span class="js">&quot;INF-GJ-A1-01&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">산출 장비</span><span class="jx2__v"><b>INF-GJ-A1-01</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="model_version" data-n="모델 버전" data-d="추론 모델 버전"><span class="jx2__ln">18</span><code class="jx2__c">    <span class="jk">&quot;model_version&quot;</span>: <span class="js">&quot;seg-v1.4.2&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">모델 버전</span><span class="jx2__v"><b>seg-v1.4.2</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="occurred_at" data-n="발생 시각" data-d="태그의 changedAt 이 된다"><span class="jx2__ln">19</span><code class="jx2__c">    <span class="jk">&quot;occurred_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:03.4456789+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">발생 시각</span><span class="jx2__tag">changedAt</span><span class="jx2__v"><b>13:00:03.446</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="ingested_at" data-n="수집 시각" data-d="Agent 는 쓰지 않는다"><span class="jx2__ln">20</span><code class="jx2__c">    <span class="jk">&quot;ingested_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:04.1123456+09:00&quot;</span></code><div class="jx2__e"><span class="jx2__n">수집 시각</span><span class="jx2__v"><b>13:00:04.112</b></span></div></div>
+              <div class="jx2__r"><span class="jx2__ln">21</span><code class="jx2__c">  }</code><div class="jx2__e"></div></div>
+              <div class="jx2__r"><span class="jx2__ln">22</span><code class="jx2__c">}</code><div class="jx2__e"></div></div>
             </div>
-            <div class="ui-row">
-              <span class="mono" style="flex:2;font-size:11.5px;word-break:break-all">LDR-GJ-A1B3-07-SEGMENTED_PCD<wbr>.ot_pipeline_assembly_artifact.raw_payload</span>
-              <span class="mono" style="flex:3;font-size:11.5px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{"zone":"ASSEMBLY","artifact_type":"SEGMENTED_PCD",…}</span>
-              <span class="mono" style="flex:1.2;font-size:11.5px">13:00:03.445</span>
-            </div>
+            <div class="jx2__foot"><span class="jx2__pos">-</span><span class="jx2__fd">줄에 마우스를 올리면 그 필드의 설명이 여기에 나옵니다</span></div>
           </div>
-          <div class="ui__body" style="padding:8px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink3)">
-            <span class="mono">id</span> 에 종류 접미사가 붙어 TagId 첫 마디부터 달라진다 — 같은 장비라도 산출물 종류마다
-            (<span class="mono">REGISTERED_PCD</span>·<span class="mono">TRANSFORMATION_MATRIX</span>·<span class="mono">SEGMENTED_PCD</span>)
-            화면에 별도 행 3~12개로 갈라져 보인다. 셋은 <span class="mono">segment_id</span>·<span class="mono">storage_uri</span>·
-            <span class="mono">transformation_matrix</span> 세 필드만 서로 다르게 채워진다(§02 표).
+        </div>
+        <div class="tabs__p" data-p="tm">
+          <div class="code jx2">
+            <div class="code__bar"><span>TRANSFORMATION_MATRIX</span><button class="code__copy" type="button">복사</button></div>
+            <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
+            <div class="jx2__scroll">
+              <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
+              <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id + 산출물 종류" data-d="{device.Id}-{artifactType}"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07-TRANSFORMATION_MATRIX&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id + 산출물 종류</span><span class="jx2__tag">장비+종류 축</span><span class="jx2__v"><b>…-TRANSFORMATION_MATRIX</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="zone" data-n="구역" data-d="ASSEMBLY·OUTFITTING"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;zone&quot;</span>: <span class="js">&quot;ASSEMBLY&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">구역</span><span class="jx2__v"><b>ASSEMBLY</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="site" data-n="사업장" data-d="거제 고정값"><span class="jx2__ln">5</span><code class="jx2__c">    <span class="jk">&quot;site&quot;</span>: <span class="js">&quot;geoje&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">사업장</span><span class="jx2__v"><b>geoje</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="shop" data-n="작업장" data-d="토픽에는 없고 payload로만 전달된다"><span class="jx2__ln">6</span><code class="jx2__c">    <span class="jk">&quot;shop&quot;</span>: <span class="js">&quot;assembly1&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">작업장</span><span class="jx2__v"><b>assembly1</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="bay" data-n="베이" data-d="토픽에는 없고 payload로만 전달된다"><span class="jx2__ln">7</span><code class="jx2__c">    <span class="jk">&quot;bay&quot;</span>: <span class="js">&quot;bay3&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">베이</span><span class="jx2__v"><b>bay3</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="scan_id" data-n="스캔 id" data-d="§3.2 실적과 같은 값 — 이 키로 실적↔산출물을 잇는다"><span class="jx2__ln">8</span><code class="jx2__c">    <span class="jk">&quot;scan_id&quot;</span>: <span class="js">&quot;3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">스캔 id</span><span class="jx2__tag">조인 키</span><span class="jx2__v"><b>3f9a2b7e-…</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="artifact_type" data-n="산출물 종류" data-d="REGISTERED_PCD·TRANSFORMATION_MATRIX·SEGMENTED_PCD 3종"><span class="jx2__ln">9</span><code class="jx2__c">    <span class="jk">&quot;artifact_type&quot;</span>: <span class="js">&quot;TRANSFORMATION_MATRIX&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">산출물 종류</span><span class="jx2__tag">3종 중 하나</span><span class="jx2__v"><b>TRANSFORMATION_MATRIX</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="hull_no" data-n="호선" data-d="선박 번호"><span class="jx2__ln">10</span><code class="jx2__c">    <span class="jk">&quot;hull_no&quot;</span>: <span class="js">&quot;H1207&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">호선</span><span class="jx2__v"><b>H1207</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="block_id" data-n="블록" data-d="호선 안의 블록 식별자"><span class="jx2__ln">11</span><code class="jx2__c">    <span class="jk">&quot;block_id&quot;</span>: <span class="js">&quot;B107P&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">블록</span><span class="jx2__v"><b>B107P</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="segment_id" data-n="세그먼트 id" data-d="SEGMENTED_PCD 일 때만 값이 있다"><span class="jx2__ln">12</span><code class="jx2__c">    <span class="jk">&quot;segment_id&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">세그먼트 id</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="storage_uri" data-n="저장 위치" data-d="이 종류는 파일이 없어 항상 null"><span class="jx2__ln">13</span><code class="jx2__c">    <span class="jk">&quot;storage_uri&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">저장 위치</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="file_size_bytes" data-n="파일 크기" data-d="이 종류는 파일이 없어 항상 null"><span class="jx2__ln">14</span><code class="jx2__c">    <span class="jk">&quot;file_size_bytes&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">파일 크기</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="checksum" data-n="체크섬" data-d="이 종류는 파일이 없어 항상 null"><span class="jx2__ln">15</span><code class="jx2__c">    <span class="jk">&quot;checksum&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">체크섬</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="transformation_matrix" data-n="변환 행렬" data-d="4×4=16개 숫자. 파일로 안 빼고 예외적으로 메시지에 직접 싣는다"><span class="jx2__ln">16</span><code class="jx2__c">    <span class="jk">&quot;transformation_matrix&quot;</span>: [1.0, 0.02, -0.01, 1042.3, …],</code><div class="jx2__e"><span class="jx2__n">변환 행렬</span><span class="jx2__tag">숫자 16개</span><span class="jx2__v"><b>[16개 숫자]</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="produced_by_device_id" data-n="산출 장비" data-d="이 산출물을 만든 장비 — 주로 inference_ws"><span class="jx2__ln">17</span><code class="jx2__c">    <span class="jk">&quot;produced_by_device_id&quot;</span>: <span class="js">&quot;INF-GJ-A1-01&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">산출 장비</span><span class="jx2__v"><b>INF-GJ-A1-01</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="model_version" data-n="모델 버전" data-d="추론 모델 버전"><span class="jx2__ln">18</span><code class="jx2__c">    <span class="jk">&quot;model_version&quot;</span>: <span class="js">&quot;seg-v1.4.2&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">모델 버전</span><span class="jx2__v"><b>seg-v1.4.2</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="occurred_at" data-n="발생 시각" data-d="태그의 changedAt 이 된다"><span class="jx2__ln">19</span><code class="jx2__c">    <span class="jk">&quot;occurred_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:03.4456789+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">발생 시각</span><span class="jx2__tag">changedAt</span><span class="jx2__v"><b>13:00:03.446</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="ingested_at" data-n="수집 시각" data-d="Agent 는 쓰지 않는다"><span class="jx2__ln">20</span><code class="jx2__c">    <span class="jk">&quot;ingested_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:04.1123456+09:00&quot;</span></code><div class="jx2__e"><span class="jx2__n">수집 시각</span><span class="jx2__v"><b>13:00:04.112</b></span></div></div>
+              <div class="jx2__r"><span class="jx2__ln">21</span><code class="jx2__c">  }</code><div class="jx2__e"></div></div>
+              <div class="jx2__r"><span class="jx2__ln">22</span><code class="jx2__c">}</code><div class="jx2__e"></div></div>
+            </div>
+            <div class="jx2__foot"><span class="jx2__pos">-</span><span class="jx2__fd">줄에 마우스를 올리면 그 필드의 설명이 여기에 나옵니다</span></div>
+          </div>
+        </div>
+        <div class="tabs__p" data-p="seg">
+          <div class="code jx2">
+            <div class="code__bar"><span>SEGMENTED_PCD × 10</span><button class="code__copy" type="button">복사</button></div>
+            <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
+            <div class="jx2__scroll">
+              <div class="jx2__r"><span class="jx2__ln">1</span><code class="jx2__c">{</code><div class="jx2__e"></div></div>
+              <div class="jx2__r jx2__r--k" data-k="id" data-n="장비 id + 산출물 종류" data-d="{device.Id}-{artifactType} — 스캔마다 이 종류로 10건이 연달아 온다"><span class="jx2__ln">2</span><code class="jx2__c">  <span class="jk">&quot;id&quot;</span>: <span class="js">&quot;LDR-GJ-A1B3-07-SEGMENTED_PCD&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">장비 id + 산출물 종류</span><span class="jx2__tag">장비+종류 축</span><span class="jx2__v"><b>…-SEGMENTED_PCD</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="raw_payload" data-n="측정 본문" data-d="tagMode=raw 면 이 객체 전체가 태그 하나의 문자열 값이 된다"><span class="jx2__ln">3</span><code class="jx2__c">  <span class="jk">&quot;raw_payload&quot;</span>: {</code><div class="jx2__e"><span class="jx2__n">측정 본문</span><span class="jx2__tag">태그 값</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="zone" data-n="구역" data-d="ASSEMBLY·OUTFITTING"><span class="jx2__ln">4</span><code class="jx2__c">    <span class="jk">&quot;zone&quot;</span>: <span class="js">&quot;ASSEMBLY&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">구역</span><span class="jx2__v"><b>ASSEMBLY</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="site" data-n="사업장" data-d="거제 고정값"><span class="jx2__ln">5</span><code class="jx2__c">    <span class="jk">&quot;site&quot;</span>: <span class="js">&quot;geoje&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">사업장</span><span class="jx2__v"><b>geoje</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="shop" data-n="작업장" data-d="토픽에는 없고 payload로만 전달된다"><span class="jx2__ln">6</span><code class="jx2__c">    <span class="jk">&quot;shop&quot;</span>: <span class="js">&quot;assembly1&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">작업장</span><span class="jx2__v"><b>assembly1</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="bay" data-n="베이" data-d="토픽에는 없고 payload로만 전달된다"><span class="jx2__ln">7</span><code class="jx2__c">    <span class="jk">&quot;bay&quot;</span>: <span class="js">&quot;bay3&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">베이</span><span class="jx2__v"><b>bay3</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="scan_id" data-n="스캔 id" data-d="§3.2 실적과 같은 값 — 이 키로 실적↔산출물을 잇는다"><span class="jx2__ln">8</span><code class="jx2__c">    <span class="jk">&quot;scan_id&quot;</span>: <span class="js">&quot;3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">스캔 id</span><span class="jx2__tag">조인 키</span><span class="jx2__v"><b>3f9a2b7e-…</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="artifact_type" data-n="산출물 종류" data-d="REGISTERED_PCD·TRANSFORMATION_MATRIX·SEGMENTED_PCD 3종"><span class="jx2__ln">9</span><code class="jx2__c">    <span class="jk">&quot;artifact_type&quot;</span>: <span class="js">&quot;SEGMENTED_PCD&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">산출물 종류</span><span class="jx2__tag">3종 중 하나</span><span class="jx2__v"><b>SEGMENTED_PCD</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="hull_no" data-n="호선" data-d="선박 번호"><span class="jx2__ln">10</span><code class="jx2__c">    <span class="jk">&quot;hull_no&quot;</span>: <span class="js">&quot;H1207&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">호선</span><span class="jx2__v"><b>H1207</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="block_id" data-n="블록" data-d="호선 안의 블록 식별자"><span class="jx2__ln">11</span><code class="jx2__c">    <span class="jk">&quot;block_id&quot;</span>: <span class="js">&quot;B107P&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">블록</span><span class="jx2__v"><b>B107P</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="segment_id" data-n="세그먼트 id" data-d="어느 세그먼트(부재·구역)인지 — SEGMENTED_PCD 일 때만 값이 있다. 스캔당 SEG-001~010"><span class="jx2__ln">12</span><code class="jx2__c">    <span class="jk">&quot;segment_id&quot;</span>: <span class="js">&quot;SEG-004&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">세그먼트 id</span><span class="jx2__v"><b>SEG-004</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="storage_uri" data-n="저장 위치" data-d="PCD 파일 본체는 여기 안 싣고 위치만 참조한다"><span class="jx2__ln">13</span><code class="jx2__c">    <span class="jk">&quot;storage_uri&quot;</span>: <span class="js">&quot;file://ot-a/pcd/2026/09/10/3f9a2b7e/seg-004.pcd&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">저장 위치</span><span class="jx2__v"><b>…/seg-004.pcd</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="file_size_bytes" data-n="파일 크기" data-d="바이트 단위. 정합 PCD 보다 한 자리 작다(세그먼트 한 조각이라)"><span class="jx2__ln">14</span><code class="jx2__c">    <span class="jk">&quot;file_size_bytes&quot;</span>: <span class="jn">18452193</span>,</code><div class="jx2__e"><span class="jx2__n">파일 크기</span><span class="jx2__v"><b>18452193</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="checksum" data-n="체크섬" data-d="파일 무결성 검증용"><span class="jx2__ln">15</span><code class="jx2__c">    <span class="jk">&quot;checksum&quot;</span>: <span class="js">&quot;sha256:7c1a9de3f0b2456a&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">체크섬</span><span class="jx2__v"><b>sha256:7c1a…</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="transformation_matrix" data-n="변환 행렬" data-d="이 종류는 값이 없어 항상 null"><span class="jx2__ln">16</span><code class="jx2__c">    <span class="jk">&quot;transformation_matrix&quot;</span>: <span class="jz">null</span>,</code><div class="jx2__e"><span class="jx2__n">변환 행렬</span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="produced_by_device_id" data-n="산출 장비" data-d="이 산출물을 만든 장비 — 주로 inference_ws"><span class="jx2__ln">17</span><code class="jx2__c">    <span class="jk">&quot;produced_by_device_id&quot;</span>: <span class="js">&quot;INF-GJ-A1-01&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">산출 장비</span><span class="jx2__v"><b>INF-GJ-A1-01</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="model_version" data-n="모델 버전" data-d="추론 모델 버전"><span class="jx2__ln">18</span><code class="jx2__c">    <span class="jk">&quot;model_version&quot;</span>: <span class="js">&quot;seg-v1.4.2&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">모델 버전</span><span class="jx2__v"><b>seg-v1.4.2</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="occurred_at" data-n="발생 시각" data-d="태그의 changedAt 이 된다"><span class="jx2__ln">19</span><code class="jx2__c">    <span class="jk">&quot;occurred_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:03.4456789+09:00&quot;</span>,</code><div class="jx2__e"><span class="jx2__n">발생 시각</span><span class="jx2__tag">changedAt</span><span class="jx2__v"><b>13:00:03.446</b></span></div></div>
+              <div class="jx2__r jx2__r--k" data-k="ingested_at" data-n="수집 시각" data-d="Agent 는 쓰지 않는다"><span class="jx2__ln">20</span><code class="jx2__c">    <span class="jk">&quot;ingested_at&quot;</span>: <span class="js">&quot;2026-09-10T13:00:04.1123456+09:00&quot;</span></code><div class="jx2__e"><span class="jx2__n">수집 시각</span><span class="jx2__v"><b>13:00:04.112</b></span></div></div>
+              <div class="jx2__r"><span class="jx2__ln">21</span><code class="jx2__c">  }</code><div class="jx2__e"></div></div>
+              <div class="jx2__r"><span class="jx2__ln">22</span><code class="jx2__c">}</code><div class="jx2__e"></div></div>
+            </div>
+            <div class="jx2__foot"><span class="jx2__pos">-</span><span class="jx2__fd">줄에 마우스를 올리면 그 필드의 설명이 여기에 나옵니다</span></div>
           </div>
         </div>
       </div>
+      <p>큰 파일(PCD)은 메시지에 싣지 않는다 — <span class="mono">storage_uri</span>만 참조한다. 변환 행렬은 숫자 16개뿐이라
+        예외적으로 메시지에 직접 포함한다(<span class="mono">TRANSFORMATION_MATRIX</span>일 때만 값이 있고 나머지는 null).
+        <span class="mono">id</span>는 <span class="mono">{device.Id}-{artifactType}</span>라 장비 하나가 스캔마다
+        12건(REGISTERED_PCD 1·TRANSFORMATION_MATRIX 1·SEGMENTED_PCD 10)을 종류마다 다른 태그로 보낸다 — 같은 장비라도
+        화면에는 별도 행 3~12개로 갈라져 보인다.</p>
 
       <div class="note note--warn">
         <p class="note__t">프로토콜 3.1.1 고정</p>
@@ -1091,6 +1196,7 @@ ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STR
 
   </main>
 </div>
+<button id="bSideOpen" class="side-reopen no-print" type="button" aria-label="목차 사이드바 펼치기">목차</button>
 
 <script>
 /* ============================================================
@@ -1985,6 +2091,8 @@ ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STR
     mk('방향', '선택 선이 붙는 면을 바꾼다 (자동 → 오른쪽>왼쪽 → …)', function () { self.cyclePort(); });
     mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
     bar.appendChild(el('span', 'dgm__sep'));
+    this.bMax = mk('넓게', '화면 가득 펼치기 (Esc 로 닫기)', function () { self.toggleMax(); });
+    bar.appendChild(el('span', 'dgm__sep'));
     mk('되돌리기', 'Ctrl+Z', function () { self.doUndo(); });
     this.bReset = mk('원래대로', '이 브라우저에 저장된 편집을 지우고 문서 원본으로', function () { self.resetSaved(); });
     bar.appendChild(el('span', 'sp'));
@@ -2040,6 +2148,24 @@ ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STR
   };
   Flow.prototype.editing = function () { return this.root.classList.contains('is-edit'); };
   Flow.prototype.status = function (t) { if (this.hint) this.hint.textContent = t; };
+
+  /* 화면 가득 펼치기. 다른 그림이 펼쳐져 있으면 먼저 닫는다(.dgm.toggleMax 와 같은 규칙). */
+  Flow.prototype.toggleMax = function (force) {
+    var self = this;
+    var on = (force == null) ? !this.root.classList.contains('is-max') : !!force;
+    if (on) {
+      var cur = document.querySelector('.flow.is-max');
+      if (cur && cur !== this.root && cur.__flow) cur.__flow.toggleMax(false);
+    }
+    this.root.classList.toggle('is-max', on);
+    document.documentElement.classList.toggle('flow-locked', on);
+    if (this.bMax) {
+      this.bMax.classList.toggle('is-on', on);
+      this.bMax.textContent = on ? '닫기' : '넓게';
+      this.bMax.title = on ? '원래 크기로 (Esc)' : '화면 가득 펼치기 (Esc 로 닫기)';
+    }
+    (window.requestAnimationFrame || setTimeout)(function () { self.draw(); });
+  };
 
   Flow.prototype.select = function (s) {
     this.sel = s;
@@ -2266,6 +2392,16 @@ ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STR
     var r = e.target.closest && e.target.closest('.flow');
     if (r && r.__flow) Flow.active = r.__flow;
   }, true);
+  /* Esc 는 펼쳐 놓은 그림을 닫는다(.dgm 과 같은 규칙). */
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var m = document.querySelector('.flow.is-max');
+    if (m && m.__flow) { ev.preventDefault(); m.__flow.toggleMax(false); }
+  });
+  window.addEventListener('resize', function () {
+    var m = document.querySelector('.flow.is-max');
+    if (m && m.__flow) m.__flow.draw();
+  });
 
   /* ── 그리기 ─────────────────────────────────────────────── */
   Flow.prototype.draw = function () {
@@ -2410,6 +2546,48 @@ ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STR
     }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
     secs.forEach(function (s) { io.observe(s); });
   }
+  /* 마지막 섹션은 짧으면 위 10~25% 관찰 밴드까지 올라오지 못해 끝까지 안 켜질 수 있다 —
+     스크롤이 문서 끝에 닿으면 무조건 마지막 링크를 켠다. */
+  if (links.length) {
+    var lastLink = links[links.length - 1];
+    var atBottom = function () {
+      return window.innerHeight + Math.round(window.scrollY) >= document.documentElement.scrollHeight - 4;
+    };
+    var checkBottom = function () {
+      if (atBottom()) { links.forEach(function (a) { a.classList.toggle('is-cur', a === lastLink); }); }
+    };
+    window.addEventListener('scroll', checkBottom, { passive: true });
+    window.addEventListener('resize', checkBottom);
+    checkBottom();
+  }
+
+  /* --- 목차 사이드바 접기/펼치기 (좁게: 목차 목록만 / 완전히: 사이드바 전체) --- */
+  (function () {
+    var bToc = document.getElementById('bToc'), tocList = document.querySelector('.toc');
+    var docEl = document.querySelector('.doc'), bOpen = document.getElementById('bSideOpen');
+    if (!bToc || !tocList || !docEl) return;
+    var TKEY = 'hwdoc:side-collapsed';
+    var collapsed = false;
+    try { collapsed = localStorage.getItem(TKEY) === '1'; } catch (e) { /* 저장 불가 환경 */ }
+    function apply(c) {
+      docEl.classList.toggle('side-collapsed', c);
+      tocList.classList.toggle('is-collapsed', c);
+      bToc.textContent = c ? '펼치기' : '접기';
+      bToc.setAttribute('aria-expanded', String(!c));
+      if (bOpen) bOpen.classList.toggle('is-shown', c);
+    }
+    apply(collapsed);
+    bToc.addEventListener('click', function () {
+      collapsed = !collapsed;
+      try { localStorage.setItem(TKEY, collapsed ? '1' : '0'); } catch (e) { /* 무시 */ }
+      apply(collapsed);
+    });
+    if (bOpen) bOpen.addEventListener('click', function () {
+      collapsed = false;
+      try { localStorage.setItem(TKEY, '0'); } catch (e) { /* 무시 */ }
+      apply(collapsed);
+    });
+  })();
 
   /* --- 체크리스트 상태 저장 --- */
   var saved = {};
@@ -2457,6 +2635,45 @@ ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STR
     if (!confirm('체크 상태를 모두 초기화할까요?')) return;
     try { localStorage.removeItem(KEY); } catch (e) { }
     location.reload();
+  });
+})();
+</script>
+<script>
+/* ============================================================
+   HW Doc Kit - 탭(.tabs) · JSON 한 줄 설명(.jx2) 엔진 (의존성 없음)
+   ============================================================ */
+(function () {
+  function show(box, key) {
+    box.querySelectorAll(':scope > .tabs__bar .tabs__b').forEach(function (b) { b.classList.toggle('on', b.dataset.t === key); });
+    box.querySelectorAll(':scope > .tabs__p').forEach(function (p) { p.classList.toggle('on', p.dataset.p === key); });
+  }
+  var boxes = document.querySelectorAll('.tabs');
+  boxes.forEach(function (box) {
+    var first = box.querySelector('.tabs__b.on') || box.querySelector('.tabs__b');
+    if (first) show(box, first.dataset.t);
+    box.querySelectorAll(':scope > .tabs__bar .tabs__b').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var sync = box.dataset.sync;
+        boxes.forEach(function (o) { if (o === box || (sync && o.dataset.sync === sync)) show(o, b.dataset.t); });
+      });
+    });
+  });
+
+  document.querySelectorAll('.jx2').forEach(function (box) {
+    var pos = box.querySelector('.jx2__pos'), fd = box.querySelector('.jx2__fd');
+    if (!pos || !fd) return;
+    var idle = fd.innerHTML;
+    box.querySelectorAll('.jx2__r--k').forEach(function (r) {
+      r.addEventListener('mouseenter', function () {
+        box.classList.add('act');
+        pos.textContent = r.querySelector('.jx2__ln').textContent + '행';
+        fd.innerHTML = '<b></b><code></code><span></span>';
+        fd.children[0].textContent = r.dataset.n;
+        fd.children[1].textContent = r.dataset.k;
+        fd.children[2].textContent = r.dataset.d;
+      });
+      r.addEventListener('mouseleave', function () { box.classList.remove('act'); pos.textContent = '-'; fd.innerHTML = idle; });
+    });
   });
 })();
 </script>
