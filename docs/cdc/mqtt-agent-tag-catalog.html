@@ -977,23 +977,30 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
       <h3 style="font-size:14px;margin:20px 0 8px;color:var(--ink2)">산출물 — <span class="mono">ot/pipeline/assembly/artifact</span>, 스캔마다 3종</h3>
       <p>장비 하나가 스캔마다 <b>3가지 종류</b>를 각각 다른 <span class="mono">id</span> 로 보낸다 — 탭으로 셋을 비교한다.</p>
       <div class="g-1-2">
-        <div class="code">
-          <div class="code__bar"><span>필드인터페이스정의서 §6.4 — 파이프라인 산출물 (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
-          <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/pipeline/{zone}/{shop}/{bay}/artifact</b></div>
+        <div class="tabs" data-sync="artifact">
+          <div class="tabs__bar" role="tablist">
+            <button type="button" class="tabs__b on" data-t="reg">정합 PCD<small>REGISTERED_PCD</small></button>
+            <button type="button" class="tabs__b" data-t="tm">변환 행렬<small>TRANSFORMATION_MATRIX</small></button>
+            <button type="button" class="tabs__b" data-t="seg">세그먼트 PCD<small>SEGMENTED_PCD × 10</small></button>
+          </div>
+          <div class="tabs__p on" data-p="reg">
+            <div class="code">
+              <div class="code__bar"><span>필드인터페이스정의서 §6.4 — REGISTERED_PCD (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
+              <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/pipeline/{zone}/{shop}/{bay}/artifact</b></div>
 <pre>{
   "zone": "ASSEMBLY",
   "site": "geoje",
   "shop": "assembly1",
   "bay": "bay3",
   "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",
-  "artifact_type": "<span class="hl">REGISTERED_PCD | TRANSFORMATION_MATRIX | SEGMENTED_PCD</span>",
+  "artifact_type": "REGISTERED_PCD",
   "hull_no": "H1207",
   "block_id": "B107P",
-  "segment_id": "<span class="cm">string | null</span>",
-  "storage_uri": "<span class="cm">string | null</span>",
-  "file_size_bytes": "<span class="cm">number | null</span>",
-  "checksum": "<span class="cm">string | null</span>",
-  "transformation_matrix": "<span class="cm">number[16] | null</span>",
+  "segment_id": <span class="jz">null</span>,
+  "storage_uri": "file://ot-a/pcd/2026/09/10/3f9a2b7e/registered.pcd",
+  "file_size_bytes": 187654321,
+  "checksum": "sha256:7c1a9de3f0b2456a",
+  "transformation_matrix": <span class="jz">null</span>,
   "produced_by_device_id": "INF-GJ-A1-01",
   "model_version": "seg-v1.4.2",
   "occurred_at": "2026-09-10T13:00:03.446+09:00",
@@ -1001,8 +1008,64 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
   "idempotency_key": "<span class="cm">string</span>",
   "raw_payload": {}
 }</pre>
+            </div>
+          </div>
+          <div class="tabs__p" data-p="tm">
+            <div class="code">
+              <div class="code__bar"><span>필드인터페이스정의서 §6.4 — TRANSFORMATION_MATRIX (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
+              <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/pipeline/{zone}/{shop}/{bay}/artifact</b></div>
+<pre>{
+  "zone": "ASSEMBLY",
+  "site": "geoje",
+  "shop": "assembly1",
+  "bay": "bay3",
+  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",
+  "artifact_type": "TRANSFORMATION_MATRIX",
+  "hull_no": "H1207",
+  "block_id": "B107P",
+  "segment_id": <span class="jz">null</span>,
+  "storage_uri": <span class="jz">null</span>,
+  "file_size_bytes": <span class="jz">null</span>,
+  "checksum": <span class="jz">null</span>,
+  "transformation_matrix": [1.0, 0.02, -0.01, 1042.3, <span class="cm">…16개</span>],
+  "produced_by_device_id": "INF-GJ-A1-01",
+  "model_version": "seg-v1.4.2",
+  "occurred_at": "2026-09-10T13:00:03.446+09:00",
+  "ingested_at": "2026-09-10T13:00:04.112+09:00",
+  "idempotency_key": "<span class="cm">string</span>",
+  "raw_payload": {}
+}</pre>
+            </div>
+          </div>
+          <div class="tabs__p" data-p="seg">
+            <div class="code">
+              <div class="code__bar"><span>필드인터페이스정의서 §6.4 — SEGMENTED_PCD (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
+              <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/pipeline/{zone}/{shop}/{bay}/artifact</b></div>
+<pre>{
+  "zone": "ASSEMBLY",
+  "site": "geoje",
+  "shop": "assembly1",
+  "bay": "bay3",
+  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",
+  "artifact_type": "SEGMENTED_PCD",
+  "hull_no": "H1207",
+  "block_id": "B107P",
+  "segment_id": "SEG-004",
+  "storage_uri": "file://ot-a/pcd/2026/09/10/3f9a2b7e/seg-004.pcd",
+  "file_size_bytes": 18452193,
+  "checksum": "sha256:7c1a9de3f0b2456a",
+  "transformation_matrix": <span class="jz">null</span>,
+  "produced_by_device_id": "INF-GJ-A1-01",
+  "model_version": "seg-v1.4.2",
+  "occurred_at": "2026-09-10T13:00:03.446+09:00",
+  "ingested_at": "2026-09-10T13:00:04.112+09:00",
+  "idempotency_key": "<span class="cm">string</span>",
+  "raw_payload": {}
+}</pre>
+            </div>
+          </div>
         </div>
-      <div class="tabs">
+      <div class="tabs" data-sync="artifact">
         <div class="tabs__bar" role="tablist">
           <button type="button" class="tabs__b on" data-t="reg">정합 PCD<small>REGISTERED_PCD</small></button>
           <button type="button" class="tabs__b" data-t="tm">변환 행렬<small>TRANSFORMATION_MATRIX</small></button>
@@ -1103,10 +1166,12 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         </div>
       </div>
       </div>
-      <p class="small muted">왼쪽 스펙은 3종 공통 스키마 하나(타입만 적힌 제안 규격)고, 오른쪽은 종류마다 값이 갈리는
-        <span class="mono">segment_id</span>·<span class="mono">storage_uri</span>·<span class="mono">file_size_bytes</span>·
-        <span class="mono">checksum</span>·<span class="mono">transformation_matrix</span> 다섯 필드를 탭으로 펼쳐 보여준다 —
-        스펙 원문은 "이 다섯은 종류에 따라 null이거나 값이 있다"까지만 말하고, 실제로 어떤 값이 채워지는지는 오른쪽 탭이 보여준다.</p>
+      <p class="small muted">토픽·스키마는 §6.4 원문에도 <b>1개</b>뿐이다 — <span class="mono">artifact_type</span> 하나로 3종을
+        구분하는 공용 메시지 모양이지, 종류마다 별도 토픽·스키마를 두지 않는다. 그래서 왼쪽도 탭 3개로 나눴다 —
+        공용 스키마 그대로에 <span class="mono">artifact_type</span> 값만 바꾸고, 그 값에 따라 스펙이 "종류별로 null이거나
+        값이 있다"고 말한 다섯 필드(<span class="mono">segment_id</span>·<span class="mono">storage_uri</span>·
+        <span class="mono">file_size_bytes</span>·<span class="mono">checksum</span>·<span class="mono">transformation_matrix</span>)를
+        실제로 채워 넣은 결과다. 탭은 왼쪽·오른쪽이 같이 넘어간다 — 같은 탭을 눌러 종류별로 스펙 대 실제를 맞춰 본다.</p>
       <p>큰 파일(PCD)은 메시지에 싣지 않는다 — <span class="mono">storage_uri</span>만 참조한다. 변환 행렬은 숫자 16개뿐이라
         예외적으로 메시지에 직접 포함한다(<span class="mono">TRANSFORMATION_MATRIX</span>일 때만 값이 있고 나머지는 null).
         <span class="mono">id</span>는 <span class="mono">{device.Id}-{artifactType}</span>라 장비 하나가 스캔마다
