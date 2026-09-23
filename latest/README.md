@@ -113,6 +113,7 @@ INSERT/UPDATE/DELETE 로 보이지 않는다. 2026-09-17 실측(TimescaleDB 2.29
 
 | | |
 |---|---|
+| 태그 기준 RDB·TSDB 스키마 설계 (HotDBProvider 전환 제안) | [lidar-tag-db-schema.html](docs/lidar-tag-db-schema.html) |
 | PG 설정 가이드 (필수·권장·금지) | Confluence `[PoC] CDC의 PG 설정 가이드` |
 | 하이퍼테이블 CDC 영향 분석 | `docs/cdc/timescaledb-cdc-impact.html` |
 | 지금 돌고 있는 것 전경 | `docs/cdc/current-lidar-cdc-overview.html` |

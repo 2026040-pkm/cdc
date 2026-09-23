@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>LiDAR 현장 관제</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23F37321'/%3E%3Ccircle cx='8' cy='8' r='3' fill='none' stroke='white' stroke-width='1.6'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  </head>
+  <body>
+    <!--
+      THESIS: 이상이 먼저 보이는 관제판. 정상 350대는 조용한 회색 칸, 벗어난 장비만 목록 맨 위와 bay 지도에 색으로 뜬다. KPI 카드 격자 대시보드를 거절한다.
+      OWN-WORLD: 팀 문서 체계 — 따뜻한 무채색 바탕, 한화 오렌지(#F37321)는 '지금 일이 일어난다'(실적 도착 · 선택)에만, risk/warn/info 는 상태에만. Pretendard, 숫자와 id 는 고정폭. 헤어라인 패널, 반경 10.
+      STORY: 운영자는 누가 이상한지 → 현장 어디인지 → 무엇을 만들고 있는지를 순서대로 읽고, 칸이나 행을 눌러 장비 원문까지 내려간다.
+      FIRST VIEWPORT: 상단 바(수신/이상/실적/산출물 + 연결 상태). 왼쪽 2/3 에 '지금 볼 것' 목록, 그 아래 조립·의장 두 줄 × 7 bay 의 장비 칸 지도. 오른쪽 1/3 실적 피드. 장비를 누르면 오른쪽 열이 장비 상세로 바뀐다(모달 없음). 시그니처: 실적이 도착한 장비 칸에서 오렌지 링이 한 번 번진다.
+      FORM: 이상 우선 보드, 내 목록 3번, seed 104d2ddb.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+    -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
