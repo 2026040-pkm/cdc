@@ -622,8 +622,8 @@ body{ background:var(--bg2) }
       <div class="meta">
         <span class="chip">범위: EMQX → Mqtt.Agent</span>
         <span class="chip chip--info">출처: nats-tag-stream · mqtt-lidar-sim · lidar-compare</span>
-        <span class="chip chip--warn">미확정: 상태 주기 · FITTING 등록 누락</span>
-        <span class="chip chip--neutral">정리 2026-09-22</span>
+        <span class="chip chip--warn">미확정: 상태 주기 · Engine 가져오기 여부</span>
+        <span class="chip chip--neutral">정리 2026-09-22 · 재검증 2026-09-23</span>
       </div>
     </header>
 
@@ -738,13 +738,17 @@ body{ background:var(--bg2) }
         <span class="mono">raw_payload</span> 한 겹뿐이다. 필드 정의서의 중첩 객체(<span class="mono">device_ids</span> 등)는
         브로커로 나갈 때 <b>평탄화한다</b> — 중첩을 두면 나중에 <span class="mono">tagMode=fields</span> 로 바꿨을 때
         키 이름이 달라지기 때문이다.</p>
-      <div class="code">
-        <div class="code__bar"><span>ot/device/assembly/status — 메시지 1건</span><button class="code__copy" type="button">복사</button></div>
+      <div class="g2">
+        <div class="code">
+          <div class="code__bar"><span>ot/device/assembly/status — 메시지 1건</span><button class="code__copy" type="button">복사</button></div>
 <pre>{
   "id": "<span class="hl">LDR-GJ-A1B3-07</span>",
   "raw_payload": {
     "device_role": "LIDAR",
-    "site": "geoje", "zone": "ASSEMBLY", "shop": "assembly1", "bay": "bay3",
+    "site": "geoje",
+    "zone": "ASSEMBLY",
+    "shop": "assembly1",
+    "bay": "bay3",
     "status": "ONLINE",
     "last_heartbeat_at": "2026-09-10T12:59:23.3532050+09:00",
     "error_code": null,
@@ -757,6 +761,26 @@ body{ background:var(--bg2) }
     "fov_mode": "wide"
   }
 }</pre>
+        </div>
+        <div class="ui">
+          <div class="ui__bar">
+            <span class="ui__dot"></span><span class="ui__dot"></span><span class="ui__dot"></span>
+            <span class="ui__addr">localhost:56441/monitoring</span>
+          </div>
+          <div class="ui__body" style="padding:0">
+            <div class="ui-row" style="font-weight:700;color:var(--ink3);font-size:11.5px">
+              <span style="flex:2">Tag ID</span><span style="flex:3">Value</span><span style="flex:1.2">changedAt</span>
+            </div>
+            <div class="ui-row">
+              <span class="mono" style="flex:2;font-size:11.5px;word-break:break-all">LDR-GJ-A1B3-07.ot_device_<wbr>assembly_status.raw_payload</span>
+              <span class="mono" style="flex:3;font-size:11.5px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{"device_role":"LIDAR","site":"geoje","zone":"ASSEMBLY",…}</span>
+              <span class="mono" style="flex:1.2;font-size:11.5px">12:59:23.360</span>
+            </div>
+          </div>
+          <div class="ui__body" style="padding:8px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink3)">
+            화면 표에서는 왼쪽 §04의 규칙대로 조립된 TagId 한 줄과, 실제 값은 옆으로 잘려 보인다 — 전체 값은 표 셀을 눌러야 펼쳐진다.
+          </div>
+        </div>
       </div>
       <div class="note note--warn">
         <p class="note__t">프로토콜 3.1.1 고정</p>
@@ -864,13 +888,24 @@ ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STR
         </table>
       </div>
       <div class="note note--warn">
-        <p class="note__t">이 재설계 기준 발행기 대 ISL 등록부 재검증은 아직 안 했다</p>
-        아래는 재설계 <b>전</b> 실제 ISL v4 Engine 캡처에서 나온 값이다 — 실적 토픽이 공정 단계(stage)마다 갈려 있던
-        시절, 조립 공정 4종 중 <span class="mono">ot/sensor/fitting/actual</span> 하나만 태그 등록이 누락돼
+        <p class="note__t">재설계 전 이력 — 지금은 일어날 수 없는 문제</p>
+        재설계 <b>전</b> 실제 ISL v4 Engine 캡처에서는, 실적 토픽이 공정 단계(stage)마다 갈려 있던 시절
+        조립 공정 4종 중 <span class="mono">ot/sensor/fitting/actual</span> 하나만 태그 등록이 누락돼
         <b>조립 210대의 FITTING 실적이 조용히 사라지는 문제</b>가 있었다(등록 2,310 vs 기대 2,520, 차이 210).
-        재설계로 실적 토픽에서 stage 자체가 없어졌으니 <i>이 특정 누락 시나리오는 더 이상 일어날 수 없다</i> — 다만
-        그렇다고 위 6토픽·1,750개가 실제 ISL Engine에 전부 등록돼 있는지는 <b>아직 확인 전</b>이다. 재설계 이후
-        <span class="mono">--export-tags</span>로 새 CSV를 뽑아 Engine에 다시 넣고 같은 방식으로 대조해야 한다.
+        재설계로 실적 토픽에서 stage 자체가 없어졌으니 이 특정 누락 시나리오는 더 이상 일어날 수 없다.
+      </div>
+      <div class="note note--ok">
+        <p class="note__t">2026-09-23 — docs/mqtt-tags 등록 파일 6개로 위 숫자를 대조 확인함</p>
+        <span class="mono">D:/git/cdc/docs/mqtt-tags/mqtt-tags_edge_mqtt_p3_ot_ot_*.csv</span> 6개 파일의 데이터 행을 세면
+        상태 210·140, 실적 210·140, 산출물 630·420 — 합계 <b>1,750행</b>으로 위 표와 정확히 일치한다. 이 CSV들은
+        오늘 시점 <span class="mono">lidar-sim.cs</span>의 <span class="mono">--export-tags</span> 결과 그대로이므로
+        발행기와 등록부 사이의 어긋남은 없다.<br>
+        다만 <span class="mono">http://localhost:56441/monitoring</span> 화면의 실제 표시값까지는 대조하지 못했다 —
+        그 화면이 부르는 <span class="mono">GET /api/monitoring/tags</span> 가 로그인 세션을 요구해(<span class="mono">401</span>)
+        curl 로는 우회할 수 없었다. 이 CSV는 UI의 "MQTT 태그 가져오기"가 그대로 읽어들이는 등록 소스일 뿐이므로,
+        <b>Engine에 이 6개 CSV를 실제로 가져오기했다는 전제 하에서만</b> 화면 값도 1,750과 같다. 그 전제를 눈으로
+        확인하려면 로그인한 브라우저에서 <span class="mono">/monitoring</span> → Agent 탭 → edgeGroup
+        <span class="mono">edge.mqtt.p3.ot</span> 선택 → 툴바의 총 태그 수(§02 표의 합계 카운트)가 1,750인지 본다.
       </div>
     </section>
 
