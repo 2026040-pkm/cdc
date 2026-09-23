@@ -9,7 +9,7 @@
 
 | 파일 | 하는 일 |
 |---|---|
-| `1-publish.cmd` | **기본 발행.** EMQX(1884)로 350대 × 22토픽, 약 426 msg/s |
+| `1-publish.cmd` | **기본 발행.** EMQX(1884)로 350대 × 6토픽, 약 426 msg/s |
 | `2-publish-slow.cmd` | 저부하 발행. 상태·스캔 모두 10분 주기 → 약 8.2 msg/s |
 | `3-export-tags.cmd` | 발행하지 않고 `tags\` 폴더에 태그 정의 CSV 만 생성 |
 | `4-dry-run.cmd` | 브로커 연결 없이 페이로드 모양만 출력 |
@@ -58,9 +58,9 @@ dotnet run tools/mqtt-lidar-sim/lidar-sim.cs -- --export-tags docs/mqtt-tags
 
 | 채널 | 토픽 | 주기 | 건수 | id |
 |---|---|---|---|---|
-| 장비 상태 | `ot/device/{zone}/lidar/status` | `--status-interval` 1초 | 1건 | `LDR-GJ-A1B3-07` |
-| 실적 결과 | `ot/sensor/{stage}/actual` | `--interval` 1분 | 1건 | `LDR-GJ-A1B3-07` |
-| 산출물 메타 | `ot/pipeline/{zone}/{shop}/{bay}/artifact` | `--interval` 1분 | 12건 | `LDR-GJ-A1B3-07-SEGMENTED_PCD` |
+| 장비 상태 | `ot/device/{zone}/status` | `--status-interval` 1초 | 1건 | `LDR-GJ-A1B3-07` |
+| 실적 결과 | `ot/sensor/{zone}/actual` | `--interval` 1분 | 1건 | `LDR-GJ-A1B3-07` |
+| 산출물 메타 | `ot/pipeline/{zone}/artifact` | `--interval` 1분 | 12건 | `LDR-GJ-A1B3-07-SEGMENTED_PCD` |
 
 기본값 기준 부하는 상태 350 msg/s + 스캔 75.8 msg/s = 약 **426 msg/s** (실측 427).
 
@@ -117,8 +117,7 @@ dotnet run tools/mqtt-lidar-sim/lidar-sim.cs -- --export-tags docs/mqtt-tags
 어딘가에서 상태가 바뀐다. `--status-interval` 을 크게 늘리면 그만큼 드물게 움직인다.
 
 `block_progress_rate` 는 되돌아가지 않는다. `event_type` 이 `COMPLETE` 를 지나면 다음 블록으로
-넘어가 0부터 다시 오른다. 스캔마다 `stage` 가 바뀌므로 한 장비의 태그가 그 구역의 stage 토픽
-전부에 걸친다.
+넘어가 0부터 다시 오른다.
 
 ## 태그 등록
 
@@ -129,7 +128,7 @@ dotnet run tools/mqtt-lidar-sim/lidar-sim.cs -- --export-tags docs/mqtt-tags
 dotnet run tools/mqtt-lidar-sim/lidar-sim.cs -- --export-tags docs/mqtt-tags
 ```
 
-토픽 22개 · 태그 2,520개가 `docs/mqtt-tags/mqtt-tags_{토픽}.csv` 로 떨어진다.
+토픽 6개 · 태그 1,750개가 `docs/mqtt-tags/mqtt-tags_{토픽}.csv` 로 떨어진다.
 UI 의 MQTT 태그 가져오기는 **한 파일이 한 토픽**이므로 파일을 토픽마다 따로 넣는다.
 모든 행이 `tagMode=raw` 라 `raw_payload` 통째가 태그 하나(`{id}.{topic}.raw_payload`)의
 STRING 값이 된다.
@@ -144,8 +143,6 @@ STRING 값이 된다.
 
 | 항목 | 현재 값 | 위치 |
 |---|---|---|
-| 조립 stage 4종 | ARRANGEMENT, FITTING, WELDING, INSPECTION | `Zones.StagesOf` |
-| 의장 stage 2종 | WIRING(전장), PIPING(관철) | `Zones.StagesOf` |
 | shop·bay 구성 | assembly1 × bay1–7, outfitting1 × bay1–7 | `Fleet.Build`, `--bays` |
 | 상태 주기 | 1초/대 (cdc 문서 D1 기준. 컨플은 10분으로 봄) | `--status-interval` |
 | 스캔 주기 | 1분/대 (컨플은 10분/대 — 부하를 보려고 줄여 둠) | `--interval` |
