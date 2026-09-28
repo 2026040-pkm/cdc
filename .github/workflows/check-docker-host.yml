@@ -1,0 +1,43 @@
+# 기본값 확인할 서버 IP 에 SSH 로 붙어 docker ps 만 실행해 연결을 확인한다.
+# 사설 IP 라 GitHub 호스팅 러너에서는 닿지 않으므로 self-hosted 러너에서 돈다.
+#
+# 필요한 저장소 Secrets
+#   SSH_USER         : 접속 계정
+#   SSH_PRIVATE_KEY  : 그 계정의 개인키 (PEM 전체)
+# 선택 Variables
+#   DOCKER_HOST_IP   : 기본값 확인할 서버 IP
+
+name: check-docker-host
+
+on:
+  workflow_dispatch:
+
+jobs:
+  docker-ps:
+    runs-on: self-hosted
+    timeout-minutes: 5
+    env:
+      HOST: ${{ vars.DOCKER_HOST_IP }}
+    steps:
+      - name: SSH 키 준비
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/ci_key
+          chmod 600 ~/.ssh/ci_key
+
+      - name: docker ps
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/ci_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=10 \
+              -o BatchMode=yes \
+              "${{ secrets.SSH_USER }}@${HOST}" \
+              'hostname && docker ps'
+
+      - name: 키 정리
+        if: always()
+        shell: bash
+        run: rm -f ~/.ssh/ci_key
