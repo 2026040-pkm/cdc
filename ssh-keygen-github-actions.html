@@ -736,6 +736,7 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
             <li>self-hosted 러너를 Windows PC 의 Podman 에 띄우기 (07)</li>
             <li>연결 확인 워크플로 작성 · 실행 (08)</li>
             <li>리눅스 서버 러너 방식 비교 · 조직 등록 · 저장소 변경 (10)</li>
+            <li>sudo 가 필요한 쉘을 Secret 비밀번호로 실행 (11)</li>
           </ul>
         </div>
         <div class="card">
@@ -1552,6 +1553,90 @@ docker compose up -d</pre>
         <li><b>동시에 쓰기</b>: 한 서버에 폴더를 나눠(<span class="mono">~/runner-cdc</span>, <span class="mono">~/runner-other</span>) 저장소마다 따로 등록 가능</li>
         <li><b>다시 등록하기 싫다면</b>: 처음부터 조직 러너로 등록하고 러너 그룹의 허용 저장소만 바꿈</li>
       </ul>
+    </section>
+
+    <!-- ---------- 11. sudo 비밀번호 ---------- -->
+    <section class="sec" id="s11">
+      <h2><span class="n">11</span>sudo 가 필요한 쉘 실행 (비밀번호를 Secret 으로)</h2>
+      <p class="why">접속 계정 <span class="mono">sit-ml</span> 은 <span class="mono">/data/vol1</span> 에 쓸 권한이 없어 기존 쉘이 중간에 <span class="mono">sudo</span> 비밀번호를 묻습니다.
+        쉘은 그대로 두고, 비밀번호를 GitHub Secret 에 넣어 <b>스크립트 전체를 sudo 로 한 번</b> 실행합니다.</p>
+
+      <div class="note note--info">
+        <p class="note__t">키로는 sudo 가 안 되는 이유</p>
+        <span class="mono">ssh-keygen</span> 으로 만든 키는 <b>SSH 로그인</b>에만 쓰입니다. <span class="mono">sudo</span> 는 서버 PAM 을 따라 계정의 리눅스 비밀번호를 따로 묻고,
+        러너에는 입력할 사람이 없어 그 자리에서 멈추거나 실패합니다.
+      </div>
+
+      <h3>11-1. Secret 추가</h3>
+      <div class="steps">
+        <div class="step"><span class="step__n">1</span><div class="step__t">New repository secret</div><div class="step__d">Name <span class="mono">SUDO_PASSWORD</span>, Secret 에 <span class="mono">sit-ml</span> 계정 비밀번호 → <b>Add secret</b></div></div>
+        <div class="step"><span class="step__n">2</span><div class="step__t">기존 값 재사용</div><div class="step__d"><span class="mono">SSH_USER</span> · <span class="mono">SSH_PRIVATE_KEY</span> 는 06 그대로</div></div>
+        <div class="step"><span class="step__n">3</span><div class="step__t">New repository variable</div><div class="step__d">Name <span class="mono">DEPLOY_HOST_IP</span>, Value 에 쉘을 돌릴 서버 IP (예: <span class="mono">192.168.135.199</span>)</div></div>
+      </div>
+
+      <h3>11-2. 쉘 정리</h3>
+      <p>스크립트가 통째로 root 로 돌기 때문에 <b>안에 있는 <span class="mono">sudo</span> 는 뺍니다.</b> 비밀번호 입력이 두 번이던 것이 한 번으로 줄어듭니다.</p>
+      <div class="code">
+        <div class="code__bar"><span>deploy.sh</span><button class="code__copy" type="button">복사</button></div>
+<pre>#!/bin/bash
+set -e                                   <span class="cm"># 중간에 실패하면 멈추고 잡도 실패로</span>
+
+<span class="cm"># sudo 없이 그대로 (이미 root)</span>
+cp -r /tmp/release/* /data/vol1/<span class="hl">&lt;대상&gt;</span>/
+
+<span class="cm"># root 소유로 남으면 sit-ml 이 나중에 못 고침 — 필요할 때만</span>
+chown -R sit-ml: /data/vol1/<span class="hl">&lt;대상&gt;</span>
+
+rm -f /tmp/deploy.sh                     <span class="cm"># 스크립트 흔적 정리</span></pre>
+      </div>
+
+      <h3>11-3. 워크플로 단계</h3>
+      <div class="code">
+        <div class="code__bar"><span>.github/workflows/*.yml (steps 일부)</span><button class="code__copy" type="button">복사</button></div>
+<pre>      - name: 쉘 복사 · sudo 실행
+        shell: bash
+        env:
+          HOST: <span class="hl">${{ vars.DEPLOY_HOST_IP }}</span>
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SUDO_PW: ${{ secrets.SUDO_PASSWORD }}
+        run: |
+          OPTS="-i $HOME/.ssh/ci_key-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes"
+          scp $OPTS deploy.sh "${SSH_USER}@${HOST}:/tmp/deploy.sh"
+          ssh $OPTS "${SSH_USER}@${HOST}" "sudo -S -p '' bash /tmp/deploy.sh" &lt;&lt;&lt; "$SUDO_PW"</pre>
+      </div>
+      <p>키 준비 · 정리 단계는 8-1 과 같습니다.</p>
+
+      <h3>11-4. 줄마다 하는 일</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:34%">부분</th><th>의미</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mono">SUDO_PW: ${{ secrets.SUDO_PASSWORD }}</span></td><td>비밀번호를 환경 변수로만 받음. 로그에 찍혀도 GitHub 가 <span class="mono">***</span> 로 가림</td></tr>
+            <tr><td><span class="mono">sudo -S</span></td><td>비밀번호를 터미널 대신 표준입력에서 읽음</td></tr>
+            <tr><td><span class="mono">-p ''</span></td><td><span class="mono">[sudo] password for ...</span> 프롬프트 문구를 찍지 않음</td></tr>
+            <tr><td><span class="mono">&lt;&lt;&lt; "$SUDO_PW"</span></td><td>비밀번호를 ssh 표준입력으로 넘김. 명령 문자열에 넣지 않으므로 230·199 의 <span class="mono">ps</span> 에 보이지 않음</td></tr>
+            <tr><td><span class="mono">bash /tmp/deploy.sh</span></td><td>스크립트 전체가 root 로 실행 → 안쪽에서 다시 묻지 않음</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--risk">
+        <p class="note__t">하지 말 것</p>
+        <ul style="margin:6px 0 0">
+          <li><span class="mono">ssh ... "echo 비번 | sudo -S ..."</span> — 원격 서버 프로세스 목록에 비밀번호가 그대로 보임</li>
+          <li>스크립트나 워크플로에서 <span class="mono">set -x</span> — 변수 값을 펼쳐 찍음</li>
+          <li>비밀번호를 <span class="mono">.yml</span> · 저장소 파일에 직접 적기</li>
+        </ul>
+      </div>
+
+      <h3>11-5. 나중에 바꿀 것 (sudo 없애기)</h3>
+      <p>실제로 필요한 건 <span class="mono">/data/vol1</span> 쓰기 권한뿐입니다. 관리자가 ACL 을 한 번 주면 Secret 비밀번호도 <span class="mono">sudo -S</span> 도 필요 없어집니다.</p>
+      <div class="code">
+        <div class="code__bar"><span>관리자 1회 (대상 서버)</span><button class="code__copy" type="button">복사</button></div>
+<pre>sudo setfacl -R    -m u:sit-ml:rwx /data/vol1   <span class="cm"># 기존 파일</span>
+sudo setfacl -R -d -m u:sit-ml:rwx /data/vol1   <span class="cm"># 앞으로 생길 파일</span></pre>
+      </div>
+      <p>그 뒤에는 <span class="mono">ssh $OPTS ... bash /tmp/deploy.sh</span> 만 남기고 <span class="mono">SUDO_PASSWORD</span> Secret 은 지웁니다.</p>
     </section>
 
   </main>
