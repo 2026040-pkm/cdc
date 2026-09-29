@@ -1,0 +1,29 @@
+# 2026040-pkm/cdc self-hosted 러너 (podman 머신, rootless)
+#   copy .env.example .env   # ACCESS_TOKEN = Fine-grained PAT (Administration: Read and write)
+#   podman compose up -d
+# 볼륨 경로는 podman 머신(리눅스) 안의 경로다.
+
+services:
+  runner:
+    build: .
+    image: localhost/github-runner-cdc:latest
+    container_name: github-runner-cdc
+    restart: unless-stopped
+    security_opt:
+      - label=disable
+    environment:
+      REPO_URL: https://github.com/2026040-pkm/cdc
+      RUNNER_SCOPE: repo
+      RUNNER_NAME: cdc-pc
+      LABELS: linux,x64,podman
+      ACCESS_TOKEN: ${ACCESS_TOKEN:?.env 에 ACCESS_TOKEN 을 채운다}
+      RUNNER_WORKDIR: /tmp/github-runner-cdc
+      CONFIGURED_ACTIONS_RUNNER_FILES_DIR: /runner/data
+      DISABLE_AUTOMATIC_DEREGISTRATION: "true"
+    volumes:
+      - /run/user/1000/podman/podman.sock:/var/run/docker.sock
+      - /tmp/github-runner-cdc:/tmp/github-runner-cdc
+      - runner-data:/runner/data
+
+volumes:
+  runner-data:

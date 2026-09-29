@@ -207,3 +207,11 @@ src/backup/
 # target/ (Maven) 이 "수신 DB" 초기화 스크립트를 먹는다. CDC 에서 target 은 빌드 출력이 아니다
 !**/infra/db/target/
 !**/infra/db/target/**
+
+### 레거시 원천 스키마 — 저장소에 두지 않는다
+# SAP(HANA) · Oracle 의 테이블 DDL·데이터. tools/ 의 생성기로 다시 만든다
+latest/legacy-schema/hana/
+latest/legacy-schema/oracle/
+# 생성기(tools/)와 결과 문서에도 조회 조건·호선·사번 같은 실데이터가 박혀 있어 통째로 뺀다
+latest/legacy-schema/
+latest/legacy-tables-by-domain.html
