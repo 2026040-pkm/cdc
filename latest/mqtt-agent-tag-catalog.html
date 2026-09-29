@@ -218,6 +218,15 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}
 .jx2__pos{font-family:var(--mono);font-size:11.5px;color:#fff;background:var(--ink4);border-radius:4px;padding:1px 7px;white-space:nowrap}
 .jx2.act .jx2__pos{background:var(--hw)}
 .jx2__fd b{color:var(--ink)} .jx2__fd code{font-size:11.5px;color:var(--ink4);margin:0 6px}
+/* 스펙 원문 ↔ 실제 발행 줄 짝 맞추기 (.spec[data-pair] ↔ .jx2[data-pair]) */
+.spec pre{white-space:normal;padding:8px 0}
+.spec .spl{display:block;white-space:pre;padding:0 14px;position:relative;line-height:28px}
+.spec .spl[data-k]{cursor:default}
+.spec .spl[data-k]:hover,.spec .spl.on{background:var(--hw-pale);box-shadow:inset 3px 0 0 var(--hw)}
+.spec .spl--warn:hover,.spec .spl--warn.on{background:var(--warn-bg);box-shadow:inset 3px 0 0 var(--warn)}
+.spec__foot{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border-top:1px solid var(--line);background:var(--bg2);font-size:12.5px;min-height:40px;color:var(--ink3)}
+.spec.act .jx2__pos{background:var(--hw)} .spec.act.warn .jx2__pos{background:var(--warn)}
+.spec__fd b{color:var(--ink)} .spec.warn .spec__fd b{color:var(--warn)}
 @media (max-width:760px){
   .jx2__head,.jx2__r{grid-template-columns:32px minmax(0,1fr)}
   .jx2__head span:last-child,.jx2__e{display:none}
@@ -835,31 +844,34 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         형태로 뜬다. 스펙 원문은 <span class="mono">ocean-inshop-process/docs/필드인터페이스정의서.md</span> §6.2~§6.4 다(§09
         참고자료).</p>
       <div class="g-1-2">
-        <div class="code">
+        <div class="code spec" data-pair="p62">
           <div class="code__bar"><span>필드인터페이스정의서 §6.2 — 공통 Envelope + LIDAR raw_payload (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
           <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/device/{zone}/{device_role}/{device_id}/status</b></div>
-<pre>{
-  "device_id": "LDR-GJ-A1B3-07",
-  "device_role": "LIDAR",
-  "site": "geoje",
-  "zone": "ASSEMBLY",
-  "shop": "assembly1",
-  "bay": "bay3",
-  "status": "ONLINE",
-  "last_heartbeat_at": "2026-09-10T12:59:23.353+09:00",
-  "error_code": null,
-  "occurred_at": "2026-09-10T12:59:23.360+09:00",
-  "ingested_at": "2026-09-10T12:59:24.530+09:00",
-  "idempotency_key": "<span class="cm">string</span>",
-  "raw_payload": {
-    "scan_rate_pts_per_sec": <span class="cm">number</span>,
-    "temperature_c": <span class="cm">number</span>,
-    "connectivity_rssi": <span class="cm">number</span>,
-    "fov_mode": "<span class="cm">string</span>"
-  }
-}</pre>
+<pre>
+<span class="spl">{</span>
+<span class="spl spl--warn" data-k="id" data-as="실제는 id · 이름 다름">  "device_id": "LDR-GJ-A1B3-07",</span>
+<span class="spl" data-k="device_role" data-as="실제는 raw_payload 안쪽">  "device_role": "LIDAR",</span>
+<span class="spl" data-k="site" data-as="실제는 raw_payload 안쪽">  "site": "geoje",</span>
+<span class="spl" data-k="zone" data-as="실제는 raw_payload 안쪽">  "zone": "ASSEMBLY",</span>
+<span class="spl" data-k="shop" data-as="실제는 raw_payload 안쪽">  "shop": "assembly1",</span>
+<span class="spl" data-k="bay" data-as="실제는 raw_payload 안쪽">  "bay": "bay3",</span>
+<span class="spl" data-k="status" data-as="실제는 raw_payload 안쪽">  "status": "ONLINE",</span>
+<span class="spl" data-k="last_heartbeat_at" data-as="실제는 raw_payload 안쪽">  "last_heartbeat_at": "2026-09-10T12:59:23.353+09:00",</span>
+<span class="spl" data-k="error_code" data-as="실제는 raw_payload 안쪽">  "error_code": null,</span>
+<span class="spl" data-k="occurred_at" data-as="실제는 raw_payload 안쪽 · changedAt">  "occurred_at": "2026-09-10T12:59:23.360+09:00",</span>
+<span class="spl" data-k="ingested_at" data-as="실제는 raw_payload 안쪽 · 버려짐">  "ingested_at": "2026-09-10T12:59:24.530+09:00",</span>
+<span class="spl" data-k="idempotency_key" data-as="실제는 raw_payload 안쪽">  "idempotency_key": "<span class="cm">string</span>",</span>
+<span class="spl spl--warn" data-k="raw_payload" data-as="실제는 봉투 전체를 감싸는 겹 · 뜻 다름">  "raw_payload": {</span>
+<span class="spl" data-k="scan_rate_pts_per_sec">    "scan_rate_pts_per_sec": <span class="cm">number</span>,</span>
+<span class="spl" data-k="temperature_c">    "temperature_c": <span class="cm">number</span>,</span>
+<span class="spl" data-k="connectivity_rssi">    "connectivity_rssi": <span class="cm">number</span>,</span>
+<span class="spl" data-k="fov_mode">    "fov_mode": "<span class="cm">string</span>"</span>
+<span class="spl">  }</span>
+<span class="spl">}</span>
+</pre>
+          <div class="spec__foot"><span class="jx2__pos">-</span><span class="spec__fd">줄에 마우스를 올리면 오른쪽의 짝 줄이 같이 켜지고, 실제 발행과 다른 점이 여기에 나옵니다</span></div>
         </div>
-      <div class="code jx2">
+      <div class="code jx2" data-pair="p62">
         <div class="code__bar"><span>ot/device/assembly/status — LIDAR (실제 발행 기준)</span><button class="code__copy" type="button">복사</button></div>
         <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
         <div class="jx2__scroll">
@@ -888,6 +900,7 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
       </div>
       </div>
       <p class="small muted">왼쪽이 스펙 원문 그대로(타입만 적힌 제안 규격), 오른쪽이 실제 lidar-sim 발행값이다.
+        어느 쪽이든 줄에 마우스를 올리면 <b>반대쪽의 짝 줄이 같이 켜진다</b> — 이름이 다르거나 층이 다른 줄은 왼쪽 발치에 "실제는 …" 힌트가 뜬다.
         <span class="mono">device_id</span>→<span class="mono">id</span>처럼 이름이 다르거나 아예 없는 필드는
         오른쪽의 <span class="jx2__tag jx2__tag--warn">스펙과 다름</span> 태그로 표시했다.</p>
 
@@ -897,42 +910,45 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         <span class="mono">scan_id</span> 를 공유한다(§07).</p>
 
       <div class="g-1-2">
-        <div class="code">
+        <div class="code spec" data-pair="p63">
           <div class="code__bar"><span>필드인터페이스정의서 §6.3 — stage · device_ids 있음 (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
           <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/sensor/{zone}/{shop}/{bay}/{stage}/actual</b></div>
-<pre>{
-  "zone": "ASSEMBLY",
-  "site": "geoje",
-  "shop": "assembly1",
-  "bay": "bay3",
-  "stage": "<span class="hl">ARRANGEMENT</span>",
-  "record_type": "ACTUAL",
-  "input_method": "AUTO",
-  "source_system": "AI Inference Service",
-  "hull_no": "H1207",
-  "block_id": "B107P",
-  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",
-  "scanned_at": "2026-09-10T13:00:00.112+09:00",
-  "device_ids": {
-    <span class="hl">"lidar": "LDR-GJ-A1B3-07",
-    "pan_tilt": "PTZ-GJ-A1B3-07",
-    "edge_pc": "EDG-GJ-A1-03",
-    "inference_ws": "INF-GJ-A1-01",
-    "vision_ocr": null</span>
-  },
-  "event_type": "PROGRESS",
-  "occurred_at": "2026-09-10T13:00:00.112+09:00",
-  "ingested_at": "2026-09-10T13:00:01.046+09:00",
-  "idempotency_key": "<span class="cm">string</span>",
-  "raw_payload": {
-    "block_progress_rate": 47.8,
-    "reference_cad_id": "CAD-H1207-B107P",
-    "match_confidence": 0.94,
-    "model_version": "seg-v1.4.2"
-  }
-}</pre>
+<pre>
+<span class="spl">{</span>
+<span class="spl" data-k="zone" data-as="실제는 raw_payload 안쪽">  "zone": "ASSEMBLY",</span>
+<span class="spl" data-k="site" data-as="실제는 raw_payload 안쪽">  "site": "geoje",</span>
+<span class="spl" data-k="shop" data-as="실제는 raw_payload 안쪽">  "shop": "assembly1",</span>
+<span class="spl" data-k="bay" data-as="실제는 raw_payload 안쪽">  "bay": "bay3",</span>
+<span class="spl spl--warn" data-k="stage" data-none="1" data-as="실제 발행에 없음 · 토픽에도 없음">  "stage": "<span class="hl">ARRANGEMENT</span>",</span>
+<span class="spl" data-k="record_type" data-as="실제는 raw_payload 안쪽">  "record_type": "ACTUAL",</span>
+<span class="spl" data-k="input_method" data-as="실제는 raw_payload 안쪽">  "input_method": "AUTO",</span>
+<span class="spl" data-k="source_system" data-as="실제는 raw_payload 안쪽">  "source_system": "AI Inference Service",</span>
+<span class="spl" data-k="hull_no" data-as="실제는 raw_payload 안쪽">  "hull_no": "H1207",</span>
+<span class="spl" data-k="block_id" data-as="실제는 raw_payload 안쪽">  "block_id": "B107P",</span>
+<span class="spl" data-k="scan_id" data-as="실제는 raw_payload 안쪽">  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",</span>
+<span class="spl" data-k="scanned_at" data-as="실제는 raw_payload 안쪽">  "scanned_at": "2026-09-10T13:00:00.112+09:00",</span>
+<span class="spl spl--warn" data-k="device_ids" data-none="1" data-as="실제는 중첩 없이 평탄화 — 안쪽 5개가 raw_payload 바로 아래">  "device_ids": {</span>
+<span class="spl spl--warn" data-k="id" data-as="실제는 id 로 평탄화 · 이름 다름">    <span class="hl">"lidar": "LDR-GJ-A1B3-07",</span></span>
+<span class="spl" data-k="pan_tilt" data-as="실제는 평탄화돼 raw_payload 바로 아래"><span class="hl">    "pan_tilt": "PTZ-GJ-A1B3-07",</span></span>
+<span class="spl" data-k="edge_pc" data-as="실제는 평탄화돼 raw_payload 바로 아래"><span class="hl">    "edge_pc": "EDG-GJ-A1-03",</span></span>
+<span class="spl" data-k="inference_ws" data-as="실제는 평탄화돼 raw_payload 바로 아래"><span class="hl">    "inference_ws": "INF-GJ-A1-01",</span></span>
+<span class="spl" data-k="vision_ocr" data-as="실제는 평탄화돼 raw_payload 바로 아래"><span class="hl">    "vision_ocr": null</span></span>
+<span class="spl">  },</span>
+<span class="spl" data-k="event_type" data-as="실제는 raw_payload 안쪽">  "event_type": "PROGRESS",</span>
+<span class="spl" data-k="occurred_at" data-as="실제는 raw_payload 안쪽 · changedAt">  "occurred_at": "2026-09-10T13:00:00.112+09:00",</span>
+<span class="spl" data-k="ingested_at" data-as="실제는 raw_payload 안쪽 · 버려짐">  "ingested_at": "2026-09-10T13:00:01.046+09:00",</span>
+<span class="spl" data-k="idempotency_key" data-as="실제는 raw_payload 안쪽">  "idempotency_key": "<span class="cm">string</span>",</span>
+<span class="spl spl--warn" data-k="raw_payload" data-as="실제는 봉투 전체를 감싸는 겹 · 뜻 다름">  "raw_payload": {</span>
+<span class="spl" data-k="block_progress_rate">    "block_progress_rate": 47.8,</span>
+<span class="spl" data-k="reference_cad_id">    "reference_cad_id": "CAD-H1207-B107P",</span>
+<span class="spl" data-k="match_confidence">    "match_confidence": 0.94,</span>
+<span class="spl" data-k="model_version">    "model_version": "seg-v1.4.2"</span>
+<span class="spl">  }</span>
+<span class="spl">}</span>
+</pre>
+          <div class="spec__foot"><span class="jx2__pos">-</span><span class="spec__fd">줄에 마우스를 올리면 오른쪽의 짝 줄이 같이 켜지고, 실제 발행과 다른 점이 여기에 나옵니다</span></div>
         </div>
-      <div class="code jx2">
+      <div class="code jx2" data-pair="p63">
         <div class="code__bar"><span>ot/sensor/assembly/actual — stage 없음, device_ids 평탄화 (실제 발행 기준)</span><button class="code__copy" type="button">복사</button></div>
         <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
         <div class="jx2__scroll">
@@ -984,32 +1000,35 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         </div>
         <div class="tabs__p on" data-p="reg">
         <div class="g-1-2">
-          <div class="code">
+          <div class="code spec" data-pair="p64reg">
             <div class="code__bar"><span>필드인터페이스정의서 §6.4 — REGISTERED_PCD (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
             <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/pipeline/{zone}/{shop}/{bay}/artifact</b></div>
-<pre>{
-  "zone": "ASSEMBLY",
-  "site": "geoje",
-  "shop": "assembly1",
-  "bay": "bay3",
-  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",
-  "artifact_type": "REGISTERED_PCD",
-  "hull_no": "H1207",
-  "block_id": "B107P",
-  "segment_id": <span class="jz">null</span>,
-  "storage_uri": "file://ot-a/pcd/2026/09/10/3f9a2b7e/registered.pcd",
-  "file_size_bytes": 187654321,
-  "checksum": "sha256:7c1a9de3f0b2456a",
-  "transformation_matrix": <span class="jz">null</span>,
-  "produced_by_device_id": "INF-GJ-A1-01",
-  "model_version": "seg-v1.4.2",
-  "occurred_at": "2026-09-10T13:00:03.446+09:00",
-  "ingested_at": "2026-09-10T13:00:04.112+09:00",
-  "idempotency_key": "<span class="cm">string</span>",
-  "raw_payload": {}
-}</pre>
+<pre>
+<span class="spl">{</span>
+<span class="spl" data-k="zone" data-as="실제는 raw_payload 안쪽">  "zone": "ASSEMBLY",</span>
+<span class="spl" data-k="site" data-as="실제는 raw_payload 안쪽">  "site": "geoje",</span>
+<span class="spl" data-k="shop" data-as="실제는 raw_payload 안쪽">  "shop": "assembly1",</span>
+<span class="spl" data-k="bay" data-as="실제는 raw_payload 안쪽">  "bay": "bay3",</span>
+<span class="spl" data-k="scan_id" data-as="실제는 raw_payload 안쪽">  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",</span>
+<span class="spl" data-k="artifact_type" data-as="실제는 raw_payload 안쪽">  "artifact_type": "REGISTERED_PCD",</span>
+<span class="spl" data-k="hull_no" data-as="실제는 raw_payload 안쪽">  "hull_no": "H1207",</span>
+<span class="spl" data-k="block_id" data-as="실제는 raw_payload 안쪽">  "block_id": "B107P",</span>
+<span class="spl" data-k="segment_id" data-as="실제는 raw_payload 안쪽">  "segment_id": <span class="jz">null</span>,</span>
+<span class="spl" data-k="storage_uri" data-as="실제는 raw_payload 안쪽">  "storage_uri": "file://ot-a/pcd/2026/09/10/3f9a2b7e/registered.pcd",</span>
+<span class="spl" data-k="file_size_bytes" data-as="실제는 raw_payload 안쪽">  "file_size_bytes": 187654321,</span>
+<span class="spl" data-k="checksum" data-as="실제는 raw_payload 안쪽">  "checksum": "sha256:7c1a9de3f0b2456a",</span>
+<span class="spl" data-k="transformation_matrix" data-as="실제는 raw_payload 안쪽">  "transformation_matrix": <span class="jz">null</span>,</span>
+<span class="spl" data-k="produced_by_device_id" data-as="실제는 raw_payload 안쪽">  "produced_by_device_id": "INF-GJ-A1-01",</span>
+<span class="spl" data-k="model_version" data-as="실제는 raw_payload 안쪽">  "model_version": "seg-v1.4.2",</span>
+<span class="spl" data-k="occurred_at" data-as="실제는 raw_payload 안쪽 · changedAt">  "occurred_at": "2026-09-10T13:00:03.446+09:00",</span>
+<span class="spl" data-k="ingested_at" data-as="실제는 raw_payload 안쪽 · 버려짐">  "ingested_at": "2026-09-10T13:00:04.112+09:00",</span>
+<span class="spl spl--warn" data-k="idempotency_key" data-none="1" data-as="실제 발행에 없음">  "idempotency_key": "<span class="cm">string</span>",</span>
+<span class="spl spl--warn" data-k="raw_payload" data-as="실제는 봉투 전체를 감싸는 겹 · 뜻 다름">  "raw_payload": {}</span>
+<span class="spl">}</span>
+</pre>
+          <div class="spec__foot"><span class="jx2__pos">-</span><span class="spec__fd">줄에 마우스를 올리면 오른쪽의 짝 줄이 같이 켜지고, 실제 발행과 다른 점이 여기에 나옵니다</span></div>
           </div>
-          <div class="code jx2">
+          <div class="code jx2" data-pair="p64reg">
             <div class="code__bar"><span>ot/pipeline/assembly/artifact — REGISTERED_PCD (실제 발행 기준)</span><button class="code__copy" type="button">복사</button></div>
             <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
             <div class="jx2__scroll">
@@ -1042,32 +1061,35 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         </div>
         <div class="tabs__p" data-p="tm">
         <div class="g-1-2">
-          <div class="code">
+          <div class="code spec" data-pair="p64tm">
             <div class="code__bar"><span>필드인터페이스정의서 §6.4 — TRANSFORMATION_MATRIX (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
             <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/pipeline/{zone}/{shop}/{bay}/artifact</b></div>
-<pre>{
-  "zone": "ASSEMBLY",
-  "site": "geoje",
-  "shop": "assembly1",
-  "bay": "bay3",
-  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",
-  "artifact_type": "TRANSFORMATION_MATRIX",
-  "hull_no": "H1207",
-  "block_id": "B107P",
-  "segment_id": <span class="jz">null</span>,
-  "storage_uri": <span class="jz">null</span>,
-  "file_size_bytes": <span class="jz">null</span>,
-  "checksum": <span class="jz">null</span>,
-  "transformation_matrix": [1.0, 0.02, -0.01, 1042.3, <span class="cm">…16개</span>],
-  "produced_by_device_id": "INF-GJ-A1-01",
-  "model_version": "seg-v1.4.2",
-  "occurred_at": "2026-09-10T13:00:03.446+09:00",
-  "ingested_at": "2026-09-10T13:00:04.112+09:00",
-  "idempotency_key": "<span class="cm">string</span>",
-  "raw_payload": {}
-}</pre>
+<pre>
+<span class="spl">{</span>
+<span class="spl" data-k="zone" data-as="실제는 raw_payload 안쪽">  "zone": "ASSEMBLY",</span>
+<span class="spl" data-k="site" data-as="실제는 raw_payload 안쪽">  "site": "geoje",</span>
+<span class="spl" data-k="shop" data-as="실제는 raw_payload 안쪽">  "shop": "assembly1",</span>
+<span class="spl" data-k="bay" data-as="실제는 raw_payload 안쪽">  "bay": "bay3",</span>
+<span class="spl" data-k="scan_id" data-as="실제는 raw_payload 안쪽">  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",</span>
+<span class="spl" data-k="artifact_type" data-as="실제는 raw_payload 안쪽">  "artifact_type": "TRANSFORMATION_MATRIX",</span>
+<span class="spl" data-k="hull_no" data-as="실제는 raw_payload 안쪽">  "hull_no": "H1207",</span>
+<span class="spl" data-k="block_id" data-as="실제는 raw_payload 안쪽">  "block_id": "B107P",</span>
+<span class="spl" data-k="segment_id" data-as="실제는 raw_payload 안쪽">  "segment_id": <span class="jz">null</span>,</span>
+<span class="spl" data-k="storage_uri" data-as="실제는 raw_payload 안쪽">  "storage_uri": <span class="jz">null</span>,</span>
+<span class="spl" data-k="file_size_bytes" data-as="실제는 raw_payload 안쪽">  "file_size_bytes": <span class="jz">null</span>,</span>
+<span class="spl" data-k="checksum" data-as="실제는 raw_payload 안쪽">  "checksum": <span class="jz">null</span>,</span>
+<span class="spl" data-k="transformation_matrix" data-as="실제는 raw_payload 안쪽">  "transformation_matrix": [1.0, 0.02, -0.01, 1042.3, <span class="cm">…16개</span>],</span>
+<span class="spl" data-k="produced_by_device_id" data-as="실제는 raw_payload 안쪽">  "produced_by_device_id": "INF-GJ-A1-01",</span>
+<span class="spl" data-k="model_version" data-as="실제는 raw_payload 안쪽">  "model_version": "seg-v1.4.2",</span>
+<span class="spl" data-k="occurred_at" data-as="실제는 raw_payload 안쪽 · changedAt">  "occurred_at": "2026-09-10T13:00:03.446+09:00",</span>
+<span class="spl" data-k="ingested_at" data-as="실제는 raw_payload 안쪽 · 버려짐">  "ingested_at": "2026-09-10T13:00:04.112+09:00",</span>
+<span class="spl spl--warn" data-k="idempotency_key" data-none="1" data-as="실제 발행에 없음">  "idempotency_key": "<span class="cm">string</span>",</span>
+<span class="spl spl--warn" data-k="raw_payload" data-as="실제는 봉투 전체를 감싸는 겹 · 뜻 다름">  "raw_payload": {}</span>
+<span class="spl">}</span>
+</pre>
+          <div class="spec__foot"><span class="jx2__pos">-</span><span class="spec__fd">줄에 마우스를 올리면 오른쪽의 짝 줄이 같이 켜지고, 실제 발행과 다른 점이 여기에 나옵니다</span></div>
           </div>
-          <div class="code jx2">
+          <div class="code jx2" data-pair="p64tm">
             <div class="code__bar"><span>ot/pipeline/assembly/artifact — TRANSFORMATION_MATRIX (실제 발행 기준)</span><button class="code__copy" type="button">복사</button></div>
             <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
             <div class="jx2__scroll">
@@ -1100,32 +1122,35 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         </div>
         <div class="tabs__p" data-p="seg">
         <div class="g-1-2">
-          <div class="code">
+          <div class="code spec" data-pair="p64seg">
             <div class="code__bar"><span>필드인터페이스정의서 §6.4 — SEGMENTED_PCD (제안 규격)</span><button class="code__copy" type="button">복사</button></div>
             <div style="padding:8px 14px;font-size:11.5px;font-family:var(--mono);color:var(--ink3);border-bottom:1px dashed var(--line);background:var(--bg2)">토픽(제안): <b style="color:var(--ink2)">ot/pipeline/{zone}/{shop}/{bay}/artifact</b></div>
-<pre>{
-  "zone": "ASSEMBLY",
-  "site": "geoje",
-  "shop": "assembly1",
-  "bay": "bay3",
-  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",
-  "artifact_type": "SEGMENTED_PCD",
-  "hull_no": "H1207",
-  "block_id": "B107P",
-  "segment_id": "SEG-004",
-  "storage_uri": "file://ot-a/pcd/2026/09/10/3f9a2b7e/seg-004.pcd",
-  "file_size_bytes": 18452193,
-  "checksum": "sha256:7c1a9de3f0b2456a",
-  "transformation_matrix": <span class="jz">null</span>,
-  "produced_by_device_id": "INF-GJ-A1-01",
-  "model_version": "seg-v1.4.2",
-  "occurred_at": "2026-09-10T13:00:03.446+09:00",
-  "ingested_at": "2026-09-10T13:00:04.112+09:00",
-  "idempotency_key": "<span class="cm">string</span>",
-  "raw_payload": {}
-}</pre>
+<pre>
+<span class="spl">{</span>
+<span class="spl" data-k="zone" data-as="실제는 raw_payload 안쪽">  "zone": "ASSEMBLY",</span>
+<span class="spl" data-k="site" data-as="실제는 raw_payload 안쪽">  "site": "geoje",</span>
+<span class="spl" data-k="shop" data-as="실제는 raw_payload 안쪽">  "shop": "assembly1",</span>
+<span class="spl" data-k="bay" data-as="실제는 raw_payload 안쪽">  "bay": "bay3",</span>
+<span class="spl" data-k="scan_id" data-as="실제는 raw_payload 안쪽">  "scan_id": "3f9a2b7e-6c1d-4e2a-9b3a-8d5c6a7b0e11",</span>
+<span class="spl" data-k="artifact_type" data-as="실제는 raw_payload 안쪽">  "artifact_type": "SEGMENTED_PCD",</span>
+<span class="spl" data-k="hull_no" data-as="실제는 raw_payload 안쪽">  "hull_no": "H1207",</span>
+<span class="spl" data-k="block_id" data-as="실제는 raw_payload 안쪽">  "block_id": "B107P",</span>
+<span class="spl" data-k="segment_id" data-as="실제는 raw_payload 안쪽">  "segment_id": "SEG-004",</span>
+<span class="spl" data-k="storage_uri" data-as="실제는 raw_payload 안쪽">  "storage_uri": "file://ot-a/pcd/2026/09/10/3f9a2b7e/seg-004.pcd",</span>
+<span class="spl" data-k="file_size_bytes" data-as="실제는 raw_payload 안쪽">  "file_size_bytes": 18452193,</span>
+<span class="spl" data-k="checksum" data-as="실제는 raw_payload 안쪽">  "checksum": "sha256:7c1a9de3f0b2456a",</span>
+<span class="spl" data-k="transformation_matrix" data-as="실제는 raw_payload 안쪽">  "transformation_matrix": <span class="jz">null</span>,</span>
+<span class="spl" data-k="produced_by_device_id" data-as="실제는 raw_payload 안쪽">  "produced_by_device_id": "INF-GJ-A1-01",</span>
+<span class="spl" data-k="model_version" data-as="실제는 raw_payload 안쪽">  "model_version": "seg-v1.4.2",</span>
+<span class="spl" data-k="occurred_at" data-as="실제는 raw_payload 안쪽 · changedAt">  "occurred_at": "2026-09-10T13:00:03.446+09:00",</span>
+<span class="spl" data-k="ingested_at" data-as="실제는 raw_payload 안쪽 · 버려짐">  "ingested_at": "2026-09-10T13:00:04.112+09:00",</span>
+<span class="spl spl--warn" data-k="idempotency_key" data-none="1" data-as="실제 발행에 없음">  "idempotency_key": "<span class="cm">string</span>",</span>
+<span class="spl spl--warn" data-k="raw_payload" data-as="실제는 봉투 전체를 감싸는 겹 · 뜻 다름">  "raw_payload": {}</span>
+<span class="spl">}</span>
+</pre>
+          <div class="spec__foot"><span class="jx2__pos">-</span><span class="spec__fd">줄에 마우스를 올리면 오른쪽의 짝 줄이 같이 켜지고, 실제 발행과 다른 점이 여기에 나옵니다</span></div>
           </div>
-          <div class="code jx2">
+          <div class="code jx2" data-pair="p64seg">
             <div class="code__bar"><span>ot/pipeline/assembly/artifact — SEGMENTED_PCD × 10 (실제 발행 기준)</span><button class="code__copy" type="button">복사</button></div>
             <div class="jx2__head"><span></span><span>JSON 원문 (줄 그대로)</span><span>이 줄의 뜻</span></div>
             <div class="jx2__scroll">
@@ -2851,6 +2876,54 @@ ot/pipeline/assembly/artifact,1,raw,LDR-GJ-A1B1-01-SEGMENTED_PCD,raw_payload,STR
         fd.children[2].textContent = r.dataset.d;
       });
       r.addEventListener('mouseleave', function () { box.classList.remove('act'); pos.textContent = '-'; fd.innerHTML = idle; });
+    });
+  });
+
+  /* 스펙 원문(.spec) ↔ 실제 발행(.jx2) 짝 줄 하이라이트 — data-pair 가 같은 두 블록을 잇는다 */
+  document.querySelectorAll('.spec[data-pair]').forEach(function (spec) {
+    var jx = document.querySelector('.jx2[data-pair="' + spec.dataset.pair + '"]');
+    if (!jx) return;
+    var scroll = jx.querySelector('.jx2__scroll');
+    function esc(k) { return (window.CSS && CSS.escape) ? CSS.escape(k) : k; }
+    function row(k) { return jx.querySelector('.jx2__r--k[data-k="' + esc(k) + '"]'); }
+    function rowOf(l) { return l.dataset.none ? null : row(l.dataset.k); }
+    function line(k) { return spec.querySelector('.spl[data-k="' + esc(k) + '"]:not([data-none])'); }
+    function reveal(r) {
+      if (!scroll) return;
+      var rr = r.getBoundingClientRect(), sr = scroll.getBoundingClientRect();
+      if (rr.top < sr.top) scroll.scrollTop += rr.top - sr.top;
+      else if (rr.bottom > sr.bottom) scroll.scrollTop += rr.bottom - sr.bottom;
+    }
+    var pos = spec.querySelector('.spec__foot .jx2__pos'), fd = spec.querySelector('.spec__fd');
+    var idle = fd ? fd.innerHTML : '';
+    function footOn(l) {
+      if (!pos || !fd) return;
+      var m = /"([^"]+)"/.exec(l.textContent), key = m ? m[1] : l.dataset.k;
+      var r = l.dataset.none ? null : row(l.dataset.k);
+      spec.classList.add('act'); spec.classList.toggle('warn', l.classList.contains('spl--warn'));
+      pos.textContent = key;
+      fd.innerHTML = '<b></b><span></span>';
+      fd.children[0].textContent = l.dataset.as || '실제 발행과 이름 · 자리 같음';
+      fd.children[1].textContent = r ? ' — 오른쪽 ' + r.querySelector('.jx2__ln').textContent + '행(' + l.dataset.k + ')' : ' — 오른쪽에 짝 없음';
+    }
+    function footOff() { if (!pos || !fd) return; spec.classList.remove('act', 'warn'); pos.textContent = '-'; fd.innerHTML = idle; }
+    spec.querySelectorAll('.spl[data-k]').forEach(function (l) {
+      l.addEventListener('mouseenter', function () {
+        footOn(l);
+        var r = rowOf(l); if (!r) return;
+        r.classList.add('on'); reveal(r);
+        r.dispatchEvent(new Event('mouseenter'));   /* 오른쪽 발치 설명도 같이 띄운다 */
+      });
+      l.addEventListener('mouseleave', function () {
+        footOff();
+        var r = rowOf(l); if (!r) return;
+        r.classList.remove('on');
+        r.dispatchEvent(new Event('mouseleave'));
+      });
+    });
+    jx.querySelectorAll('.jx2__r--k').forEach(function (r) {
+      r.addEventListener('mouseenter', function () { var l = line(r.dataset.k); if (l) { l.classList.add('on'); footOn(l); } });
+      r.addEventListener('mouseleave', function () { var l = line(r.dataset.k); if (l) { l.classList.remove('on'); footOff(); } });
     });
   });
 })();

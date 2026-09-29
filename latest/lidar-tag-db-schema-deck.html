@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>태그 기반 LiDAR RDB · TSDB 스키마 설계</title>
+<title>HotDB 기준 LiDAR RDB · TSDB 스키마</title>
 <style>
 /* ============================================================
    HW Doc Kit - design tokens & base primitives
@@ -178,7 +178,54 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .g-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.g-1-2{display:grid;grid-template-columns:1fr 2fr;gap:16px}
 .stack{display:flex;flex-direction:column;gap:12px}
+
+/* ── 탭 (.tabs) — 같은 모양·다른 값 여러 건을 한 자리에서 비교 ── */
+.tabs{margin:10px 0 16px}
+.tabs__bar{display:flex;gap:4px;flex-wrap:wrap;padding:4px;background:var(--bg3);border-radius:10px;width:fit-content;max-width:100%;margin-bottom:12px}
+.tabs__b{border:0;background:transparent;padding:6px 14px;border-radius:7px;font:inherit;font-size:13.5px;font-weight:700;color:var(--ink3);
+  cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;line-height:1.3}
+.tabs__b small{font-family:var(--mono);font-size:10.5px;font-weight:400;color:var(--ink4)}
+.tabs__b:hover{color:var(--ink)}
+.tabs__b.on{background:var(--bg);color:var(--hw-dk);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.tabs__p{display:none}
+.tabs__p.on{display:block}
+
+/* ── JSON 한 줄 = 설명 한 줄 (.jx2) — 필드에 마우스를 올리면 뜻이 옆(그리고 발치)에 뜬다 ── */
+.code.jx2{margin-bottom:6px}
+.jx2__meta{margin-left:auto;font-family:inherit;font-size:11.5px;color:var(--ink3);display:flex;align-items:center;gap:6px}
+.jx2__head,.jx2__r{display:grid;grid-template-columns:40px minmax(0,1.15fr) minmax(0,1fr)}
+.jx2__head{font-size:11px;font-weight:800;color:var(--ink3);background:var(--bg2);border-bottom:1px solid var(--line)}
+.jx2__head span{padding:5px 12px}
+.jx2__scroll{max-height:460px;overflow:auto;overscroll-behavior:contain}
+.jx2__r{min-height:28px;align-items:stretch}
+.jx2__r--k{cursor:default}
+.jx2__ln{font-family:var(--mono);font-size:11px;color:var(--ink4);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;
+  background:var(--bg2);border-right:1px solid var(--line)}
+.jx2__c{display:block;line-height:28px;white-space:pre;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;padding:0 12px;border-right:1px dashed var(--line);background:transparent}
+.jx2__e{display:flex;align-items:center;gap:8px;padding:0 12px;min-width:0;font-size:13px}
+.jx2__n{font-weight:700;white-space:nowrap}
+.jx2__tag{font-size:10.5px;line-height:1.5;padding:0 7px;border-radius:9px;background:var(--hw-tint);color:var(--hw-dp);font-weight:700;white-space:nowrap}
+.jx2__tag--warn{background:var(--warn-bg);color:var(--warn)}
+.jx2__v{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.jx2__v b{color:var(--ink)} .jx2__v .chip{font-size:11px}
+.jx2 .jk{color:var(--ink3)} .jx2 .js{color:var(--ink)} .jx2 .jn{color:var(--info);font-weight:700} .jx2 .jz{color:var(--ink4);font-style:italic}
+.jx2__r--k:hover,.jx2__r.on{background:var(--hw-pale)}
+.jx2__r--k:hover .jx2__ln,.jx2__r.on .jx2__ln{background:var(--hw);color:#fff;font-weight:800}
+.jx2__r--k:hover .jx2__c,.jx2__r.on .jx2__c{box-shadow:inset 3px 0 0 var(--hw)}
+.jx2__foot{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border-top:1px solid var(--line);background:var(--bg2);font-size:12.5px;min-height:40px;color:var(--ink3)}
+.jx2__pos{font-family:var(--mono);font-size:11.5px;color:#fff;background:var(--ink4);border-radius:4px;padding:1px 7px;white-space:nowrap}
+.jx2.act .jx2__pos{background:var(--hw)}
+.jx2__fd b{color:var(--ink)} .jx2__fd code{font-size:11.5px;color:var(--ink4);margin:0 6px}
+@media (max-width:760px){
+  .jx2__head,.jx2__r{grid-template-columns:32px minmax(0,1fr)}
+  .jx2__head span:last-child,.jx2__e{display:none}
+}
+@media print{
+  .tabs__bar{display:none} .tabs__p{display:block!important;margin-bottom:18px}
+  .jx2__scroll{max-height:none}
+}
 
 /* ---------- 다이어그램 캔버스 ---------- */
 .dgm{
@@ -313,119 +360,119 @@ h1, h2, h3, h4, p, li, td, th, dt, dd,
 .mono, pre, code, .refs__meta { word-break: break-all; overflow-wrap: normal }
 
 /* ============================================================
-   HW Doc Kit - 개발용 문서 레이아웃 (사이드 TOC + 본문 단일 컬럼)
+   HW Doc Kit - 발표용(PPT형) 덱 레이아웃
+   슬라이드 논리 크기 1280x720 (16:9). JS가 --k 배율만 조정.
    ============================================================ */
-body{ background:var(--bg2) }
+:root{ --k:1; --stage-pad-x:64px; }
 
-.doc{ display:grid; grid-template-columns:270px minmax(0,1fr); align-items:start; }
-
-/* 사이드바 */
-.side{
-  position:sticky; top:0; height:100vh; overflow:auto;
-  background:var(--bg); border-right:1px solid var(--line); padding:20px 16px 40px;
+.deck{
+  display:flex; flex-direction:column; align-items:center; gap:0;
+  padding:0; min-height:100vh; justify-content:center;
 }
-.side__brand{ display:flex; align-items:center; gap:9px; margin-bottom:6px }
-.side__brand .bar{ width:5px; height:26px; background:var(--hw); border-radius:2px }
-.side__brand b{ font-size:14.5px; letter-spacing:-.01em }
-.side__meta{ font-size:11.5px; color:var(--ink4); margin:0 0 16px; font-family:var(--mono) }
-.toc{ list-style:none; margin:0; padding:0; font-size:13.5px }
-.toc li{ margin:1px 0 }
-.toc a{
-  display:block; padding:5px 10px; border-radius:6px; color:var(--ink2);
-  text-decoration:none; border-left:2px solid transparent;
+.slide{ width:calc(1280px * var(--k)); height:calc(720px * var(--k)); flex:0 0 auto; position:relative; }
+.deck:not(.is-overview) .slide{ display:none; }
+.deck:not(.is-overview) .slide.is-cur{ display:block; }
+
+.stage{
+  width:1280px; height:720px; transform:scale(var(--k)); transform-origin:top left;
+  background:var(--bg); position:relative; overflow:hidden;
+  box-shadow:var(--shadow); display:flex; flex-direction:column;
+  padding:44px var(--stage-pad-x) 62px;
 }
-.toc a:hover{ background:var(--bg3); color:var(--ink) }
-.toc a.is-cur{ background:var(--hw-pale); color:var(--hw-dp); font-weight:700; border-left-color:var(--hw) }
-.toc .sub a{ padding-left:22px; font-size:12.5px; color:var(--ink3) }
-.side__foot{ margin-top:18px; padding-top:14px; border-top:1px solid var(--line); display:flex; gap:6px; flex-wrap:wrap }
-.side__foot button{
-  border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:5px;
-  padding:3px 9px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:var(--font);
+.stage::before{ /* 상단 브랜드 스트립 */
+  content:''; position:absolute; left:0; top:0; width:100%; height:6px;
+  background:linear-gradient(90deg,var(--hw) 0%,var(--hw-dk) 62%,var(--hw-dp) 100%);
 }
-.side__foot button:hover{ border-color:var(--hw); color:var(--hw-dk) }
 
-/* 본문 */
-.main{ padding:34px 44px 100px; max-width:1040px; }
-.doc-head{ border-bottom:2px solid var(--hw); padding-bottom:18px; margin-bottom:26px }
-.doc-head h1{ font-size:32px; letter-spacing:-.025em; margin:6px 0 8px }
-.doc-head .sub{ font-size:15px; color:var(--ink2); max-width:80ch }
-.doc-head .meta{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px }
+/* 슬라이드 헤더 */
+.s-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+  border-bottom:2px solid var(--hw); padding-bottom:12px; margin-bottom:22px; flex:0 0 auto; }
+.s-head__l{ min-width:0 }
+.s-head h2{ font-size:31px; letter-spacing:-.02em; }
+.s-head .kicker{ display:block; margin-bottom:5px; font-size:12px }
+.s-head__r{ text-align:right; font-size:12.5px; color:var(--ink3); white-space:nowrap }
 
-.sec{ margin:0 0 44px; scroll-margin-top:18px }
-.sec > h2{
-  font-size:21px; margin:0 0 4px; display:flex; align-items:baseline; gap:10px;
+.s-body{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:16px; }
+.s-body.is-scroll{ overflow:hidden }
+.s-lead{ font-size:16px; color:var(--ink2); max-width:96ch }
+
+/* 슬라이드 푸터 */
+.s-foot{
+  position:absolute; left:var(--stage-pad-x); right:var(--stage-pad-x); bottom:18px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  font-size:11.5px; color:var(--ink4); border-top:1px solid var(--line); padding-top:8px;
 }
-.sec > h2 .n{ font-family:var(--mono); font-size:14px; font-weight:800; color:var(--hw) }
-.sec > .why{ font-size:13.5px; color:var(--ink3); margin:0 0 16px; padding-left:2px }
-.sec h3{ font-size:16px; margin:24px 0 10px; padding-left:10px; border-left:3px solid var(--hw-tint) }
-.sec h4{ font-size:14px; margin:16px 0 6px; color:var(--ink2) }
-.sec p, .sec li{ font-size:14.5px }
-.sec ul, .sec ol{ margin:0 0 12px; padding-left:20px }
-.sec li{ margin:3px 0 }
+.s-foot .pg{ font-family:var(--mono); font-weight:700; color:var(--hw-dk) }
 
-/* 체크리스트 */
-.chk{ list-style:none; padding:0; margin:0 }
-.chk li{
-  display:flex; gap:10px; align-items:flex-start; padding:9px 12px;
-  border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--bg); margin-bottom:6px;
+/* 타이틀 슬라이드 */
+.slide--title .stage{ padding:0; display:grid; grid-template-columns:1.35fr 1fr; }
+.slide--title .stage::before{ display:none } /* 우측 오렌지 패널이 브랜드를 대신함 */
+.t-left{ padding:76px 64px; display:flex; flex-direction:column; justify-content:center; gap:16px }
+.t-left h1{ font-size:48px; line-height:1.15; letter-spacing:-.03em }
+.t-left .sub{ font-size:19px; color:var(--ink2) }
+.t-meta{ margin-top:18px; display:flex; flex-wrap:wrap; gap:8px }
+.t-right{ background:var(--hw); position:relative; overflow:hidden }
+.t-right::after{
+  content:''; position:absolute; inset:0;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.16) 0 42%, transparent 42%),
+    linear-gradient(315deg, rgba(0,0,0,.14) 0 34%, transparent 34%);
 }
-.chk input{ margin-top:3px; width:15px; height:15px; accent-color:var(--hw); flex:0 0 auto }
-.chk li.is-done{ background:var(--bg2); border-color:var(--line) }
-.chk li.is-done .t{ text-decoration:line-through; color:var(--ink4) }
-.chk .t{ font-weight:600; font-size:14px }
-.chk .d{ font-size:12.5px; color:var(--ink3); display:block; margin-top:2px }
-
-/* 시나리오 (Given/When/Then) */
-.gwt{ border:1px solid var(--line); border-left:4px solid var(--hw); border-radius:var(--radius-sm);
-  background:var(--bg); padding:14px 16px; margin:0 0 12px }
-.gwt__t{ font-weight:700; font-size:14.5px; margin:0 0 8px }
-.gwt dl{ margin:0; display:grid; grid-template-columns:64px 1fr; gap:4px 10px; font-size:13.5px }
-.gwt dt{ font-weight:800; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--hw-dk); padding-top:2px }
-.gwt dd{ margin:0; color:var(--ink2) }
-
-/* 작업 단위 카드 */
-.slice{ border:1px solid var(--line); border-radius:var(--radius); background:var(--bg); overflow:hidden; margin-bottom:12px }
-.slice__h{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg3); border-bottom:1px solid var(--line) }
-.slice__h .no{ font-family:var(--mono); font-weight:800; color:#fff; background:var(--hw);
-  border-radius:5px; padding:1px 8px; font-size:12px }
-.slice__h b{ font-size:14.5px }
-.slice__h .sp{ flex:1 }
-.slice__b{ padding:12px 14px; font-size:13.5px }
-.slice__b dl{ margin:0; display:grid; grid-template-columns:110px 1fr; gap:6px 12px }
-.slice__b dt{ color:var(--ink3); font-size:12.5px; font-weight:700 }
-.slice__b dd{ margin:0; color:var(--ink2) }
-
-/* 의사결정 기록 */
-.adr{ border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; background:var(--bg); margin-bottom:12px }
-.adr__t{ font-size:15px; font-weight:700; margin:0 0 8px }
-.adr dl{ margin:0; display:grid; grid-template-columns:96px 1fr; gap:5px 12px; font-size:13.5px }
-.adr dt{ color:var(--hw-dk); font-weight:700; font-size:12.5px }
-.adr dd{ margin:0; color:var(--ink2) }
-
-/* 높이는 diagram.js 의 autoHeight 가 내용 비율에 맞춰 인라인으로 잡는다.
-   아래 값은 스크립트가 돌기 전의 자리 잡기용이다. */
-.dgm{ margin:0 0 16px; height:420px }
-/* 다이어그램은 본문 글줄 폭에 갇히지 않고 사이드바 오른쪽을 전부 쓴다.
-   270px 사이드바 + 본문 좌우 패딩 88px + 스크롤바 여유 18px 를 뺀 값. */
-@media (min-width:1001px){
-  .dgm{ width:min(calc(100vw - 376px), 1700px); max-width:none }
+.t-right .mark{
+  position:absolute; left:44px; bottom:44px; color:#fff; z-index:1;
+  font-size:13px; font-weight:800; letter-spacing:.22em; text-transform:uppercase;
 }
-.tbl-wrap{ margin-bottom:14px }
-.note{ margin-bottom:12px }
-.code{ margin-bottom:14px }
 
-@media (max-width:1000px){
-  .doc{ grid-template-columns:1fr }
-  .side{ position:static; height:auto; border-right:0; border-bottom:1px solid var(--line) }
-  .main{ padding:24px 20px 60px }
+/* 섹션 구분 슬라이드 */
+.slide--section .stage{ justify-content:center; background:var(--bg3) }
+.slide--section .s-no{ font-family:var(--mono); font-size:64px; font-weight:800; color:var(--hw); line-height:1 }
+.slide--section h2{ font-size:40px; margin-top:10px }
+.slide--section .s-desc{ font-size:16px; color:var(--ink3); margin-top:10px; max-width:70ch }
+
+/* 발표자 노트 */
+.notes{ display:none }
+.deck.is-notes .slide.is-cur .notes{
+  display:block; position:fixed; left:0; right:0; bottom:46px; z-index:20;
+  max-height:32vh; overflow:auto; background:var(--bg); border-top:2px solid var(--hw);
+  padding:12px 18px; font-size:14px; color:var(--ink2); box-shadow:0 -8px 24px rgba(0,0,0,.12);
 }
+.notes b{ color:var(--hw-dk); display:block; margin-bottom:4px; font-size:12px; letter-spacing:.1em; text-transform:uppercase }
+
+/* 오버뷰(썸네일 격자) */
+.deck.is-overview{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:18px; padding:24px; align-items:start; justify-content:start; min-height:auto;
+}
+.deck.is-overview .slide{ --k:.216; cursor:pointer; outline:1px solid var(--line); }
+.deck.is-overview .slide.is-cur{ outline:3px solid var(--hw) }
+.deck.is-overview .slide::after{
+  content:attr(data-n); position:absolute; right:6px; bottom:4px; font-size:11px;
+  font-family:var(--mono); font-weight:700; color:var(--ink4);
+}
+
+/* HUD */
+.hud{
+  position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex; align-items:center; gap:8px;
+  padding:6px 12px; background:var(--bg); border-top:1px solid var(--line); font-size:12px;
+}
+.hud .sp{ flex:1 }
+.hud button{
+  border:1px solid var(--line2); background:var(--bg); color:var(--ink2);
+  border-radius:5px; padding:3px 10px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font);
+}
+.hud button:hover{ border-color:var(--hw); color:var(--hw-dk) }
+.hud .cnt{ font-family:var(--mono); font-weight:700; color:var(--ink2) }
+.hud .ttl{ color:var(--ink4); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:40vw }
+.prog{ position:fixed; left:0; bottom:0; height:3px; background:var(--hw); z-index:31; transition:width .18s ease }
+
 @media print{
-  @page{ size:A4; margin:14mm }
-  .side{ display:none }
-  .doc{ display:block }
-  .main{ max-width:none; padding:0 }
-  .sec{ page-break-inside:avoid }
-  .dgm{ height:340px !important; width:auto }
+  @page{ size:1280px 720px; margin:0 }
+  .hud,.prog,.notes{ display:none !important }
+  html,body{ background:#fff }
+  .deck,.deck.is-overview{ display:block; padding:0; gap:0 }
+  .deck .slide{ display:block !important; width:1280px; height:720px; page-break-after:always; outline:0 }
+  .deck .slide:last-child{ page-break-after:auto }
+  .stage{ transform:none; box-shadow:none }
 }
 
 /* ============================================================
@@ -442,10 +489,18 @@ body{ background:var(--bg2) }
   border:1px solid var(--line); border-radius:18px;
   padding:18px 22px 16px; overflow-x:auto;
 }
-/* 개발 문서: 본문 글줄 폭을 넘어 사이드바 오른쪽 전체를 쓴다 (.dgm 과 같은 규칙) */
-@media (min-width: 1200px){
-  .main .flow{ width:min(calc(100vw - 376px), 1560px); max-width:none }
+/* 화면 가득 펼치기 — 툴바의 "넓게" 버튼 / Esc 로 닫는다 (.dgm.is-max 와 같은 규칙) */
+.flow.is-max{
+  position:fixed; inset:14px; z-index:80; overflow:auto;
+  width:auto !important; max-width:none !important; height:auto !important;
+  box-shadow:0 12px 48px rgba(20,20,20,.28); border-color:var(--line2);
 }
+html.flow-locked, html.flow-locked body{ overflow:hidden }
+/* 예전엔 사이드바 오른쪽 전체로 폭을 늘렸지만, 그러면 사이드바를 접었을 때
+   본문(.main)만 가운데 남고 흐름도는 화면 가장자리까지 벌어져 카드 사이가
+   성겨 보였다. .main 폭(위 dev.css 의 .main margin:auto) 을 그대로 쓰는 쪽이
+   사이드바 상태와 무관하게 항상 가운데·컴팩트하다 — 카드가 더 필요하면
+   .flow 자체의 overflow-x:auto 로 옆으로 스크롤한다. */
 /* 슬라이드: 무대 안에 들어가도록 최소 폭을 풀고 카드를 줄인다 */
 .slide .flow{ margin:6px 0; padding:12px 14px 10px; overflow:visible; display:flex; flex-direction:column }
 .slide .flow__in{ flex:1; align-content:center }
@@ -470,7 +525,7 @@ body{ background:var(--bg2) }
 .fnode{
   position:relative; z-index:1; display:flex; gap:10px; align-items:flex-start;
   background:var(--bg); border:1px solid var(--line); border-radius:14px;
-  padding:11px 12px 11px 11px; min-height:58px;
+  padding:11px 12px 11px 11px; min-height:58px; min-width:0;
   box-shadow:0 1px 2px rgba(20,20,20,.04), 0 8px 22px -12px rgba(20,20,20,.18);
   transition:transform .18s ease, box-shadow .18s ease, opacity .25s ease, border-color .18s ease;
 }
@@ -481,11 +536,15 @@ body{ background:var(--bg2) }
 }
 .fnode__ic svg{ width:18px; height:18px }
 .fnode__body{ min-width:0 }
-.fnode__t{ font-weight:700; font-size:13.5px; line-height:1.3; color:var(--ink) }
-.fnode__s{ font-size:11.8px; line-height:1.45; color:var(--ink3); margin-top:2px }
+/* min-width:0 만으로는 부족하다 — 칸이 줄어도 점(.)으로만 이어진 긴 문자열
+   (토픽·호스트명 등, 띄어쓰기가 없어 줄바꿈할 곳이 없다)은 안 줄어들고 카드
+   폭 전체를, 나아가 grid 트랙 전체를 억지로 넓힌다. 어디서든 끊기게 한다. */
+.fnode__t{ font-weight:700; font-size:13.5px; line-height:1.3; color:var(--ink); overflow-wrap:anywhere }
+.fnode__s{ font-size:11.8px; line-height:1.45; color:var(--ink3); margin-top:2px; overflow-wrap:anywhere }
 .fnode__tag{
   display:inline-block; margin-top:6px; font-family:var(--mono); font-size:10.8px; color:var(--ink3);
   background:var(--bg2); border:1px solid var(--line); border-radius:6px; padding:1px 6px;
+  max-width:100%; overflow-wrap:anywhere;
 }
 .fnode__no{
   position:absolute; top:-9px; left:-9px; width:22px; height:22px; border-radius:50%;
@@ -544,7 +603,7 @@ body{ background:var(--bg2) }
 .flow__links path.ln--flow{ stroke:var(--hw); stroke-width:2.2; stroke-opacity:.55 }
 .flow__links path.ln--ok{ stroke:var(--ok); stroke-width:2.2; stroke-opacity:.6 }
 .flow__links path.ln--risk{ stroke:var(--risk); stroke-dasharray:6 6; animation:flow-dash 1.2s linear infinite; stroke-opacity:.8 }
-.flow__links path.ln--muted{ stroke:var(--ink4); stroke-dasharray:4 5; stroke-opacity:.7 }
+.flow__links path.ln--muted{ stroke:var(--ink3); stroke-dasharray:2.5 3.5; stroke-opacity:.85 }
 .flow__links circle.dot{ fill:var(--hw) }
 .flow__links circle.dot--ok{ fill:var(--ok) }
 @keyframes flow-dash{ to{ stroke-dashoffset:-24 } }
@@ -567,7 +626,7 @@ body{ background:var(--bg2) }
 .flow__legend i{ display:inline-block; vertical-align:middle; width:26px; height:0; margin-right:6px; border-top:2.2px solid var(--hw) }
 .flow__legend i.ok{ border-top-color:var(--ok) }
 .flow__legend i.risk{ border-top:2px dashed var(--risk) }
-.flow__legend i.muted{ border-top:2px dashed var(--ink4) }
+.flow__legend i.muted{ border-top:2px dashed var(--ink3) }
 .flow__legend b.nw{ display:inline-block; width:14px; height:4px; border-radius:2px; background:var(--hw); vertical-align:middle; margin-right:6px }
 
 /* ── 편집 모드 ───────────────────────────────────────── */
@@ -593,329 +652,639 @@ body{ background:var(--bg2) }
   .flow{ width:auto; overflow:visible; background:var(--bg); page-break-inside:avoid }
   .flow__seg, .flow__edit, .flow__bar{ display:none }
   .flow__links circle.dot{ display:none }
+  .flow.is-max{ position:static; inset:auto; box-shadow:none }
 }
 
-.doc{grid-template-columns:230px minmax(0,1fr)}.main{width:100%;max-width:1200px;min-width:0;padding:38px 44px 80px}.main .flow{width:100%;max-width:100%;padding:20px}.flow__in{min-width:700px;column-gap:26px;row-gap:24px}.fnode__t{font-size:14px}.fnode__s{font-size:12px}.sec>h2{margin-bottom:18px}.sec p,.sec li{font-size:15.5px;line-height:1.85}.tbl td,.tbl th{padding:13px 12px;white-space:normal;overflow-wrap:anywhere;vertical-align:top}.tbl{font-size:14px}.code pre{font-size:13px;line-height:1.65;max-height:650px;overflow:auto}details{border:1px solid var(--line);border-radius:10px;margin:14px 0;background:var(--bg)}summary{padding:16px 20px;font-size:15px;font-weight:700;cursor:pointer}.detail-body{padding:0 20px 20px}.flow__links{max-width:none}.side__meta{font-family:var(--font)}
-@media(max-width:1000px){.doc{grid-template-columns:190px minmax(0,1fr)}.main{padding:28px 22px}}
-@media(max-width:700px){.doc{display:block}.side{position:relative;height:auto;padding:16px}.toc,.side__meta{display:none}.side__foot{border:0;padding:0;margin-top:10px}.main{padding:24px 16px}.doc-head h1{font-size:26px}.sec>h2{font-size:21px}.tbl{min-width:620px}.tbl-wrap{overflow:auto}.detail-body{padding:0 12px 16px}.code pre{font-size:12px}.sec p{font-size:15px}}
-@media print{.doc{display:block}.main{max-width:none;padding:0}.flow__in{min-width:0;column-gap:10px}.main .flow{overflow:visible;padding:8px}.fnode__ic{display:none}.fnode__t{font-size:11px}.fnode__s{font-size:10px}.flow__hint{display:none}.tbl{min-width:0;font-size:10px}.sec p{font-size:11px}.code pre{max-height:none;white-space:pre-wrap;overflow-wrap:anywhere;font-size:9px}.sec{break-before:auto}details:not([open]){display:none}}
+/* ---- 이 덱 전용 보강 ---- */
+.er text{font-family:var(--mono);fill:var(--ink)}
+.er .t{font-size:13.5px;font-weight:700}
+.er .r{font-size:12px}
+.er .r.pk{font-weight:700;fill:var(--hw-dp)}
+.er .r.fk{fill:var(--info)}
+.er .r.dim{fill:var(--ink3)}
+.er .box{fill:var(--bg);stroke:var(--line2);stroke-width:1.2}
+.er .hd{fill:var(--hw-pale);stroke:var(--line2);stroke-width:1.2}
+.er .hd.ts{fill:var(--info-bg)}
+.er .hd.rj{fill:var(--warn-bg)}
+.er .ln{fill:none;stroke:var(--ink4);stroke-width:1.4}
+.er .ln.dash{stroke-dasharray:5 4}
+.er .lb{font-family:var(--sans);font-size:11.5px;fill:var(--ink3)}
+.er .lbb{fill:var(--bg);stroke:var(--line);stroke-width:1}
+.er .schema{font-family:var(--sans);font-size:11px;fill:var(--ink3);font-weight:700;letter-spacing:.06em}
+.fan text{font-family:var(--mono);fill:var(--ink);font-size:12px}
+.fan .tagbox{fill:var(--hw-pale);stroke:var(--hw);stroke-width:1.4}
+.fan .rowbox{fill:var(--bg);stroke:var(--line2);stroke-width:1}
+.fan .rowbox.seg{fill:var(--info-bg);stroke:var(--info)}
+.fan .ln{fill:none;stroke:var(--hw-lt);stroke-width:1.3}
+.fan .cap{font-family:var(--sans);fill:var(--ink3);font-size:11.5px}
+.fan .cnt{font-family:var(--sans);fill:var(--hw-dp);font-size:20px;font-weight:800}
+.tcard{border:1px solid var(--line2);border-radius:8px;padding:10px 12px;background:var(--bg);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:4px}
+.tcard__n{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--hw-dp)}
+.tcard__r{font-size:12.5px;color:var(--ink2)}
+.tcard__k{font-family:var(--mono);font-size:11.5px;color:var(--info);word-break:break-all}
+.tcard--ts{border-top:3px solid var(--info)}
+.tcard--rj{border-top:3px solid var(--warn)}
+.tcard--rdb{border-top:3px solid var(--hw)}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.slide .tbl th,.slide .tbl td{padding:7px 10px;font-size:13px}
+.slide .kpi__v{font-size:28px}
+.slide .fnode__s{font-size:12px}
+.slide .code pre{font-size:12px;line-height:1.5}
+.adv{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.adv__i{border-left:4px solid var(--hw);background:var(--bg2);border-radius:6px;padding:10px 12px}
+.adv__t{font-weight:800;font-size:14.5px;margin:0 0 4px;color:var(--hw-dp)}
+.adv__d{font-size:13px;color:var(--ink2);margin:0}
 </style>
 </head>
 <body>
-<div class="doc">
+<div class="deck" id="deck">
 
-  <!-- ================= 사이드바 ================= -->
-  <aside class="side no-print">
-    <div class="side__brand"><span class="bar"></span><b>태그 기반 DB 스키마</b></div>
-    <p class="side__meta">설계 제안 · 2026-09-23</p>
-    <ul class="toc"></ul>
-    <div class="side__foot">
-      <button id="bTheme" type="button">테마</button>
-      <button id="bPrint" type="button">인쇄</button>
-      
+  <!-- ========== 01 표지 ========== -->
+  <section class="slide slide--title">
+    <div class="stage">
+      <div class="t-left">
+        <span class="kicker">Schema Design Proposal</span>
+        <h1>HotDB 관점으로 설계하는<br>LiDAR RDB · TSDB 스키마</h1>
+        <p class="sub">HotDBProvider 가 받는 태그를 <b>어느 표에 · 어떤 키로 · 언제까지</b> 보관할지를 저장소 쪽에서 정합니다. RDB 는 최신값과 업무 목록, TSDB 는 시간 이력을 맡습니다.</p>
+        <div class="t-meta">
+          <span class="chip chip--neutral">2026-09-28</span>
+          <span class="chip chip--neutral">status · actual · artifact</span>
+          <span class="chip chip--warn">설계 제안 · 운영 미적용</span>
+        </div>
+      </div>
+      <div class="t-right"><span class="mark">Internal Use Only</span></div>
     </div>
-  </aside>
+  </section>
 
-  <!-- ================= 본문 ================= -->
-  <main class="main">
+  <!-- ========== 02 목차 ========== -->
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">Agenda</span><h2>오늘 답할 여섯 가지</h2></div>
+        <div class="s-head__r">발표 15분 · 논의 10분</div>
+      </div>
+      <div class="s-body">
+        <div class="g2" style="gap:14px 28px">
+          <div class="card card--accent"><p class="card__t">01. 왜 이 스키마인가</p><p class="card__d">HotDB 가 답해야 할 네 가지 조회가 표 모양을 정합니다</p></div>
+          <div class="card card--accent"><p class="card__t">02. 어떤 구조인가</p><p class="card__d">태그가 DB 행이 되기까지의 흐름과 채널별 저장 모양</p></div>
+          <div class="card card--accent"><p class="card__t">03. 실제 스키마</p><p class="card__d">테이블 8개와 키 관계 (ER) · 각 표가 맡는 한 행</p></div>
+          <div class="card card--accent"><p class="card__t">04. 데이터가 들어가는 법</p><p class="card__d">태그 1개 ≠ 데이터 1건 · 필드가 컬럼이 되는 규칙 · 저장 순서</p></div>
+          <div class="card card--accent"><p class="card__t">05. 어떻게 쓰나</p><p class="card__d">화면 · 분석 조회가 읽는 표, 쓰기량, HANA CDC 범위</p></div>
+          <div class="card card--accent"><p class="card__t">06. 장점과 남은 결정</p><p class="card__d">기존 대비 달라지는 다섯 가지, 검증 결과, 합의가 필요한 것</p></div>
+        </div>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div>
+    <aside class="notes"><b>발표자 노트</b>03 ER 과 04 저장 순서에서 질문이 몰린다. 01 은 2분 안에 넘긴다. 상세 근거는 lidar-tag-db-schema.html (개발 문서) 에 있다.</aside>
+  </section>
 
-<header class="doc-head"><span class="kicker">TAG-FIRST SCHEMA DESIGN</span><h1>태그 기준으로 설계하는<br>LiDAR RDB · TSDB 스키마</h1><p class="sub">Kafka 토픽·오프셋 대신 <b>태그가 가리키는 장비, 스캔, 산출물</b>을 데이터의 기준으로 삼습니다. HotDBProvider로 교체해도 유지할 저장 구조입니다.</p><div class="meta"><span class="chip">status · actual · artifact</span><span class="chip chip--warn">설계 제안 · 운영 미적용</span><span class="chip chip--neutral">2026-09-23</span></div></header><section class="sec" id="s0"><h2><span class="n">00</span>무엇을 어디에 저장할지 먼저 정합니다</h2><div class="note note--info"><p class="note__t">권고안</p><b>상태는 “최신값 + 시간 이력”, 실적은 “스캔별 결과”, 산출물은 “파일·행렬 목록”으로 나눕니다.</b> 태그마다 테이블을 만들거나 세 채널을 모두 시간 이력 테이블로 만드는 방식은 기본안으로 선택하지 않습니다.</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>채널</th><th>쉽게 말하면</th><th>RDB</th><th>TSDB</th></tr></thead><tbody><tr><td>status</td><td>지금 장비 상태 / 온도 변화</td><td><code>status_current</code> 태그별 최신 1행</td><td><code>status_history</code> 측정마다 1행</td></tr><tr><td>actual</td><td>이 스캔에서 블록 진척률을 얼마로 판단했나</td><td><code>scan + actual_result</code> 스캔·이벤트별 결과</td><td>시간 집계가 필요할 때 <code>actual_metric_history</code> 추가</td></tr><tr><td>artifact</td><td>점군 파일·변환행렬은 어디에 있나</td><td><code>scan + artifact</code> 종류·세그먼트별 목록</td><td>파일 상태 변화 분석 시 <code>artifact_event_history</code> 추가</td></tr></tbody></table></div><p>“RDB는 최신값, TSDB는 모든 것”으로 나누지 않습니다. 실적과 산출물도 RDB에서 이력을 보관합니다. TSDB는 시간 범위 분석·압축이 필요한 데이터에 적용합니다. 여기서 RDB/TSDB는 같은 PostgreSQL 인스턴스의 두 스키마이며 데이터 역할을 구분하는 이름입니다.</p><div class="flow" data-key="tag-schema-architecture-v1" data-edit="off">
-  <div class="flow__head"><span class="flow__title">태그를 받아 채널별 데이터로 저장</span><span class="flow__hint">HotDBProvider는 제안 구성 · 좁은 화면에서는 좌우로 이동</span><span class="sp"></span></div>
-  <div class="flow__in" style="grid-template-columns:repeat(4,minmax(0,1fr));">
-    <div style="grid-column:1 / span 1;grid-row:2 / span 1;" class="fnode" data-id="tag"><span class="fnode__ic" data-ic="tag"></span><div class="fnode__body"><div class="fnode__t">Agent → Engine</div><div class="fnode__s">태그 변경 배열</div></div></div>
-    <div style="grid-column:2 / span 1;grid-row:2 / span 1;" class="fnode fnode--new" data-id="provider"><span class="fnode__ic" data-ic="code"></span><div class="fnode__body"><div class="fnode__t">HotDBProvider</div><div class="fnode__s">등록 대조 · JSON 검증</div></div></div>
-    <div style="grid-column:3 / span 1;grid-row:1 / span 1;" class="fnode fnode--store" data-id="ts"><span class="fnode__ic" data-ic="archive"></span><div class="fnode__body"><div class="fnode__t">TSDB 상태 이력</div><div class="fnode__s">측정값마다 추가 저장</div></div></div>
-    <div style="grid-column:3 / span 1;grid-row:2 / span 1;" class="fnode fnode--store" data-id="rdb"><span class="fnode__ic" data-ic="db"></span><div class="fnode__body"><div class="fnode__t">RDB 최신값·목록</div><div class="fnode__s">상태 / 실적 / 산출물</div></div></div>
-    <div style="grid-column:4 / span 1;grid-row:2 / span 1;" class="fnode" data-id="hana"><span class="fnode__ic" data-ic="send"></span><div class="fnode__body"><div class="fnode__t">CDC → HANA</div><div class="fnode__s">선택한 RDB 표만 전달</div></div></div>
-    <div style="grid-column:2 / span 1;grid-row:3 / span 1;" class="fnode fnode--warn fnode--small" data-id="reject"><span class="fnode__ic" data-ic="alert"></span><div class="fnode__body"><div class="fnode__t">격리</div><div class="fnode__s">미등록 · 키 충돌 · 형식 오류</div></div></div>
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">01. 왜 이 스키마인가</span><h2>HotDB 가 답해야 할 네 가지 조회가 표 모양을 정합니다</h2></div>
+        <div class="s-head__r">근거는 각주 · 출처 장</div>
+      </div>
+      <div class="s-body">
+        <p class="s-lead">태그는 JSON 한 덩어리로 들어오지만, 화면과 분석은 서로 다른 모양의 표를 원합니다. 그 조회 요구가 곧 RDB · TSDB 의 표와 키입니다.<sup class="ref" data-ref="1">1</sup></p>
+        <div class="kpi">
+          <div class="kpi__item"><div class="kpi__v">1,750개</div><div class="kpi__l">등록 태그 (CSV 6개 · 상태 350 · 실적 350 · 산출물 1,050)<sup class="ref" data-ref="1">1</sup></div></div>
+          <div class="kpi__item"><div class="kpi__v">12행</div><div class="kpi__l">스캔 1회의 산출물 행 수 — 태그는 3개뿐</div></div>
+          <div class="kpi__item"><div class="kpi__v">3,024만</div><div class="kpi__l">하루 status 행 (350대 · 1초 가정의 산술값)<sup class="ref" data-ref="2">2</sup></div></div>
+          <div class="kpi__item"><div class="kpi__v">8개</div><div class="kpi__l">테이블 — RDB 7 + TSDB 1 (선택 3개 별도)</div></div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:18%">조회 요구</th><th style="width:32%">필요한 저장 모양</th><th style="width:28%">표</th><th>근거</th></tr></thead>
+            <tbody>
+              <tr><td><span class="chip chip--info">최신값</span> 지금 장비 상태</td><td>태그별 최신 1행 · 이력을 훑지 않는 인덱스</td><td class="mono">rdb.status_current (site, status)</td><td class="mono">lidar-tag-db-schema.html §01</td></tr>
+              <tr><td><span class="chip chip--info">이력</span> 온도 · 상태 추이</td><td>측정마다 1행 · 시간 파티션 · 압축 · 보관 정책</td><td class="mono">tsdb.status_history (tag_key, event_time)</td><td class="mono">lidar-tag-db-schema.html §02</td></tr>
+              <tr><td><span class="chip chip--warn">목록</span> 스캔 · 세그먼트</td><td>태그 1개가 12행 · 자연 키 4개로 무손실</td><td class="mono">rdb.scan · rdb.artifact</td><td class="mono">mqtt-agent-tag-catalog.html §06</td></tr>
+              <tr><td><span class="chip chip--risk">조사</span> 실패한 수신</td><td>버리지 않고 원문째 격리 · FK 없음</td><td class="mono">rdb.ingest_reject</td><td class="mono">lidar-tag-db-schema.html §04</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>1,750 은 태그 수이지 DB 행 수가 아니다. 3,024만은 코드 주기의 산술값 — 실측 아님을 미리 말한다. Kafka 경로는 쓰지 않으므로 기존 timescaledb 스키마의 param_id · send_topic · kafka_offset 컬럼은 만들지 않는다 (개발 문서 §05).</aside>
+  </section>
+
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">02. 어떤 구조인가</span><h2>태그를 받아 채널별 표에 넣고, HANA 에는 RDB 표만 보냅니다</h2></div>
+        <div class="s-head__r">카드에 마우스를 올리면 연결선만 남습니다</div>
+      </div>
+      <div class="s-body">
+        <p class="s-lead">HotDBProvider 가 등록부로 태그를 확인하고 JSON 을 검증한 뒤 <b>이력과 최신값을 같은 트랜잭션</b>으로 씁니다. 검증 실패는 버리지 않고 격리합니다.<sup class="ref" data-ref="3">3</sup><sup class="ref" data-ref="4">4</sup></p>
+        <div class="flow" data-key="deck-tag-arch">
+  <div class="flow__head"><span class="flow__title">태그가 DB 행이 되기까지</span><span class="flow__hint">주황 띠 카드가 이번에 설계하는 범위 · 나머지는 기존 구성</span><span class="sp"></span></div>
+  <div class="flow__in" style="grid-template-columns:repeat(5, 1fr);">
+    <div style="grid-column:1 / span 1;grid-row:1 / span 2;align-self:center;" class="fnode fnode--isl" data-id="agent"><span class="fnode__ic" data-ic="tag"></span><div class="fnode__body"><div class="fnode__t">Mqtt.Agent</div><div class="fnode__s">토픽 + id 를 태그 하나로 접음</div><span class="fnode__tag">기존</span></div></div>
+    <div style="grid-column:2 / span 1;grid-row:1 / span 1;" class="fnode fnode--isl" data-id="engine"><span class="fnode__ic" data-ic="stream"></span><div class="fnode__body"><div class="fnode__t">Engine · NATS</div><div class="fnode__s">Core Publish 로 태그 배열 발행</div><span class="fnode__tag">기존</span></div></div>
+    <div style="grid-column:3 / span 1;grid-row:1 / span 2;align-self:center;" class="fnode fnode--new" data-id="provider"><span class="fnode__ic" data-ic="code"></span><div class="fnode__body"><div class="fnode__t">HotDBProvider</div><div class="fnode__s">등록 대조 · JSON 검증 · 같은 트랜잭션</div><span class="fnode__tag">신규 · 설계 대상</span></div></div>
+    <div style="grid-column:4 / span 1;grid-row:1 / span 1;" class="fnode fnode--store" data-id="ts"><span class="fnode__ic" data-ic="archive"></span><div class="fnode__body"><div class="fnode__t">tsdb.status_history</div><div class="fnode__s">상태 이력 · 측정마다 1행</div><span class="fnode__tag">TimescaleDB</span></div></div>
+    <div style="grid-column:4 / span 1;grid-row:2 / span 1;" class="fnode fnode--store" data-id="rdb"><span class="fnode__ic" data-ic="db"></span><div class="fnode__body"><div class="fnode__t">rdb.*</div><div class="fnode__s">최신 상태 · 스캔 · 실적 · 산출물</div><span class="fnode__tag">PostgreSQL</span></div></div>
+    <div style="grid-column:5 / span 1;grid-row:2 / span 1;" class="fnode fnode--isl" data-id="hana"><span class="fnode__ic" data-ic="send"></span><div class="fnode__body"><div class="fnode__t">CDC → HANA</div><div class="fnode__s">선택한 RDB 표만 전달</div><span class="fnode__tag">기존</span></div></div>
+    <div style="grid-column:2 / span 1;grid-row:2 / span 1;" class="fnode fnode--risk fnode--small" data-id="lost"><span class="fnode__ic" data-ic="alert"></span><div class="fnode__body"><div class="fnode__t">구독 없던 구간</div><div class="fnode__s">재전달 없음 · 내구성 큐 별도</div></div></div>
+    <div style="grid-column:3 / span 1;grid-row:3 / span 1;" class="fnode fnode--warn fnode--small" data-id="reject"><span class="fnode__ic" data-ic="inbox"></span><div class="fnode__body"><div class="fnode__t">rdb.ingest_reject</div><div class="fnode__s">미등록 · 키 충돌 · 형식 오류 격리</div></div></div>
   </div>
-  <script type="application/json" class="flow-links">[{"from": "tag", "to": "provider", "kind": "flow"}, {"from": "provider", "to": "rdb", "kind": "flow"}, {"from": "provider", "to": "ts", "kind": "flow", "port": "t>l"}, {"from": "rdb", "to": "hana", "kind": "flow"}, {"from": "provider", "to": "reject", "kind": "risk", "port": "b>t"}]</script>
+  <div class="flow__legend"><span><i></i>데이터 흐름</span><span><i class="ok"></i>저장 · 확정</span><span><i class="risk"></i>실패 · 유실되는 경로</span><span><i class="muted"></i>버림 · 보류</span><span><b class="nw"></b>이번에 만드는 구성요소</span><span>카드에 마우스를 올리면 연결된 선만 강조됩니다 · 편집 버튼으로 바로 고칠 수 있습니다</span></div>
+  <script type="application/json" class="flow-links">[{"from": "agent", "to": "engine", "kind": "flow"}, {"from": "engine", "to": "provider", "kind": "flow"}, {"from": "provider", "to": "ts", "kind": "flow"}, {"from": "provider", "to": "rdb", "kind": "ok"}, {"from": "rdb", "to": "hana", "kind": "flow"}, {"from": "engine", "to": "lost", "kind": "risk", "label": "중단 시", "port": "b>t"}, {"from": "provider", "to": "reject", "kind": "risk", "label": "검증 실패", "port": "b>t"}]</script>
 </div>
-</section>
-<details><summary>왜 이 구조인가 — 다른 설계와 비교</summary><div class="detail-body"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>설계</th><th>장점</th><th>이번 선택</th></tr></thead><tbody><tr><td>태그마다 테이블 생성</td><td>태그와 표가 일대일</td><td>태그 추가 때마다 DDL이 늘고 채널 전체 조회가 어려워 제외</td></tr><tr><td>공통 tag_value JSON 이력 하나</td><td>새 필드 수용이 쉬움</td><td>임시 원문 수신에는 가능. 스캔·세그먼트 키와 타입 검사가 약해 최종 업무 표로는 제외</td></tr><tr><td>모든 필드를 개별 측정 행으로 저장</td><td>범용 수치 태그 처리에 유리</td><td>현재 raw JSON은 한 이벤트 묶음. 행 수 증가·행렬·NULL·같은 스캔 연결 문제로 기본안에서 제외</td></tr><tr><td>채널별 타입 표 + 상태만 TSDB 기본</td><td>조회 키·중복 규칙·파일 관리가 명확</td><td><b>권고</b>. 새 payload 버전에는 매핑·DDL 관리 필요</td></tr></tbody></table></div><p>향후 장비별 필드가 빈번하게 달라지는 수치 태그 서비스로 바뀐다면 별도 scalar 측정 모델을 재검토합니다. 지금의 “최적”은 현재 raw 태그 계약과 조회 요구에 대한 조건부 판단입니다.</p></div></details><section class="sec" id="s1"><h2><span class="n">01</span>태그 하나와 데이터 한 건은 다릅니다</h2><p>현재 <code>tagMode=raw</code>에서는 JSON 본문 전체가 문자열 태그 값입니다. 온도·상태·진척률 필드마다 별도 태그가 만들어지지 않습니다.<sup class="ref" data-ref="1">1</sup><sup class="ref" data-ref="3">3</sup></p><div class="code"><div class="code__bar"><span>같은 산출물 태그가 여러 행이 되는 예</span><button class="code__copy" type="button">복사</button></div><pre>tagId = LDR-GJ-A1B3-01-SEGMENTED_PCD.ot_pipeline_assembly_artifact.raw_payload
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>RDB/TSDB 는 같은 PostgreSQL 인스턴스의 두 스키마다. 별도 서버가 아니다. 재전달은 스키마가 아니라 수신 큐가 해결할 문제 — 12장에서 다시.</aside>
+  </section>
 
-같은 tagId + 같은 scan_id + SEG-001 → artifact 1행
-같은 tagId + 같은 scan_id + SEG-002 → artifact 1행
-...
-같은 tagId + 같은 scan_id + SEG-010 → artifact 1행
-
-태그 1개 ≠ 데이터 1건. 이 경우에는 산출물 10행입니다.</pre></div><div class="note note--warn"><p class="note__t">태그 ID로만 중복 제거하면 안 됩니다</p>세그먼트들이 같은 tagId와 같은 발생 시각으로 들어올 수 있어 <code>(tag_id, changed_at)</code>도 산출물 고유 키가 아닙니다. HotDBProvider는 수신 배열의 각 항목을 처리해야 합니다. 태그별 마지막 값 하나로 합치면 산출물이 빠집니다.</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>식별자</th><th>무엇을 식별하는가</th><th>사용처</th></tr></thead><tbody><tr><td>edgeGroupId + tagId</td><td>그룹의 등록 태그</td><td>tag_catalog 유일 키</td></tr><tr><td>tag_key</td><td>등록 태그의 내부 숫자 키</td><td>긴 TagId 반복 저장 대신 참조</td></tr><tr><td>site + device_id</td><td>사업장의 장비</td><td>장비 마스터</td></tr><tr><td>site + scan_id 전체 UUID</td><td>스캔 1개</td><td>실적·산출물 연결</td></tr><tr><td>site + scan_id + artifact_type + segment_key</td><td>스캔의 산출물 1개</td><td>artifact 기본 키</td></tr></tbody></table></div><p>등록 CSV 6개의 태그는 status 350, actual 350, artifact 1,050개로 총 1,750개입니다. <b>DB 전체 행 수가 아닙니다.</b> 장비 350대·상태 1초·스캔 1분·세그먼트 10개는 발행기 기본 가정이며 현장 확정값은 아닙니다.<sup class="ref" data-ref="2">2</sup></p></section>
-<section class="sec" id="s2"><h2><span class="n">02</span>HotDBProvider가 받는 입력 계약</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>입력</th><th>저장 / 변환</th><th>규칙</th></tr></thead><tbody><tr><td>edgeGroupId + tagId</td><td>tag_key, channel, site, device_id 조회</td><td>등록부로 확정. 문자열 역분해에만 의존하지 않음</td></tr><tr><td>valueKind / value</td><td>String 허용 → JSON 객체 파싱</td><td>NATS 봉투 디코딩 후 value는 JSON 문자열</td></tr><tr><td>changedAt</td><td>changed_at</td><td>Agent가 occurred_at을 읽고, 실패하면 수신 시각 사용</td></tr><tr><td>payload.occurred_at</td><td>event_time + source_time_text</td><td>제안 Provider에서는 누락/시각 오류 격리</td></tr><tr><td>payload.ingested_at</td><td>source_ingested_at</td><td>발신 수집 시각. raw 값 안에 남으며 DB 시각이 아님</td></tr><tr><td>Provider 수신 / DB INSERT</td><td>received_at / written_at</td><td>written_at은 행 쓰기 시각, 커밋 완료 시각 아님</td></tr><tr><td>schema_version 입력 없음</td><td>tag_catalog.schema_version=1</td><td>새로 제안하는 파서 버전. 발신 필드로 오인 금지</td></tr></tbody></table></div><p>TagId는 토픽의 <code>/</code>와 안전하지 않은 문자를 정규화한 결과여서 원래 토픽으로 완전 역변환할 수 없습니다. 등록 CSV의 <code>mqtt_topic</code>, <code>source_id</code>를 함께 보관합니다. 그룹·태그 키의 장비/채널 매핑은 불변으로 관리하고 충돌하는 재등록은 거부합니다.<sup class="ref" data-ref="3">3</sup></p><div class="tbl-wrap"><table class="tbl"><thead><tr><th>기존 Kafka 전용 정보</th><th>새 도메인 표</th></tr></thead><tbody><tr><td>param_id / send_topic</td><td>제거. 등록 태그 직접 참조</td></tr><tr><td>kafka_offset / partition / 헤더</td><td>제거. 필요하면 별도 전송 감사 로그</td></tr><tr><td>pm_mode / content_ts</td><td>현재 태그 입력에 없으므로 도메인 컬럼으로 만들지 않음</td></tr><tr><td>idempotency_key</td><td>source_event_key로 보존하지만 그대로 유일 키로 신뢰하지 않음</td></tr></tbody></table></div><div class="note note--warn"><p class="note__t">스키마가 재전송을 만들어 주지는 않습니다</p>확인한 Engine은 Core NATS Publish를 사용합니다. 소비자가 없던 구간의 자동 재전달은 보장되지 않습니다. HotDBProvider의 내구성 큐/로컬 저장/ACK는 별도 구현 조건입니다. HANA까지 무손실이 필요하면 이 구간도 보완해야 합니다.<sup class="ref" data-ref="4">4</sup><sup class="ref" data-ref="8">8</sup></div></section>
-<section class="sec" id="s3"><h2><span class="n">03</span>RDB 스키마: 장비·태그·스캔·목록</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>테이블</th><th>한 행 / 기본 키</th><th>역할</th></tr></thead><tbody><tr><td>rdb.device</td><td>사업장 장비 / (site,device_id)</td><td>등록 기준</td></tr><tr><td>rdb.tag_catalog</td><td>등록 태그 / tag_key</td><td>원래 토픽·장비·채널·종류 연결</td></tr><tr><td>rdb.status_current</td><td>태그의 최신 상태 / tag_key</td><td>최신 조회·선택적 CDC</td></tr><tr><td>rdb.scan</td><td>스캔 1개 / (site,scan_id)</td><td>장비·블록·위치 연결, artifact 선도착 허용</td></tr><tr><td>rdb.actual_result</td><td>스캔 이벤트 / (site,scan_id,event_type)</td><td>진척률 결과. stage 없음</td></tr><tr><td>rdb.artifact</td><td>산출물 / (site,scan_id,artifact_type,segment_key)</td><td>파일 메타 또는 행렬</td></tr><tr><td>rdb.ingest_reject</td><td>검증 실패 수신 / reject_id</td><td>오류·키 충돌 조사</td></tr></tbody></table></div><h3>상태 최신값은 태그별로 관리합니다</h3><p>같은 장비가 여러 그룹에 등록될 수 있어 최신 상태 키는 tag_key입니다. 장비당 한 상태가 필요한 화면은 승인된 대표 status 태그를 선택합니다. 수집원이 다른 값을 임의 합치지 않습니다.</p><h3>actual에는 stage를 다시 만들지 않습니다</h3><p>최신 발행기에 stage가 없습니다. 이후 판별 서비스가 만든다면 별도 결과 표에 판별 출처·시각을 저장합니다. START/COMPLETE는 공정 이름이 아닙니다. 진척률은 정정되거나 새 주기에서 낮아질 수 있으므로 GREATEST로 고정하지 않습니다.<sup class="ref" data-ref="2">2</sup></p><p><b>키의 전제:</b> 같은 scan_id 안에서 동일 event_type의 확정 결과는 하나로 봅니다. 동일 스캔의 PROGRESS가 여러 번 갱신되는 실제 계약이라면 source revision을 키에 추가해야 합니다. 같은 키로 다른 내용이 오는 경우를 조용히 덮어쓰지 않는 이유입니다.</p><h3>artifact가 actual보다 먼저 올 수 있습니다</h3><p>먼저 <code>scan</code> 연결 행을 만들고 artifact를 저장합니다. scanned_at은 actual 도착 시 채웁니다. 같은 스캔의 장비·위치·블록이 다르면 덮어쓰지 않고 격리합니다. 비세그먼트의 <code>segment_id=null</code>은 <code>segment_key=''</code>로 정규화해 NULL 중복 문제를 피합니다.<sup class="ref" data-ref="7">7</sup></p><p>등록 PCD 1개 + 행렬 1개 + 세그먼트 10개는 12행입니다. PCD 본체는 외부 스토리지에, URI·크기·체크섬은 DB에 둡니다. 행렬은 숫자 16개라 배열로 저장합니다. 메타 수신과 파일 검증 완료는 <code>file_state</code>로 구분합니다.</p></section>
-<section class="sec" id="s4"><h2><span class="n">04</span>태그 필드가 어느 컬럼으로 들어가는가</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>공통 필드</th><th>저장 위치</th><th>규칙</th></tr></thead><tbody><tr><td>site / zone / shop / bay</td><td>status_history·status_current / scan</td><td>이벤트 시점 위치 보존</td></tr><tr><td>id 또는 태그 접두사</td><td>tag_catalog → device_id</td><td>종류 접미사 처리는 등록 시 검증</td></tr><tr><td>occurred_at / ingested_at</td><td>event_time / source_ingested_at</td><td>발생·수집·DB 수신 시각 구분</td></tr><tr><td>전체 JSON 본문</td><td>actual_result / artifact의 source_payload</td><td>JSONB는 의미 보존이며 원문 바이트 보존은 아님</td></tr></tbody></table></div><details><summary>status 필드 전체</summary><div class="detail-body"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>입력 필드</th><th>타입 / 저장</th><th>규칙</th></tr></thead><tbody><tr><td>device_role / status / error_code</td><td>text / text / text</td><td>status 4종 검사, 오류 NULL 허용</td></tr><tr><td>last_heartbeat_at</td><td>timestamptz</td><td>OFFLINE 중 그대로일 수 있음</td></tr><tr><td>scan_rate_pts_per_sec</td><td>bigint</td><td>0 이상</td></tr><tr><td>temperature_c / connectivity_rssi / fov_mode</td><td>double precision / smallint / text</td><td>장비별 상하한은 사양 확정 후</td></tr><tr><td>idempotency_key</td><td>source_event_key text</td><td>초 단위 값만으로 고빈도 측정 구분 불가</td></tr></tbody></table></div></div></details><details><summary>actual 필드 전체</summary><div class="detail-body"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>입력 필드</th><th>저장 위치 / 타입</th><th>규칙</th></tr></thead><tbody><tr><td>scan_id / scanned_at</td><td>scan의 uuid / timestamptz</td><td>UUID 전체 사용</td></tr><tr><td>hull_no / block_id</td><td>scan의 text</td><td>블록별 검색</td></tr><tr><td>record_type / input_method / source_system</td><td>actual_result text</td><td>ACTUAL 검사, 나머지 값 보존</td></tr><tr><td>pan_tilt / edge_pc / inference_ws / vision_ocr</td><td>text, NULL 허용</td><td>보조 장비 ID, 미등록 장비 강제 FK 없음</td></tr><tr><td>event_type / block_progress_rate</td><td>text / double precision</td><td>START·PROGRESS·COMPLETE / 0~100</td></tr><tr><td>reference_cad_id / match_confidence / model_version</td><td>text / double precision / text</td><td>신뢰도 0~1</td></tr><tr><td>idempotency_key</td><td>source_event_key text</td><td>현재 UUID 앞 8자 기반. 고유 키로 사용 금지</td></tr></tbody></table></div></div></details><details><summary>artifact 필드 전체</summary><div class="detail-body"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>입력 필드</th><th>저장 위치 / 타입</th><th>규칙</th></tr></thead><tbody><tr><td>scan_id / hull_no / block_id</td><td>scan 참조</td><td>artifact에도 위치 필드가 있음</td></tr><tr><td>artifact_type / segment_id</td><td>text / segment_key text</td><td>세그먼트는 비어 있지 않은 키</td></tr><tr><td>storage_uri / file_size_bytes / checksum</td><td>text / bigint / text</td><td>PCD 필수. URI만으로 파일 확인 완료 아님</td></tr><tr><td>transformation_matrix</td><td>double precision[]</td><td>길이16·1차원·NULL 원소 없음</td></tr><tr><td>produced_by_device_id / model_version</td><td>text / text</td><td>생성 주체·모델</td></tr><tr><td>idempotency_key 없음</td><td>DB 자연 키</td><td>전체 scan UUID·종류·세그먼트 사용</td></tr></tbody></table></div></div></details><p>예상하지 않은 필드가 오면 버리지 않고 스키마 버전 불일치로 격리합니다. status는 정상 이력에 JSON 원문을 중복 저장하지 않는 기본안이므로 이 검사가 필요합니다. actual·artifact의 JSONB는 타입 컬럼과 중복되며 보관 비용에 포함합니다.</p></section>
-<section class="sec" id="s5"><h2><span class="n">05</span>TSDB 스키마: 시간 분석이 필요한 이력만</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>테이블</th><th>내용 / 키</th><th>정책 출발점</th></tr></thead><tbody><tr><td>status_history · 기본</td><td>상태 타입 컬럼 / (tag_key,event_time,event_key)</td><td>6시간 청크, tag_key 묶음, event_time 정렬</td></tr><tr><td>actual_metric_history · 선택</td><td>진척률·신뢰도 / (site,scan_id,event_type,event_time)</td><td>1일 청크. 확정된 결과의 시간 집계</td></tr><tr><td>artifact_event_history · 선택</td><td>수신·파일 확인·삭제 / (event_id,event_time)</td><td>1일 청크. 파일 카탈로그 사본 아님</td></tr></tbody></table></div><p>하이퍼테이블 고유 키는 시간 파티션 컬럼을 포함합니다. 동일 이벤트가 다른 시간으로 다시 오면 이 키만으로 전역 중복 제거되지 않습니다. 재전송 시 발생 시각을 바꾸지 않는 입력 계약이 필요합니다.</p><p>status의 6시간 청크, 3일 후 압축, 31일 보관은 <b>기존 설정에서 가져온 후보값</b>입니다. 행 크기·인덱스·지연 도착을 측정한 후 정합니다. DDL에는 자동 보존 삭제를 넣지 않습니다. 생성 옵션의 자동 컬럼 저장 정책은 DDL에서 명시적으로 제거합니다. 합의된 압축 시점으로 정책을 추가해야 자동 압축이 시작됩니다.</p><p>actual 정정 계약은 미확정이므로 RDB 결과를 기본으로 유지합니다. artifact는 파일 상태 갱신이 있어 일반 목록으로 둡니다. <b>실적·산출물 RDB도 스캔마다 커집니다.</b> TSDB를 선택하지 않았다고 고정 크기가 되는 것은 아닙니다.</p></section>
-<section class="sec" id="s6"><h2><span class="n">06</span>중복·역순·세그먼트를 처리하는 규칙</h2><div class="flow" data-key="tag-schema-write-v1" data-edit="off">
-  <div class="flow__head"><span class="flow__title">한 태그 변경을 저장하는 순서</span><span class="flow__hint">같은 태그 ID의 반복 항목을 합치지 않습니다</span><span class="sp"></span></div>
-  <div class="flow__in" style="grid-template-columns:repeat(4,minmax(0,1fr));">
-    <div style="grid-column:1 / span 1;grid-row:1 / span 1;" class="fnode" data-id="lookup"><span class="fnode__ic" data-ic="tag"></span><div class="fnode__body"><div class="fnode__t">① 등록 확인</div><div class="fnode__s">edgeGroupId + tagId</div></div></div>
-    <div style="grid-column:2 / span 1;grid-row:1 / span 1;" class="fnode" data-id="parse"><span class="fnode__ic" data-ic="filter"></span><div class="fnode__body"><div class="fnode__t">② 본문 검증</div><div class="fnode__s">채널 · 시간 · 데이터 키</div></div></div>
-    <div style="grid-column:3 / span 1;grid-row:1 / span 1;" class="fnode" data-id="write"><span class="fnode__ic" data-ic="db"></span><div class="fnode__body"><div class="fnode__t">③ 동일 트랜잭션</div><div class="fnode__s">이력 + 최신값 / 스캔 + 목록</div></div></div>
-    <div style="grid-column:4 / span 1;grid-row:1 / span 1;" class="fnode" data-id="commit"><span class="fnode__ic" data-ic="check"></span><div class="fnode__body"><div class="fnode__t">④ 커밋 후 완료</div><div class="fnode__s">내구성 수신 경로의 ACK</div></div></div>
-    <div style="grid-column:2 / span 1;grid-row:2 / span 1;" class="fnode fnode--warn fnode--small" data-id="bad"><span class="fnode__ic" data-ic="alert"></span><div class="fnode__body"><div class="fnode__t">검증 실패</div><div class="fnode__s">격리 저장 · 정상 건과 구분</div></div></div>
-    <div style="grid-column:3 / span 1;grid-row:2 / span 1;" class="fnode fnode--warn fnode--small" data-id="retry"><span class="fnode__ic" data-ic="retry"></span><div class="fnode__body"><div class="fnode__t">DB 실패</div><div class="fnode__s">롤백 · 같은 이벤트 재시도</div></div></div>
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">02. 어떤 구조인가</span><h2>상태는 최신값 + 이력, 실적 · 산출물은 스캔별 목록입니다</h2></div>
+        <div class="s-head__r">"RDB 는 최신값, TSDB 는 전부" 로 나누지 않습니다</div>
+      </div>
+      <div class="s-body">
+        <p class="s-lead">PCD 본체는 스토리지에 두고 DB 에는 URI · 크기 · 체크섬만 넣습니다. 변환 행렬은 숫자 16개라 배열 컬럼입니다. 스캔 1회 = <span class="mono">scan</span> 1행 + 이벤트별 <span class="mono">actual_result</span> + 산출물 12행.</p>
+        <div class="flow" data-key="deck-tag-channel">
+  <div class="flow__head"><span class="flow__title">세 채널이 각자 다른 모양으로 저장됩니다</span><span class="flow__hint">상태는 최신값 + 이력 · 실적과 산출물은 스캔에 묶인 목록</span><span class="sp"></span></div>
+  <div class="flow__in" style="grid-template-columns:repeat(4, 1fr);">
+    <div style="grid-column:1 / span 1;grid-row:1 / span 1;" class="fnode" data-id="st"><span class="fnode__ic" data-ic="tag"></span><div class="fnode__body"><div class="fnode__t">status 태그</div><div class="fnode__s">1초 · 장비 상태 · 온도</div><span class="fnode__tag">350개</span></div></div>
+    <div style="grid-column:1 / span 1;grid-row:2 / span 1;" class="fnode" data-id="ac"><span class="fnode__ic" data-ic="tag"></span><div class="fnode__body"><div class="fnode__t">actual 태그</div><div class="fnode__s">1분 · 블록 진척률</div><span class="fnode__tag">350개</span></div></div>
+    <div style="grid-column:1 / span 1;grid-row:3 / span 1;" class="fnode" data-id="ar"><span class="fnode__ic" data-ic="tag"></span><div class="fnode__body"><div class="fnode__t">artifact 태그</div><div class="fnode__s">1분 · PCD · 행렬 · 세그먼트</div><span class="fnode__tag">1,050개</span></div></div>
+    <div style="grid-column:2 / span 1;grid-row:1 / span 3;align-self:center;" class="fnode fnode--new" data-id="prov"><span class="fnode__ic" data-ic="code"></span><div class="fnode__body"><div class="fnode__t">HotDBProvider</div><div class="fnode__s">채널별 파서 · 한 트랜잭션에 함께 저장</div><span class="fnode__tag">신규</span></div></div>
+    <div style="grid-column:3 / span 1;grid-row:1 / span 1;" class="fnode fnode--store" data-id="cur"><span class="fnode__ic" data-ic="db"></span><div class="fnode__body"><div class="fnode__t">status_current</div><div class="fnode__s">태그별 최신 1행 · 화면 조회</div><span class="fnode__tag">rdb</span></div></div>
+    <div style="grid-column:4 / span 1;grid-row:1 / span 1;" class="fnode fnode--store" data-id="his"><span class="fnode__ic" data-ic="archive"></span><div class="fnode__body"><div class="fnode__t">status_history</div><div class="fnode__s">측정마다 1행 · 6시간 청크</div><span class="fnode__tag">tsdb</span></div></div>
+    <div style="grid-column:3 / span 1;grid-row:2 / span 2;align-self:center;" class="fnode fnode--store" data-id="scan"><span class="fnode__ic" data-ic="link"></span><div class="fnode__body"><div class="fnode__t">scan</div><div class="fnode__s">스캔 앵커 · 먼저 온 쪽이 생성</div><span class="fnode__tag">rdb</span></div></div>
+    <div style="grid-column:4 / span 1;grid-row:2 / span 1;" class="fnode fnode--store" data-id="res"><span class="fnode__ic" data-ic="db"></span><div class="fnode__body"><div class="fnode__t">actual_result</div><div class="fnode__s">스캔 · 이벤트별 1행</div><span class="fnode__tag">rdb</span></div></div>
+    <div style="grid-column:4 / span 1;grid-row:3 / span 1;" class="fnode fnode--store" data-id="art"><span class="fnode__ic" data-ic="file"></span><div class="fnode__body"><div class="fnode__t">artifact</div><div class="fnode__s">종류 · 세그먼트별 1행</div><span class="fnode__tag">rdb</span></div></div>
   </div>
-  <script type="application/json" class="flow-links">[{"from": "lookup", "to": "parse", "kind": "flow"}, {"from": "parse", "to": "write", "kind": "flow"}, {"from": "write", "to": "commit", "kind": "ok"}, {"from": "parse", "to": "bad", "kind": "risk", "port": "b>t"}, {"from": "write", "to": "retry", "kind": "risk", "port": "b>t"}]</script>
+  <div class="flow__legend"><span><i></i>데이터 흐름</span><span><i class="ok"></i>저장 · 확정</span><span><i class="risk"></i>실패 · 유실되는 경로</span><span><i class="muted"></i>버림 · 보류</span><span><b class="nw"></b>이번에 만드는 구성요소</span><span>카드에 마우스를 올리면 연결된 선만 강조됩니다 · 편집 버튼으로 바로 고칠 수 있습니다</span></div>
+  <script type="application/json" class="flow-links">[{"from": "st", "to": "prov", "kind": "flow"}, {"from": "ac", "to": "prov", "kind": "flow"}, {"from": "ar", "to": "prov", "kind": "flow"}, {"from": "prov", "to": "cur", "kind": "flow"}, {"from": "cur", "to": "his", "kind": "ok"}, {"from": "prov", "to": "scan", "kind": "flow"}, {"from": "scan", "to": "res", "kind": "ok"}, {"from": "scan", "to": "art", "kind": "ok"}]</script>
 </div>
-<div class="tbl-wrap"><table class="tbl"><thead><tr><th>상황</th><th>규칙</th></tr></thead><tbody><tr><td>동일 태그의 세그먼트 10개</td><td>10개 모두 처리. Dictionary(tagId)·Last() 축약 금지</td></tr><tr><td>status event_key</td><td>SHA-256(canonical JSON 배열 [edgeGroupId,tagId,정밀 UTC 발생시각,source_event_key])</td></tr><tr><td>같은 status 키·다른 내용</td><td>payload_hash 비교 후 충돌 격리. DO NOTHING만으로 숨기지 않음</td></tr><tr><td>status 역순</td><td>과거 이력 저장, 최신값은 더 늦은 event_time만 반영</td></tr><tr><td>같은 시각·다른 status 측정</td><td>source sequence가 없으면 선후 불명. 임의 최신화하지 않고 동률 충돌 기록</td></tr><tr><td>actual·artifact 동일 자연 키</td><td>업무 내용 hash 같으면 중복, 다르면 정정/재생성 계약 전까지 격리</td></tr><tr><td>파일 상태 갱신</td><td>검증 서비스가 갱신. 수신 재시도가 verified를 되돌리지 않음</td></tr><tr><td>DB 실패</td><td>롤백 후 같은 키 재시도. 내구성 수신 완료는 커밋 후</td></tr><tr><td>검증 실패</td><td>ingest_reject에 원문 저장. 격리 저장 실패 시에도 완료 ACK 금지</td></tr></tbody></table></div><p>payload_hash는 키 순서·숫자·시각 표기를 정규화한 업무 필드 기준입니다. 전송 정보와 재시도 때 바뀔 수 있는 ingested_at은 제외합니다. revision이 정의되기 전에는 다른 값의 재수신을 무조건 최신 정정으로 처리하지 않습니다.</p><p>.NET 시각은 PostgreSQL 마이크로초보다 정밀할 수 있어 source_time_text로 원문을 보존합니다. event_key는 DB 시각 반올림 전에 생성합니다. 발신 status 키는 초 단위, actual 키는 UUID 앞 8자 기반이므로 이 값만으로 고유성을 보장하지 않습니다.<sup class="ref" data-ref="2">2</sup></p></section>
-<section class="sec" id="s7"><h2><span class="n">07</span>검토용 SQL — 신규 DB에서만 실행</h2><p>제안 구조의 생성 DDL이며 기존 스키마 변경용 마이그레이션이 아닙니다. 필드 변환·hash·등록 대조·최신값 갱신·충돌 격리는 Provider가 구현해야 합니다.</p><p><span class="chip chip--ok" id="sql-validation">격리 DB 검증 통과 · PostgreSQL 17.11 / TimescaleDB 2.29.2</span></p><details><summary>기본 RDB + TSDB 생성 SQL</summary><div class="detail-body"><div class="code"><div class="code__bar"><span>기본안 · PostgreSQL 17 / TimescaleDB 2.29.2</span><button class="code__copy" type="button">복사</button></div><pre id="schema-base">-- Proposal: new empty database only; NOT an existing-schema migration.
-CREATE EXTENSION IF NOT EXISTS timescaledb;
-CREATE SCHEMA rdb;
-CREATE SCHEMA tsdb;
-CREATE TABLE rdb.device (
-  site text NOT NULL, device_id text NOT NULL, device_role text NOT NULL,
-  active boolean NOT NULL DEFAULT true, PRIMARY KEY(site,device_id)
-);
-CREATE TABLE rdb.tag_catalog (
-  tag_key bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  edge_group_id text NOT NULL, tag_id varchar(100) NOT NULL,
-  mqtt_topic text NOT NULL, source_id text NOT NULL,
-  site text NOT NULL, device_id text NOT NULL,
-  channel text NOT NULL CHECK(channel IN (&#x27;status&#x27;,&#x27;actual&#x27;,&#x27;artifact&#x27;)),
-  artifact_type text,
-  field_name text NOT NULL DEFAULT &#x27;raw_payload&#x27; CHECK(field_name=&#x27;raw_payload&#x27;),
-  value_kind text NOT NULL DEFAULT &#x27;String&#x27; CHECK(value_kind=&#x27;String&#x27;),
-  schema_version integer NOT NULL DEFAULT 1 CHECK(schema_version&gt;0),
-  active boolean NOT NULL DEFAULT true,
-  UNIQUE(edge_group_id,tag_id),
-  FOREIGN KEY(site,device_id) REFERENCES rdb.device(site,device_id),
-  CHECK ((channel=&#x27;artifact&#x27; AND artifact_type IS NOT NULL AND artifact_type IN
-    (&#x27;REGISTERED_PCD&#x27;,&#x27;TRANSFORMATION_MATRIX&#x27;,&#x27;SEGMENTED_PCD&#x27;))
-    OR (channel IN (&#x27;status&#x27;,&#x27;actual&#x27;) AND artifact_type IS NULL))
-);
-CREATE TABLE tsdb.status_history (
-  event_time timestamptz NOT NULL,
-  tag_key bigint NOT NULL REFERENCES rdb.tag_catalog(tag_key),
-  event_key bytea NOT NULL CHECK(octet_length(event_key)=32),
-  payload_hash bytea NOT NULL CHECK(octet_length(payload_hash)=32),
-  source_time_text text NOT NULL, source_event_key text NOT NULL,
-  changed_at timestamptz NOT NULL,
-  site text NOT NULL, device_id text NOT NULL, device_role text NOT NULL,
-  zone text NOT NULL, shop text NOT NULL, bay text NOT NULL,
-  status text NOT NULL CHECK(status IN (&#x27;ONLINE&#x27;,&#x27;CALIBRATING&#x27;,&#x27;ERROR&#x27;,&#x27;OFFLINE&#x27;)),
-  last_heartbeat_at timestamptz, error_code text,
-  scan_rate_pts_per_sec bigint CHECK(scan_rate_pts_per_sec&gt;=0),
-  temperature_c double precision, connectivity_rssi smallint, fov_mode text,
-  source_ingested_at timestamptz, received_at timestamptz NOT NULL,
-  written_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  PRIMARY KEY(tag_key,event_time,event_key)
-) WITH (tsdb.hypertable, tsdb.partition_column=&#x27;event_time&#x27;,
-  tsdb.chunk_interval=&#x27;6 hours&#x27;, tsdb.segmentby=&#x27;tag_key&#x27;,
-  tsdb.orderby=&#x27;event_time DESC&#x27;);
--- TimescaleDB 2.29 creates a default columnstore policy with this DDL.
--- Remove that policy until a measured compression window is agreed.
-CALL remove_columnstore_policy(&#x27;tsdb.status_history&#x27;, if_exists =&gt; true);
--- LIKE with these options does not copy primary/foreign keys.
-CREATE TABLE rdb.status_current
-  (LIKE tsdb.status_history INCLUDING DEFAULTS INCLUDING CONSTRAINTS);
-ALTER TABLE rdb.status_current ADD PRIMARY KEY(tag_key);
-ALTER TABLE rdb.status_current ADD FOREIGN KEY(tag_key)
-  REFERENCES rdb.tag_catalog(tag_key);
-CREATE INDEX status_current_alarm_idx ON rdb.status_current(site,status);
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>태그마다 테이블을 만드는 안, 세 채널 모두 시간 이력으로 두는 안은 검토 후 제외했다. 근거는 개발 문서 §00 접힘 표.</aside>
+  </section>
 
--- actual OR artifact creates this anchor, whichever arrives first.
-CREATE TABLE rdb.scan (
-  site text NOT NULL, scan_id uuid NOT NULL, device_id text NOT NULL,
-  zone text NOT NULL, shop text NOT NULL, bay text NOT NULL,
-  hull_no text NOT NULL, block_id text NOT NULL, scanned_at timestamptz,
-  first_received_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  PRIMARY KEY(site,scan_id),
-  FOREIGN KEY(site,device_id) REFERENCES rdb.device(site,device_id)
-);
-CREATE INDEX scan_block_time_idx
-  ON rdb.scan(site,hull_no,block_id,scanned_at DESC);
-CREATE TABLE rdb.actual_result (
-  site text NOT NULL, scan_id uuid NOT NULL,
-  event_type text NOT NULL CHECK(event_type IN (&#x27;START&#x27;,&#x27;PROGRESS&#x27;,&#x27;COMPLETE&#x27;)),
-  tag_key bigint NOT NULL REFERENCES rdb.tag_catalog(tag_key),
-  event_time timestamptz NOT NULL, source_time_text text NOT NULL,
-  changed_at timestamptz NOT NULL, source_event_key text NOT NULL,
-  record_type text NOT NULL CHECK(record_type=&#x27;ACTUAL&#x27;),
-  input_method text NOT NULL, source_system text NOT NULL,
-  pan_tilt text, edge_pc text, inference_ws text, vision_ocr text,
-  block_progress_rate double precision NOT NULL
-    CHECK(block_progress_rate BETWEEN 0 AND 100),
-  reference_cad_id text,
-  match_confidence double precision CHECK(match_confidence BETWEEN 0 AND 1),
-  model_version text, source_ingested_at timestamptz,
-  received_at timestamptz NOT NULL,
-  payload_hash bytea NOT NULL CHECK(octet_length(payload_hash)=32),
-  source_payload jsonb NOT NULL CHECK(jsonb_typeof(source_payload)=&#x27;object&#x27;),
-  PRIMARY KEY(site,scan_id,event_type),
-  FOREIGN KEY(site,scan_id) REFERENCES rdb.scan(site,scan_id)
-);
-CREATE INDEX actual_event_time_idx ON rdb.actual_result(event_time DESC);
-CREATE TABLE rdb.artifact (
-  site text NOT NULL, scan_id uuid NOT NULL,
-  artifact_type text NOT NULL CHECK(artifact_type IN
-    (&#x27;REGISTERED_PCD&#x27;,&#x27;TRANSFORMATION_MATRIX&#x27;,&#x27;SEGMENTED_PCD&#x27;)),
-  segment_key text NOT NULL DEFAULT &#x27;&#x27;,
-  tag_key bigint NOT NULL REFERENCES rdb.tag_catalog(tag_key),
-  event_time timestamptz NOT NULL, source_time_text text NOT NULL,
-  changed_at timestamptz NOT NULL,
-  storage_uri text, file_size_bytes bigint CHECK(file_size_bytes&gt;=0),
-  checksum text, transformation_matrix double precision[],
-  produced_by_device_id text, model_version text,
-  source_ingested_at timestamptz, received_at timestamptz NOT NULL,
-  payload_hash bytea NOT NULL CHECK(octet_length(payload_hash)=32),
-  source_payload jsonb NOT NULL CHECK(jsonb_typeof(source_payload)=&#x27;object&#x27;),
-  file_state text NOT NULL DEFAULT &#x27;metadata_only&#x27;
-    CHECK(file_state IN (&#x27;metadata_only&#x27;,&#x27;verified&#x27;,&#x27;removed&#x27;)),
-  PRIMARY KEY(site,scan_id,artifact_type,segment_key),
-  FOREIGN KEY(site,scan_id) REFERENCES rdb.scan(site,scan_id),
-  CHECK((artifact_type=&#x27;SEGMENTED_PCD&#x27; AND segment_key&lt;&gt;&#x27;&#x27;)
-    OR (artifact_type&lt;&gt;&#x27;SEGMENTED_PCD&#x27; AND segment_key=&#x27;&#x27;)),
-  CHECK(
-    (artifact_type=&#x27;TRANSFORMATION_MATRIX&#x27;
-      AND transformation_matrix IS NOT NULL
-      AND cardinality(transformation_matrix)=16
-      AND array_ndims(transformation_matrix)=1
-      AND array_position(transformation_matrix,NULL) IS NULL
-      AND storage_uri IS NULL AND file_size_bytes IS NULL AND checksum IS NULL)
-    OR (artifact_type IN (&#x27;REGISTERED_PCD&#x27;,&#x27;SEGMENTED_PCD&#x27;)
-      AND transformation_matrix IS NULL
-      AND storage_uri IS NOT NULL AND storage_uri&lt;&gt;&#x27;&#x27;
-      AND file_size_bytes IS NOT NULL AND checksum IS NOT NULL)
-  )
-);
-CREATE INDEX artifact_time_idx ON rdb.artifact(event_time DESC);
-CREATE TABLE rdb.ingest_reject (
-  reject_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  received_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  edge_group_id text, tag_id text, raw_value text,
-  reason text NOT NULL, detail jsonb, resolved_at timestamptz
-);
--- No automatic retention / no publication created by this proposal.
-</pre></div></div></details><details><summary>선택 기능 SQL</summary><div class="detail-body"><div class="code"><div class="code__bar"><span>집계·파일 상태 이력·status 원본 CDC 필요 시만</span><button class="code__copy" type="button">복사</button></div><pre id="schema-optional">-- OPTIONAL: turn on only for concrete analytics / full-event CDC needs.
-CREATE TABLE tsdb.actual_metric_history (
-  event_time timestamptz NOT NULL,
-  site text NOT NULL, scan_id uuid NOT NULL, event_type text NOT NULL,
-  tag_key bigint NOT NULL REFERENCES rdb.tag_catalog(tag_key),
-  block_progress_rate double precision NOT NULL
-    CHECK(block_progress_rate BETWEEN 0 AND 100),
-  match_confidence double precision CHECK(match_confidence BETWEEN 0 AND 1),
-  PRIMARY KEY(site,scan_id,event_type,event_time)
-) WITH (tsdb.hypertable, tsdb.partition_column=&#x27;event_time&#x27;,
-  tsdb.chunk_interval=&#x27;1 day&#x27;, tsdb.segmentby=&#x27;tag_key&#x27;,
-  tsdb.orderby=&#x27;event_time DESC&#x27;);
-CALL remove_columnstore_policy(&#x27;tsdb.actual_metric_history&#x27;, if_exists =&gt; true);
-CREATE INDEX actual_metric_tag_time_idx
-  ON tsdb.actual_metric_history(tag_key,event_time DESC);
--- Lifecycle audit: not another copy of the catalog.
-CREATE TABLE tsdb.artifact_event_history (
-  event_time timestamptz NOT NULL, site text NOT NULL, scan_id uuid NOT NULL,
-  artifact_type text NOT NULL, segment_key text NOT NULL,
-  event_id uuid NOT NULL,
-  action text NOT NULL CHECK(action IN (&#x27;received&#x27;,&#x27;verified&#x27;,&#x27;removed&#x27;)),
-  PRIMARY KEY(event_id,event_time)
-) WITH (tsdb.hypertable, tsdb.partition_column=&#x27;event_time&#x27;,
-  tsdb.chunk_interval=&#x27;1 day&#x27;, tsdb.segmentby=&#x27;site&#x27;,
-  tsdb.orderby=&#x27;event_time DESC&#x27;);
-CALL remove_columnstore_policy(&#x27;tsdb.artifact_event_history&#x27;, if_exists =&gt; true);
-CREATE INDEX artifact_event_scan_idx
-  ON tsdb.artifact_event_history(site,scan_id,event_time DESC);
--- Every status event to relational CDC: same transaction as status_history.
-CREATE TABLE rdb.status_event_buffer
-  (LIKE tsdb.status_history INCLUDING DEFAULTS INCLUDING CONSTRAINTS);
-ALTER TABLE rdb.status_event_buffer ADD PRIMARY KEY(tag_key,event_time,event_key);
-ALTER TABLE rdb.status_event_buffer ADD FOREIGN KEY(tag_key)
-  REFERENCES rdb.tag_catalog(tag_key);
-</pre></div></div></details><p>status_current는 이력 컬럼을 복사하되 키는 tag_key 하나입니다. FK는 별도로 추가합니다. 채널·장비 일치, scan 공통값 일치, 허용 시계 오차, 행렬 유한 숫자는 Provider가 검사합니다. enum·NOT NULL은 현재 발행기 계약 기준이며 벤더 합의 후 버전 관리합니다.</p></section>
-<section class="sec" id="s8"><h2><span class="n">08</span>조회·쓰기·보관 비용과 CDC 범위</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>조회</th><th>표 / 인덱스</th><th>효과</th></tr></thead><tbody><tr><td>지금 ERROR 장비</td><td>status_current(site,status)</td><td>전체 이력 스캔 없음</td></tr><tr><td>한 태그 최근 1시간 온도</td><td>status_history PK의 tag_key,event_time</td><td>숫자 태그 키로 범위 탐색</td></tr><tr><td>블록 스캔 목록</td><td>scan(site,hull_no,block_id,scanned_at)</td><td>artifact 선도착이면 scanned_at NULL 가능</td></tr><tr><td>스캔 산출물 전체</td><td>artifact PK의 site,scan_id</td><td>개별 세그먼트 조회</td></tr><tr><td>장기 진척률 집계</td><td>actual_result / 선택 actual_metric_history</td><td>투영을 켜면 같은 트랜잭션으로 추가 쓰기</td></tr></tbody></table></div><p>6개 등록 CSV도 직접 세어 1,750행임을 확인했습니다. 기본 발행 가정에서 status 350행/s, actual 약 5.83행/s, artifact 70행/s로 하루 약 3,024만 / 50.4만 / 604.8만 행입니다. <b>코드 주기의 산술값이며 처리 성능 실측이 아닙니다.</b> status에는 이력 INSERT와 최신값 UPDATE가 발생하고 선택 표를 켜면 쓰기·WAL이 늘어납니다.</p><p>파일 용량과 DB 용량은 분리합니다. DB에는 메타만 보관합니다. <code>일 행 수 × 실측 bytes/행 × 보관 일수</code>에 WAL·백업을 추가해 산정하며, 압축 배수는 여기서 가정하지 않습니다.</p><div class="tbl-wrap"><table class="tbl"><thead><tr><th>HANA 요구</th><th>CDC 대상</th><th>의미</th></tr></thead><tbody><tr><td>최신 상태 + 실적 + 산출물</td><td>status_current, scan, actual_result, artifact + 필요 마스터</td><td>status 원본 전량 보장은 아님</td></tr><tr><td>모든 status 원본도 필요</td><td>위 대상 + 선택 status_event_buffer</td><td>이력과 같은 트랜잭션으로 매 행 저장. 전달 완료 후 단기 정리</td></tr><tr><td>압축된 TSDB 이력</td><td>기본 CDC 대상에서 제외</td><td>직접 CDC는 버전·커넥터 별도 검증</td></tr></tbody></table></div><p>보존은 단순 max(event_time)이 아니라 미전달·지연·격리가 없는 연속 완료 구간으로 판정합니다. RDB 보존 정리 DELETE와 HANA 업무 삭제를 구분해야 합니다. 파일 삭제는 참조와 실제 스토리지 상태를 확인하며 DB TTL만으로 파일이 지워지지 않습니다.</p></section>
-<section class="sec" id="s9"><h2><span class="n">09</span>현재 구조에서 바꿀 부분과 남은 결정</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>현재</th><th>제안</th><th>이유</th></tr></thead><tbody><tr><td>send_topic + param_id 등록부</td><td>edge_group_id + tag_id → tag_key</td><td>EES 숫자 ID와 독립</td></tr><tr><td>세 채널 모두 TSDB 이력</td><td>status TSDB + actual/artifact RDB</td><td>스캔·세그먼트 식별과 파일 상태 관리</td></tr><tr><td>stage / 공정별 완료 컬럼</td><td>원천 입력에서 제외</td><td>최신 payload에 없음</td></tr><tr><td>블록별 산출물 개수·대표 URI</td><td>스캔·종류·세그먼트별 행</td><td>세그먼트별 조회·복구</td></tr><tr><td>Kafka 메시지 원장</td><td>독립 전송 감사 정보</td><td>업무 키에서 분리</td></tr></tbody></table></div><p>별도 DB에서 검증 후 전환합니다. 이미 Kafka 경로에서 누락된 세그먼트는 새 스키마가 복구하지 못합니다. 원본 파일·내구성 로그와 대사가 필요합니다.<sup class="ref" data-ref="5">5</sup></p><div class="tbl-wrap"><table class="tbl"><thead><tr><th>확인할 것</th><th>완료 기준 / 결정</th></tr></thead><tbody><tr><td>같은 태그 세그먼트 10개</td><td>10행 보존, 재전송 후에도 10행</td></tr><tr><td>비세그먼트 중복</td><td>빈 segment_key로 중복 등록 PCD/행렬 거부</td></tr><tr><td>artifact 선도착</td><td>scan 연결 행 생성 후 저장 가능</td></tr><tr><td>늦은 status</td><td>이력 보존, 최신값 후퇴 0건</td></tr><tr><td>정정·재생성</td><td>revision/supersedes 없으면 다른 내용은 격리</td></tr><tr><td>파일 무결성</td><td>발행기 checksum은 16자리 가짜 값. 실제 SHA-256 검증 완료로 오인 금지</td></tr><tr><td>수신 내구성</td><td>Core NATS 중단 구간은 재전달 보장 없음. 별도 큐·ACK 확정</td></tr><tr><td>현장 합의</td><td>장비 수·주기·보관·지연·HANA 전체/최신값 여부</td></tr></tbody></table></div><div class="note"><p class="note__t">완료 범위</p>테이블·키·컬럼·중복 처리 원칙을 검토 가능한 제안으로 정리합니다. 확인한 Providers 경로에서 HotDBProvider 구현은 찾지 못했으며 수신·ACK·정정 규칙은 추가 구현 사항입니다. 기존 수집기·DB·CDC 설정은 변경하지 않습니다.</div></section>
-<div class="note note--ok"><p class="note__t">실제로 실행한 검증</p>신규 격리 컨테이너에서 기본·선택 DDL 생성, artifact 선도착, 같은 태그의 세그먼트 10개 + PCD + 행렬 12행, 재전송 후 12행 유지, 중복 PCD 거부, 잘못된 행렬/빈 세그먼트/파일 URI 누락 거부, 동일 UUID 앞 8자의 다른 스캔 2건 구분, 진척률 범위 검사, status 중복 제거와 압축 후 2행 조회를 확인했습니다.</div><p>현재값 표에 최신 fixture를 넣는 것까지 검증했습니다. <b>Provider의 실제 역순 갱신 방지, hash 생성, 충돌 격리, 재시도·ACK, HANA 전달은 구현·통합 시험이 남아 있습니다.</b> 이것들을 실행 완료로 표시하지 않습니다.</p><details><summary>재현용 SQL 검증 fixture 보기</summary><div class="detail-body"><p>기본 DDL과 선택 DDL을 실행한 빈 테스트 DB에서만 실행합니다. 샘플 태그의 identity 키 1~5를 전제로 합니다. 실제 서비스 DB에 실행하지 마세요.</p><div class="code"><div class="code__bar"><span>검증 fixture · 데이터 및 제약 검사</span><button class="code__copy" type="button">복사</button></div><pre id="schema-validation">SELECT alter_job(job_id, scheduled =&gt; false)
-FROM timescaledb_information.jobs WHERE hypertable_schema=&#x27;tsdb&#x27;;
-INSERT INTO rdb.device(site,device_id,device_role) VALUES(&#x27;geoje&#x27;,&#x27;LDR-01&#x27;,&#x27;LIDAR&#x27;);
-INSERT INTO rdb.tag_catalog(edge_group_id,tag_id,mqtt_topic,source_id,site,device_id,channel,artifact_type)
-VALUES
-(&#x27;edge.test&#x27;,&#x27;status&#x27;,&#x27;ot/device/assembly/status&#x27;,&#x27;LDR-01&#x27;,&#x27;geoje&#x27;,&#x27;LDR-01&#x27;,&#x27;status&#x27;,NULL),
-(&#x27;edge.test&#x27;,&#x27;actual&#x27;,&#x27;ot/sensor/assembly/actual&#x27;,&#x27;LDR-01&#x27;,&#x27;geoje&#x27;,&#x27;LDR-01&#x27;,&#x27;actual&#x27;,NULL),
-(&#x27;edge.test&#x27;,&#x27;segments&#x27;,&#x27;ot/pipeline/assembly/artifact&#x27;,&#x27;LDR-01-SEGMENTED_PCD&#x27;,&#x27;geoje&#x27;,&#x27;LDR-01&#x27;,&#x27;artifact&#x27;,&#x27;SEGMENTED_PCD&#x27;),
-(&#x27;edge.test&#x27;,&#x27;registered&#x27;,&#x27;ot/pipeline/assembly/artifact&#x27;,&#x27;LDR-01-REGISTERED_PCD&#x27;,&#x27;geoje&#x27;,&#x27;LDR-01&#x27;,&#x27;artifact&#x27;,&#x27;REGISTERED_PCD&#x27;),
-(&#x27;edge.test&#x27;,&#x27;matrix&#x27;,&#x27;ot/pipeline/assembly/artifact&#x27;,&#x27;LDR-01-TRANSFORMATION_MATRIX&#x27;,&#x27;geoje&#x27;,&#x27;LDR-01&#x27;,&#x27;artifact&#x27;,&#x27;TRANSFORMATION_MATRIX&#x27;);
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">03. 실제 스키마</span><h2>테이블 8개, 조인 키는 등록부 · 장비 · 스캔 셋뿐입니다</h2></div>
+        <div class="s-head__r">PK 주황 · FK 청 · 점선은 컬럼 복사</div>
+      </div>
+      <div class="s-body">
+        <svg class="er" viewBox="0 0 1120 405" width="1120" height="405" style="display:block" role="img" aria-label="ER 다이어그램"><rect class="box" x="10" y="16" width="250" height="102" rx="7"/>
+<rect class="hd" x="10" y="16" width="250" height="30" rx="7"/>
+<rect class="hd" x="10" y="34" width="250" height="12" style="stroke:none"/>
+<text class="t" x="22" y="36">rdb.device</text>
+<text class="schema" x="248" y="36" text-anchor="end">RDB</text>
+<text class="r pk" x="22" y="66">PK site, device_id</text>
+<text class="r r" x="22" y="86">device_role</text>
+<text class="r dim" x="22" y="106">active</text>
+<rect class="box" x="300" y="16" width="250" height="162" rx="7"/>
+<rect class="hd" x="300" y="16" width="250" height="30" rx="7"/>
+<rect class="hd" x="300" y="34" width="250" height="12" style="stroke:none"/>
+<text class="t" x="312" y="36">rdb.tag_catalog</text>
+<text class="schema" x="538" y="36" text-anchor="end">RDB</text>
+<text class="r pk" x="312" y="66">PK tag_key  (identity)</text>
+<text class="r pk" x="312" y="86">UQ edge_group_id, tag_id</text>
+<text class="r fk" x="312" y="106">FK site, device_id</text>
+<text class="r r" x="312" y="126">channel · artifact_type</text>
+<text class="r dim" x="312" y="146">mqtt_topic · source_id</text>
+<text class="r dim" x="312" y="166">schema_version</text>
+<rect class="box" x="590" y="16" width="250" height="142" rx="7"/>
+<rect class="hd" x="590" y="16" width="250" height="30" rx="7"/>
+<rect class="hd" x="590" y="34" width="250" height="12" style="stroke:none"/>
+<text class="t" x="602" y="36">rdb.status_current</text>
+<text class="schema" x="828" y="36" text-anchor="end">RDB</text>
+<text class="r pk" x="602" y="66">PK tag_key</text>
+<text class="r fk" x="602" y="86">FK tag_key → tag_catalog</text>
+<text class="r r" x="602" y="106">status · temperature_c …</text>
+<text class="r r" x="602" y="126">event_time · changed_at</text>
+<text class="r dim" x="602" y="146">(status_history 와 같은 컬럼)</text>
+<rect class="box" x="870" y="16" width="250" height="142" rx="7"/>
+<rect class="hd ts" x="870" y="16" width="250" height="30" rx="7"/>
+<rect class="hd ts" x="870" y="34" width="250" height="12" style="stroke:none"/>
+<text class="t" x="882" y="36">tsdb.status_history</text>
+<text class="schema" x="1108" y="36" text-anchor="end">TSDB</text>
+<text class="r pk" x="882" y="66">PK tag_key, event_time, event_key</text>
+<text class="r fk" x="882" y="86">FK tag_key → tag_catalog</text>
+<text class="r r" x="882" y="106">payload_hash · source_time_text</text>
+<text class="r r" x="882" y="126">status · temperature_c …</text>
+<text class="r dim" x="882" y="146">6h 청크 · segmentby tag_key</text>
+<rect class="box" x="10" y="236" width="250" height="122" rx="7"/>
+<rect class="hd rj" x="10" y="236" width="250" height="30" rx="7"/>
+<rect class="hd rj" x="10" y="254" width="250" height="12" style="stroke:none"/>
+<text class="t" x="22" y="256">rdb.ingest_reject</text>
+<text class="schema" x="248" y="256" text-anchor="end">RDB</text>
+<text class="r pk" x="22" y="286">PK reject_id</text>
+<text class="r r" x="22" y="306">edge_group_id · tag_id</text>
+<text class="r r" x="22" y="326">raw_value · reason · detail</text>
+<text class="r dim" x="22" y="346">FK 없음 — 원문 그대로</text>
+<rect class="box" x="300" y="236" width="250" height="142" rx="7"/>
+<rect class="hd" x="300" y="236" width="250" height="30" rx="7"/>
+<rect class="hd" x="300" y="254" width="250" height="12" style="stroke:none"/>
+<text class="t" x="312" y="256">rdb.scan</text>
+<text class="schema" x="538" y="256" text-anchor="end">RDB</text>
+<text class="r pk" x="312" y="286">PK site, scan_id (uuid)</text>
+<text class="r fk" x="312" y="306">FK site, device_id</text>
+<text class="r r" x="312" y="326">hull_no · block_id</text>
+<text class="r r" x="312" y="346">zone · shop · bay</text>
+<text class="r dim" x="312" y="366">scanned_at (actual 도착 시)</text>
+<rect class="box" x="590" y="236" width="250" height="142" rx="7"/>
+<rect class="hd" x="590" y="236" width="250" height="30" rx="7"/>
+<rect class="hd" x="590" y="254" width="250" height="12" style="stroke:none"/>
+<text class="t" x="602" y="256">rdb.actual_result</text>
+<text class="schema" x="828" y="256" text-anchor="end">RDB</text>
+<text class="r pk" x="602" y="286">PK site, scan_id, event_type</text>
+<text class="r fk" x="602" y="306">FK site, scan_id → scan</text>
+<text class="r fk" x="602" y="326">FK tag_key → tag_catalog</text>
+<text class="r r" x="602" y="346">block_progress_rate 0~100</text>
+<text class="r dim" x="602" y="366">payload_hash · source_payload</text>
+<rect class="box" x="870" y="236" width="250" height="162" rx="7"/>
+<rect class="hd" x="870" y="236" width="250" height="30" rx="7"/>
+<rect class="hd" x="870" y="254" width="250" height="12" style="stroke:none"/>
+<text class="t" x="882" y="256">rdb.artifact</text>
+<text class="schema" x="1108" y="256" text-anchor="end">RDB</text>
+<text class="r pk" x="882" y="286">PK site, scan_id, artifact_type,</text>
+<text class="r pk" x="882" y="306">   segment_key</text>
+<text class="r fk" x="882" y="326">FK site, scan_id → scan</text>
+<text class="r fk" x="882" y="346">FK tag_key → tag_catalog</text>
+<text class="r r" x="882" y="366">storage_uri · checksum · matrix[16]</text>
+<text class="r dim" x="882" y="386">file_state</text>
+<path class="ln" d="M260,60 H300"/>
+<rect class="lbb" x="228" y="37" width="104" height="17" rx="4"/><text class="lb" x="280" y="49.5" text-anchor="middle">site, device_id</text>
+<path class="ln" d="M550,60 H590"/>
+<rect class="lbb" x="540" y="37" width="60" height="17" rx="4"/><text class="lb" x="570" y="49.5" text-anchor="middle">tag_key</text>
+<path class="ln dash" d="M840,60 H870"/>
+<rect class="lbb" x="833" y="37" width="44" height="17" rx="4"/><text class="lb" x="855" y="49.5" text-anchor="middle">LIKE</text>
+<path class="ln" d="M135,92 V226 H330 V236"/>
+<rect class="lbb" x="180" y="217" width="104" height="17" rx="4"/><text class="lb" x="232" y="229.5" text-anchor="middle">site, device_id</text>
+<path class="ln" d="M425,158 V214 H995 V236"/>
+<path class="ln" d="M700,214 V236"/>
+<rect class="lbb" x="530" y="205" width="60" height="17" rx="4"/><text class="lb" x="560" y="217.5" text-anchor="middle">tag_key</text>
+<path class="ln" d="M550,300 H590"/>
+<rect class="lbb" x="525" y="277" width="90" height="17" rx="4"/><text class="lb" x="570" y="289.5" text-anchor="middle">site, scan_id</text>
+<path class="ln" d="M425,368 V392 H995 V368"/>
+<rect class="lbb" x="665" y="383" width="90" height="17" rx="4"/><text class="lb" x="710" y="395.5" text-anchor="middle">site, scan_id</text></svg>
+        <div class="stack" style="gap:0">
+          <div class="note note--info" style="margin:0"><p class="note__t">선택 표 3개는 필요할 때만 켭니다</p><span class="mono">tsdb.actual_metric_history</span> (진척률 시간 집계) · <span class="mono">tsdb.artifact_event_history</span> (파일 상태 변화) · <span class="mono">rdb.status_event_buffer</span> (status 원본 전량 CDC). 켜면 같은 트랜잭션에 쓰기가 늘어납니다.</div>
+        </div>
+        <p style="font-size:12.5px;color:var(--ink3);margin:0">ingest_reject 만 FK 가 없습니다 — 검증에 실패한 원문을 그대로 두고 조사하는 표라서 다른 표에 묶지 않습니다. 전체 DDL 은 격리 DB (PostgreSQL 17.11 · TimescaleDB 2.29.2) 에서 통과했습니다.<sup class="ref" data-ref="7">7</sup></p>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>tag_key 는 긴 TagId(80자대) 를 매 행 반복 저장하지 않으려는 숫자 키. edge_group_id + tag_id 가 등록부의 유일 키.</aside>
+  </section>
 
-INSERT INTO rdb.scan(site,scan_id,device_id,zone,shop,bay,hull_no,block_id)
-VALUES(&#x27;geoje&#x27;,&#x27;541a1c5a-058b-4acf-bbea-7c7a5ac18422&#x27;,&#x27;LDR-01&#x27;,&#x27;ASSEMBLY&#x27;,&#x27;assembly1&#x27;,&#x27;bay1&#x27;,&#x27;H1207&#x27;,&#x27;B107P&#x27;);
--- Artifacts BEFORE actual: all 10 segments share tag_key and event_time.
-INSERT INTO rdb.artifact(site,scan_id,artifact_type,segment_key,tag_key,event_time,
-source_time_text,changed_at,storage_uri,file_size_bytes,checksum,received_at,payload_hash,source_payload)
-SELECT &#x27;geoje&#x27;,&#x27;541a1c5a-058b-4acf-bbea-7c7a5ac18422&#x27;,&#x27;SEGMENTED_PCD&#x27;,
-&#x27;SEG-&#x27;||lpad(i::text,3,&#x27;0&#x27;),3,&#x27;2026-09-23T01:00:00Z&#x27;,&#x27;2026-09-23T01:00:00Z&#x27;,
-&#x27;2026-09-23T01:00:00Z&#x27;,&#x27;file:///test/seg-&#x27;||i||&#x27;.pcd&#x27;,100,&#x27;fixture-only&#x27;,now(),
-decode(repeat(&#x27;aa&#x27;,32),&#x27;hex&#x27;),&#x27;{}&#x27;::jsonb FROM generate_series(1,10) i;
-INSERT INTO rdb.artifact(site,scan_id,artifact_type,tag_key,event_time,source_time_text,
-changed_at,storage_uri,file_size_bytes,checksum,received_at,payload_hash,source_payload)
-VALUES(&#x27;geoje&#x27;,&#x27;541a1c5a-058b-4acf-bbea-7c7a5ac18422&#x27;,&#x27;REGISTERED_PCD&#x27;,4,
-&#x27;2026-09-23T01:00:00Z&#x27;,&#x27;2026-09-23T01:00:00Z&#x27;,&#x27;2026-09-23T01:00:00Z&#x27;,
-&#x27;file:///test/registered.pcd&#x27;,1000,&#x27;fixture-only&#x27;,now(),decode(repeat(&#x27;bb&#x27;,32),&#x27;hex&#x27;),&#x27;{}&#x27;);
-INSERT INTO rdb.artifact(site,scan_id,artifact_type,tag_key,event_time,source_time_text,
-changed_at,transformation_matrix,received_at,payload_hash,source_payload)
-VALUES(&#x27;geoje&#x27;,&#x27;541a1c5a-058b-4acf-bbea-7c7a5ac18422&#x27;,&#x27;TRANSFORMATION_MATRIX&#x27;,5,
-&#x27;2026-09-23T01:00:00Z&#x27;,&#x27;2026-09-23T01:00:00Z&#x27;,&#x27;2026-09-23T01:00:00Z&#x27;,
-ARRAY[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]::double precision[],
-now(),decode(repeat(&#x27;cc&#x27;,32),&#x27;hex&#x27;),&#x27;{}&#x27;);
--- Repeat exact rows: natural keys prevent growth.
-INSERT INTO rdb.artifact SELECT * FROM rdb.artifact ON CONFLICT DO NOTHING;
-DO $$
-BEGIN
- IF (SELECT count(*) FROM rdb.artifact)&lt;&gt;12 THEN RAISE EXCEPTION &#x27;artifact count&#x27;; END IF;
- IF EXISTS(SELECT FROM rdb.actual_result) THEN RAISE EXCEPTION &#x27;arrival fixture&#x27;; END IF;
- BEGIN
-  INSERT INTO rdb.artifact SELECT * FROM rdb.artifact WHERE artifact_type=&#x27;REGISTERED_PCD&#x27;;
-  RAISE EXCEPTION &#x27;duplicate registration accepted&#x27;;
- EXCEPTION WHEN unique_violation THEN NULL; END;
- BEGIN
-  UPDATE rdb.artifact SET transformation_matrix=ARRAY[1.0,2.0] WHERE artifact_type=&#x27;TRANSFORMATION_MATRIX&#x27;;
-  RAISE EXCEPTION &#x27;bad matrix accepted&#x27;;
- EXCEPTION WHEN check_violation THEN NULL; END;
- BEGIN
-  UPDATE rdb.artifact SET segment_key=&#x27;&#x27; WHERE artifact_type=&#x27;SEGMENTED_PCD&#x27; AND segment_key=&#x27;SEG-001&#x27;;
-  RAISE EXCEPTION &#x27;empty segment accepted&#x27;;
- EXCEPTION WHEN check_violation THEN NULL; END;
- BEGIN
-  UPDATE rdb.artifact SET storage_uri=NULL WHERE artifact_type=&#x27;REGISTERED_PCD&#x27;;
-  RAISE EXCEPTION &#x27;missing URI accepted&#x27;;
- EXCEPTION WHEN check_violation THEN NULL; END;
-END $$;
--- Full UUIDs, even with identical 8-character prefixes, are distinct.
-INSERT INTO rdb.scan(site,scan_id,device_id,zone,shop,bay,hull_no,block_id)
-VALUES(&#x27;geoje&#x27;,&#x27;541a1c5a-0000-4000-8000-000000000001&#x27;,&#x27;LDR-01&#x27;,&#x27;ASSEMBLY&#x27;,&#x27;assembly1&#x27;,&#x27;bay1&#x27;,&#x27;H1207&#x27;,&#x27;B107P&#x27;);
-INSERT INTO rdb.actual_result(site,scan_id,event_type,tag_key,event_time,source_time_text,
-changed_at,source_event_key,record_type,input_method,source_system,block_progress_rate,
-match_confidence,received_at,payload_hash,source_payload)
-SELECT site,scan_id,&#x27;PROGRESS&#x27;,2,&#x27;2026-09-23T01:00:00Z&#x27;,&#x27;2026-09-23T01:00:00Z&#x27;,
-&#x27;2026-09-23T01:00:00Z&#x27;,&#x27;541a1c5a:PROGRESS&#x27;,&#x27;ACTUAL&#x27;,&#x27;AUTO&#x27;,&#x27;test&#x27;,42.7,0.86,
-now(),decode(repeat(&#x27;dd&#x27;,32),&#x27;hex&#x27;),&#x27;{}&#x27;::jsonb FROM rdb.scan;
-DO $$ BEGIN
- IF (SELECT count(*) FROM rdb.actual_result)&lt;&gt;2 THEN RAISE EXCEPTION &#x27;UUID key&#x27;; END IF;
- BEGIN
-  UPDATE rdb.actual_result SET block_progress_rate=101;
-  RAISE EXCEPTION &#x27;bad progress accepted&#x27;;
- EXCEPTION WHEN check_violation THEN NULL; END;
-END $$;
-INSERT INTO tsdb.status_history(event_time,tag_key,event_key,payload_hash,source_time_text,
-source_event_key,changed_at,site,device_id,device_role,zone,shop,bay,status,received_at)
-VALUES
-(&#x27;2026-09-16T01:00:00Z&#x27;,1,decode(repeat(&#x27;11&#x27;,32),&#x27;hex&#x27;),decode(repeat(&#x27;11&#x27;,32),&#x27;hex&#x27;),
-&#x27;2026-09-16T01:00:00Z&#x27;,&#x27;status:1&#x27;,&#x27;2026-09-16T01:00:00Z&#x27;,
-&#x27;geoje&#x27;,&#x27;LDR-01&#x27;,&#x27;LIDAR&#x27;,&#x27;ASSEMBLY&#x27;,&#x27;assembly1&#x27;,&#x27;bay1&#x27;,&#x27;ONLINE&#x27;,now()),
-(&#x27;2026-09-16T01:00:01Z&#x27;,1,decode(repeat(&#x27;22&#x27;,32),&#x27;hex&#x27;),decode(repeat(&#x27;22&#x27;,32),&#x27;hex&#x27;),
-&#x27;2026-09-16T01:00:01Z&#x27;,&#x27;status:2&#x27;,&#x27;2026-09-16T01:00:01Z&#x27;,
-&#x27;geoje&#x27;,&#x27;LDR-01&#x27;,&#x27;LIDAR&#x27;,&#x27;ASSEMBLY&#x27;,&#x27;assembly1&#x27;,&#x27;bay1&#x27;,&#x27;ERROR&#x27;,now());
-INSERT INTO tsdb.status_history SELECT * FROM tsdb.status_history ON CONFLICT DO NOTHING;
-INSERT INTO rdb.status_current SELECT * FROM tsdb.status_history ORDER BY event_time DESC LIMIT 1;
-INSERT INTO rdb.status_event_buffer SELECT * FROM tsdb.status_history;
-SELECT compress_chunk(c) FROM show_chunks(&#x27;tsdb.status_history&#x27;) c;
-DO $$ BEGIN
- IF (SELECT count(*) FROM tsdb.status_history)&lt;&gt;2 THEN RAISE EXCEPTION &#x27;history loss&#x27;; END IF;
- IF (SELECT status FROM rdb.status_current) &lt;&gt; &#x27;ERROR&#x27; THEN RAISE EXCEPTION &#x27;current fixture&#x27;; END IF;
- IF (SELECT count(*) FROM rdb.status_event_buffer)&lt;&gt;2 THEN RAISE EXCEPTION &#x27;buffer fixture&#x27;; END IF;
-END $$;
-SELECT &#x27;PASS: DDL, 12 artifacts, replay, uniqueness, matrix, segment, URI, full UUID, range, compressed read&#x27; AS result;
-SELECT version();
-SELECT extversion FROM pg_extension WHERE extname=&#x27;timescaledb&#x27;;
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">03. 실제 스키마</span><h2>표 하나가 맡는 "한 행" 을 먼저 정했습니다</h2></div>
+        <div class="s-head__r">한 행의 정의가 곧 기본 키입니다</div>
+      </div>
+      <div class="s-body">
+        <div class="g4">
+          <div class="tcard tcard--rdb"><span class="tcard__n">rdb.device</span><span class="tcard__r">사업장의 장비 1대</span><span class="tcard__k">PK (site, device_id)</span></div>
+          <div class="tcard tcard--rdb"><span class="tcard__n">rdb.tag_catalog</span><span class="tcard__r">등록 CSV 의 태그 1개 · 원래 토픽 · 채널 · 종류</span><span class="tcard__k">PK tag_key · UQ (edge_group_id, tag_id)</span></div>
+          <div class="tcard tcard--rdb"><span class="tcard__n">rdb.status_current</span><span class="tcard__r">태그의 최신 상태 1행 · 화면 · 선택적 CDC</span><span class="tcard__k">PK tag_key</span></div>
+          <div class="tcard tcard--ts"><span class="tcard__n">tsdb.status_history</span><span class="tcard__r">상태 측정 1건 · 6시간 청크 · 압축 대상</span><span class="tcard__k">PK (tag_key, event_time, event_key)</span></div>
+          <div class="tcard tcard--rdb"><span class="tcard__n">rdb.scan</span><span class="tcard__r">스캔 1회 · 장비 · 블록 · 위치 앵커</span><span class="tcard__k">PK (site, scan_id)</span></div>
+          <div class="tcard tcard--rdb"><span class="tcard__n">rdb.actual_result</span><span class="tcard__r">스캔의 이벤트 1건 · 진척률 · 신뢰도</span><span class="tcard__k">PK (site, scan_id, event_type)</span></div>
+          <div class="tcard tcard--rdb"><span class="tcard__n">rdb.artifact</span><span class="tcard__r">스캔의 산출물 1개 · 파일 메타 또는 행렬</span><span class="tcard__k">PK (site, scan_id, artifact_type, segment_key)</span></div>
+          <div class="tcard tcard--rj"><span class="tcard__n">rdb.ingest_reject</span><span class="tcard__r">검증 실패 수신 1건 · 원문 · 사유</span><span class="tcard__k">PK reject_id · FK 없음</span></div>
+        </div>
+        <div class="g2">
+          <div class="note note--warn"><p class="note__t">status 최신값은 장비가 아니라 태그 기준</p>같은 장비가 여러 그룹에 등록될 수 있어 키는 tag_key 입니다. 장비당 한 상태가 필요한 화면은 대표 status 태그를 고릅니다. 수집원이 값을 임의로 합치지 않습니다.</div>
+          <div class="note note--warn"><p class="note__t">actual 에 stage 를 다시 만들지 않습니다</p>최신 발행기에 stage 가 없습니다. START · COMPLETE 는 공정 이름이 아닙니다. 진척률은 정정될 수 있어 GREATEST 로 고정하지 않습니다.<sup class="ref" data-ref="2">2</sup></div>
+        </div>
 
-</pre></div></div></details><section class="sec" id="s10"><h2><span class="n">10</span>근거와 검증 범위</h2><ol class="refs"><li id="ref-1"><span class="refs__n">1</span><span><a href="mqtt-agent-tag-catalog.html">태그 카탈로그</a><span class="refs__meta">doc · 2026-09-23 재검증 · ingested_at 설명은 raw 파서로 보완</span></span></li><li id="ref-2"><span class="refs__n">2</span><span><a href="../../util/mqtt-lidar-sim/lidar-sim.cs">실제 LiDAR 발행기</a><span class="refs__meta">code · StatusPayload:592 / ActualPayload:615 / SegmentPayload:683 · cf538da 작업트리</span></span></li><li id="ref-3"><span class="refs__n">3</span><span><a href="../../../intersyslink-v4/src/Edge/Agents/Mqtt/Mqtt.Agent/Core/Domain/MqttPayloadParser.cs">Agent raw 파서와 TagId 규칙</a><span class="refs__meta">code · AppendRawSample / ResolveChangedAt / 인접 MqttTagId.cs · fd70c7e7 작업트리</span></span></li><li id="ref-4"><span class="refs__n">4</span><span><a href="../../../intersyslink-v4/src/Engine/Engine/Outbound/Nats/Edge/Tags/NatsWorkflowTagChangeStream.cs">Engine NATS 태그 발행</a><span class="refs__meta">code · BuildPipeline / PublishBatchAsync · fd70c7e7 작업트리</span></span></li><li id="ref-5"><span class="refs__n">5</span><span><a href="../timescaledb/infra/db/init/01-schema.sql">기존 DB 스키마</a><span class="refs__meta">code · Kafka 의존 컬럼·현재 RDB/TSDB 분리</span></span></li><li id="ref-6"><span class="refs__n">6</span><span><a href="lidar-topic-tag-respec.html">토픽 재정의</a><span class="refs__meta">doc · 2026-09-22 · stage 제거·태그 수</span></span></li><li id="ref-7"><span class="refs__n">7</span><span><a href="https://www.postgresql.org/docs/17/ddl-constraints.html">PostgreSQL 17 Constraints</a><span class="refs__meta">web · 확인 2026-09-23 · NULL/UNIQUE·CHECK·FK</span></span></li><li id="ref-8"><span class="refs__n">8</span><span><a href="https://docs.nats.io/learn/core-nats/">Core NATS</a><span class="refs__meta">web · 확인 2026-09-23 · 기본 전달 특성</span></span></li></ol><p>외부 스크립트·폰트 없이 열리는 단일 HTML입니다. 로컬 근거 링크는 저장소가 함께 있어야 열립니다. SQL 검증은 신규 격리 DB 기준이며 HotDBProvider 연결·HANA CDC·처리량 벤치마크는 범위에 포함하지 않습니다.</p></section>
-  </main>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>비세그먼트 산출물의 segment_id=null 은 segment_key='' 로 정규화한다. NULL 은 UNIQUE 에서 서로 다르게 취급되어 중복이 통과하기 때문.</aside>
+  </section>
+
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">04. 데이터가 들어가는 법</span><h2>태그 1개가 데이터 1건이 아닙니다</h2></div>
+        <div class="s-head__r">tagMode=raw · JSON 본문 전체가 태그 값</div>
+      </div>
+      <div class="s-body">
+        <div class="g-2-1" style="flex:1;min-height:0">
+          <svg class="fan" viewBox="0 0 736 410" width="736" height="410" style="display:block" role="img" aria-label="태그 3개가 산출물 12행이 되는 그림"><rect class="tagbox" x="10" y="22" width="300" height="40" rx="6"/>
+<text x="22" y="38" style="font-size:10.5px;fill:var(--ink3)">tagId</text>
+<text x="22" y="54" style="font-size:12px;font-weight:700">LDR-GJ-A1B3-07-REGISTERED_PCD</text>
+<rect class="tagbox" x="10" y="72" width="300" height="40" rx="6"/>
+<text x="22" y="88" style="font-size:10.5px;fill:var(--ink3)">tagId</text>
+<text x="22" y="104" style="font-size:12px;font-weight:700">LDR-GJ-A1B3-07-TRANSFORMATION_MATRIX</text>
+<rect class="tagbox" x="10" y="226" width="300" height="40" rx="6"/>
+<text x="22" y="242" style="font-size:10.5px;fill:var(--ink3)">tagId</text>
+<text x="22" y="258" style="font-size:12px;font-weight:700">LDR-GJ-A1B3-07-SEGMENTED_PCD</text>
+<rect class="rowbox " x="420" y="30" width="306" height="19" rx="3"/>
+<text x="430" y="44" style="font-size:11.5px">REGISTERED_PCD          segment_key = ''</text>
+<rect class="rowbox " x="420" y="80" width="306" height="19" rx="3"/>
+<text x="430" y="94" style="font-size:11.5px">TRANSFORMATION_MATRIX   segment_key = ''</text>
+<rect class="rowbox seg" x="420" y="130" width="306" height="19" rx="3"/>
+<text x="430" y="144" style="font-size:11.5px">SEGMENTED_PCD           segment_key = 'SEG-001'</text>
+<rect class="rowbox seg" x="420" y="154" width="306" height="19" rx="3"/>
+<text x="430" y="168" style="font-size:11.5px">SEGMENTED_PCD           segment_key = 'SEG-002'</text>
+<rect class="rowbox seg" x="420" y="178" width="306" height="19" rx="3"/>
+<text x="430" y="192" style="font-size:11.5px">SEGMENTED_PCD           segment_key = 'SEG-003'</text>
+<rect class="rowbox seg" x="420" y="202" width="306" height="19" rx="3"/>
+<text x="430" y="216" style="font-size:11.5px">SEGMENTED_PCD           segment_key = 'SEG-004'</text>
+<rect class="rowbox seg" x="420" y="226" width="306" height="19" rx="3"/>
+<text x="430" y="240" style="font-size:11.5px">SEGMENTED_PCD           segment_key = 'SEG-005'</text>
+<rect class="rowbox seg" x="420" y="250" width="306" height="19" rx="3"/>
+<text x="430" y="264" style="font-size:11.5px">SEGMENTED_PCD           segment_key = 'SEG-006'</text>
+<rect class="rowbox seg" x="420" y="274" width="306" height="19" rx="3"/>
+<text x="430" y="288" style="font-size:11.5px">SEGMENTED_PCD           segment_key = 'SEG-007'</text>
+<rect class="rowbox seg" x="420" y="298" width="306" height="19" rx="3"/>
+<text x="430" y="312" style="font-size:11.5px">SEGMENTED_PCD           segment_key = 'SEG-008'</text>
+<rect class="rowbox seg" x="420" y="322" width="306" height="19" rx="3"/>
+<text x="430" y="336" style="font-size:11.5px">SEGMENTED_PCD           segment_key = 'SEG-009'</text>
+<rect class="rowbox seg" x="420" y="346" width="306" height="19" rx="3"/>
+<text x="430" y="360" style="font-size:11.5px">SEGMENTED_PCD           segment_key = 'SEG-010'</text>
+<path class="ln" d="M310,42 C370,42 360,40 420,40"/>
+<path class="ln" d="M310,92 C370,92 360,90 420,90"/>
+<path class="ln" d="M310,246 C380,246 350,140 420,140"/>
+<path class="ln" d="M310,246 C380,246 350,164 420,164"/>
+<path class="ln" d="M310,246 C380,246 350,188 420,188"/>
+<path class="ln" d="M310,246 C380,246 350,212 420,212"/>
+<path class="ln" d="M310,246 C380,246 350,236 420,236"/>
+<path class="ln" d="M310,246 C380,246 350,260 420,260"/>
+<path class="ln" d="M310,246 C380,246 350,284 420,284"/>
+<path class="ln" d="M310,246 C380,246 350,308 420,308"/>
+<path class="ln" d="M310,246 C380,246 350,332 420,332"/>
+<path class="ln" d="M310,246 C380,246 350,356 420,356"/>
+<text class="cap" x="10" y="12">등록 태그 3개 (장비 1대 · 스캔 1회 · 같은 scan_id)</text>
+<text class="cap" x="420" y="12">rdb.artifact 에 생기는 행</text>
+<text class="cnt" x="726" y="400" text-anchor="end">= 12행</text>
+<text class="cap" x="10" y="398">세그먼트 10건은 같은 tagId · 같은 occurred_at 으로 한꺼번에 옵니다</text></svg>
+          <div class="stack">
+            <div class="note note--risk"><p class="note__t">태그 ID 로 중복 제거하면 안 됩니다</p>세그먼트 10개가 같은 tagId · 같은 발생 시각으로 들어옵니다. <span class="mono">(tag_id, changed_at)</span> 도 고유 키가 아닙니다.<sup class="ref" data-ref="1">1</sup></div>
+            <div class="note note--info"><p class="note__t">그래서 산출물 키는 넷</p><span class="mono">site + scan_id + artifact_type + segment_key</span>. 수신 배열의 항목마다 처리하고, 태그별 마지막 값 하나로 합치지 않습니다.</div>
+            <div class="note note--ok"><p class="note__t">격리 DB 에서 확인</p>세그먼트 10개 + PCD + 행렬 = 12행 저장, 재전송 후에도 12행 유지, 중복 PCD 등록 거부.<sup class="ref" data-ref="7">7</sup></div>
+          </div>
+        </div>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>현재 tagMode=raw 에서는 온도 · 상태 · 진척률마다 별도 태그가 생기지 않는다. JSON 한 덩어리가 문자열 태그 값이다.</aside>
+  </section>
+
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">04. 데이터가 들어가는 법</span><h2>태그 JSON 의 필드가 타입 있는 컬럼으로 풀립니다</h2></div>
+        <div class="s-head__r">status 실제 값 · 발행기 출력 그대로</div>
+      </div>
+      <div class="s-body">
+        <div class="g2" style="flex:1;min-height:0;grid-template-columns:1fr 1.15fr">
+          <div class="code" style="font-size:12px">
+            <div class="code__bar"><span>status 태그 값 · LDR-GJ-A1B3-07</span><button class="code__copy" type="button">복사</button></div>
+<pre>{
+  "id": "LDR-GJ-A1B3-07",
+  "raw_payload": {
+    "site": "geoje",
+    "zone": "ASSEMBLY",
+    "shop": "assembly1",
+    "bay": "bay3",
+    <span class="hl">"status": "ONLINE",</span>
+    "last_heartbeat_at": "2026-09-10T12:59:23.3532050+09:00",
+    "error_code": null,
+    <span class="hl">"occurred_at": "2026-09-10T12:59:23.3603189+09:00",</span>
+    "ingested_at": "2026-09-10T12:59:24.5303189+09:00",
+    "idempotency_key": "LDR-GJ-A1B3-07:20260910T125923",
+    "scan_rate_pts_per_sec": 229866,
+    "temperature_c": 40.9,
+    "connectivity_rssi": -52,
+    "fov_mode": "wide"
+  }
+}</pre>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th style="width:27%">입력 필드</th><th style="width:33%">컬럼 · 타입</th><th>규칙</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">id (+ edgeGroupId)</td><td class="mono">tag_catalog → tag_key, device_id</td><td>등록부로 확정. 문자열을 역분해해 장비를 추정하지 않음</td></tr>
+                <tr><td class="mono">occurred_at</td><td class="mono">event_time timestamptz<br>source_time_text text</td><td>.NET 7자리 정밀도 원문을 함께 보존. event_key 는 반올림 전에 생성</td></tr>
+                <tr><td class="mono">ingested_at</td><td class="mono">source_ingested_at</td><td>발신 수집 시각. DB 수신 시각(received_at) 과 구분</td></tr>
+                <tr><td class="mono">status</td><td class="mono">status text CHECK</td><td>ONLINE · CALIBRATING · ERROR · OFFLINE 4종만 허용</td></tr>
+                <tr><td class="mono">temperature_c · connectivity_rssi</td><td class="mono">double precision · smallint</td><td>장비별 상하한은 사양 확정 후 CHECK 추가</td></tr>
+                <tr><td class="mono">idempotency_key</td><td class="mono">source_event_key text</td><td>초 단위라 고유 키로 못 씀. event_key = SHA-256(그룹, 태그, 발생시각, 키)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>예상하지 않은 필드가 오면 버리지 않고 스키마 버전 불일치로 격리한다. status 는 정상 이력에 JSON 원문을 중복 저장하지 않으므로 이 검사가 필요하다. actual · artifact 는 source_payload jsonb 를 같이 둔다.</aside>
+  </section>
+
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">04. 데이터가 들어가는 법</span><h2>검증 · 저장 · 커밋을 한 트랜잭션으로 묶고, 실패는 격리합니다</h2></div>
+        <div class="s-head__r">정상 경로 · 실패 경로</div>
+      </div>
+      <div class="s-body">
+        <div class="flow" data-key="deck-tag-write">
+  <div class="flow__head"><span class="flow__title">태그 변경 한 건을 저장하는 순서</span><span class="flow__hint">같은 태그 ID 의 반복 항목을 합치지 않고 항목마다 처리</span><span class="sp"></span></div>
+  <div class="flow__in" style="grid-template-columns:repeat(4, 1fr);">
+    <div style="grid-column:1 / span 1;grid-row:1 / span 1;" class="fnode fnode--src" data-id="lookup"><span class="fnode__no">1</span><span class="fnode__ic" data-ic="tag"></span><div class="fnode__body"><div class="fnode__t">등록 확인</div><div class="fnode__s">edgeGroupId + tagId → tag_key</div></div></div>
+    <div style="grid-column:2 / span 1;grid-row:1 / span 1;" class="fnode fnode--decide" data-id="parse"><span class="fnode__no">2</span><span class="fnode__ic" data-ic="filter"></span><div class="fnode__body"><div class="fnode__t">본문 검증</div><div class="fnode__s">채널 · 시간 · 데이터 키 · 필드 범위</div><span class="fnode__tag">판정</span></div></div>
+    <div style="grid-column:3 / span 1;grid-row:1 / span 1;" class="fnode fnode--new" data-id="write"><span class="fnode__no">3</span><span class="fnode__ic" data-ic="db"></span><div class="fnode__body"><div class="fnode__t">같은 트랜잭션</div><div class="fnode__s">이력 + 최신값 / 스캔 + 목록</div></div></div>
+    <div style="grid-column:4 / span 1;grid-row:1 / span 1;" class="fnode fnode--ok" data-id="commit"><span class="fnode__no">4</span><span class="fnode__ic" data-ic="check"></span><div class="fnode__body"><div class="fnode__t">커밋 후 ACK</div><div class="fnode__s">내구성 수신 경로에 완료 통보</div></div></div>
+    <div style="grid-column:1 / span 1;grid-row:2 / span 1;" class="fnode fnode--warn fnode--small" data-id="unreg"><span class="fnode__ic" data-ic="alert"></span><div class="fnode__body"><div class="fnode__t">미등록 태그</div><div class="fnode__s">ingest_reject 격리</div></div></div>
+    <div style="grid-column:2 / span 1;grid-row:2 / span 1;" class="fnode fnode--warn fnode--small" data-id="bad"><span class="fnode__ic" data-ic="alert"></span><div class="fnode__body"><div class="fnode__t">검증 실패</div><div class="fnode__s">원문 그대로 격리 · 정상 건과 분리</div></div></div>
+    <div style="grid-column:3 / span 1;grid-row:2 / span 1;" class="fnode fnode--risk fnode--small" data-id="retry"><span class="fnode__ic" data-ic="retry"></span><div class="fnode__body"><div class="fnode__t">DB 실패</div><div class="fnode__s">롤백 · 같은 이벤트 재시도</div></div></div>
+  </div>
+  <div class="flow__legend"><span><i></i>데이터 흐름</span><span><i class="ok"></i>저장 · 확정</span><span><i class="risk"></i>실패 · 유실되는 경로</span><span><i class="muted"></i>버림 · 보류</span><span><b class="nw"></b>이번에 만드는 구성요소</span><span>카드에 마우스를 올리면 연결된 선만 강조됩니다 · 편집 버튼으로 바로 고칠 수 있습니다</span></div>
+  <script type="application/json" class="flow-links">[{"from": "lookup", "to": "parse", "kind": "flow"}, {"from": "parse", "to": "write", "kind": "flow"}, {"from": "write", "to": "commit", "kind": "ok"}, {"from": "lookup", "to": "unreg", "kind": "risk", "port": "b>t"}, {"from": "parse", "to": "bad", "kind": "risk", "port": "b>t"}, {"from": "write", "to": "retry", "kind": "risk", "port": "b>t"}]</script>
+</div>
+        <div class="g3">
+          <div class="note note--info"><p class="note__t">중복</p>같은 키로 다시 오면 <span class="mono">payload_hash</span> 비교. 같으면 중복, 다르면 정정 계약이 생기기 전까지 격리. DO NOTHING 으로 숨기지 않음.</div>
+          <div class="note note--info"><p class="note__t">역순 도착</p>늦게 온 과거 status 는 이력에 저장하고, 최신값은 더 늦은 event_time 만 반영. 최신값 후퇴 0건이 완료 기준.</div>
+          <div class="note note--info"><p class="note__t">선도착</p>artifact 가 actual 보다 먼저 오면 <span class="mono">scan</span> 앵커 행을 먼저 만들고 저장. scanned_at 은 actual 도착 시 채움.</div>
+        </div>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>ACK 는 커밋 후에만. 격리 저장에 실패해도 완료 ACK 를 보내지 않는다. 이 부분은 HotDBProvider 구현 조건이지 DDL 이 보장하는 게 아니다.</aside>
+  </section>
+
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">05. 어떻게 쓰나</span><h2>화면과 분석이 각각 다른 표를 읽습니다</h2></div>
+        <div class="s-head__r">조회 한 건 = 표 한 개 + 인덱스 한 개</div>
+      </div>
+      <div class="s-body">
+        <div class="g-2-1" style="flex:1;min-height:0">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th style="width:30%">묻는 것</th><th style="width:38%">읽는 표 · 인덱스</th><th>효과</th></tr></thead>
+              <tbody>
+                <tr><td>지금 ERROR 인 장비</td><td class="mono">status_current (site, status)</td><td>이력 전체를 훑지 않음</td></tr>
+                <tr><td>한 장비 최근 1시간 온도</td><td class="mono">status_history PK (tag_key, event_time)</td><td>숫자 키로 범위 탐색 · 청크 1~2개</td></tr>
+                <tr><td>블록 B107P 의 스캔 목록</td><td class="mono">scan (site, hull_no, block_id, scanned_at)</td><td>산출물 선도착이면 scanned_at NULL 가능</td></tr>
+                <tr><td>스캔 하나의 산출물 전부</td><td class="mono">artifact PK (site, scan_id)</td><td>세그먼트 10개를 개별 행으로</td></tr>
+                <tr><td>장기 진척률 추이</td><td class="mono">actual_result / 선택 actual_metric_history</td><td>켜면 같은 트랜잭션에 추가 쓰기</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="stack">
+            <div class="ui">
+              <div class="ui__bar"><span class="ui__dot"></span><span class="ui__dot"></span><span class="ui__dot"></span><span class="ui__addr">localhost:56441/monitoring/devices?status=ERROR</span></div>
+              <div class="ui__body" style="padding:0">
+                <div class="ui-row" style="font-weight:700;color:var(--ink3);font-size:11.5px"><span style="flex:2.2">장비</span><span style="flex:1">상태</span><span style="flex:1;text-align:right">온도</span><span style="flex:1.4;text-align:right">event_time</span></div>
+                <div class="ui-row" style="font-size:12px"><span class="mono" style="flex:2.2">LDR-GJ-A1B3-07</span><span style="flex:1;color:var(--risk);font-weight:700">ERROR</span><span class="mono" style="flex:1;text-align:right">40.9</span><span class="mono" style="flex:1.4;text-align:right">12:59:23.360</span></div>
+                <div class="ui-row" style="font-size:12px"><span class="mono" style="flex:2.2">LDR-GJ-A2B1-03</span><span style="flex:1;color:var(--risk);font-weight:700">ERROR</span><span class="mono" style="flex:1;text-align:right">61.4</span><span class="mono" style="flex:1.4;text-align:right">12:59:22.871</span></div>
+              </div>
+            </div>
+            <div class="card"><p class="card__t">이 화면이 읽는 것</p><p class="card__d"><span class="mono">SELECT … FROM rdb.status_current WHERE site='geoje' AND status='ERROR'</span> 한 번. 350행 안에서 인덱스로 끝납니다.</p></div>
+            <div class="note note--ok"><p class="note__t">이력 화면</p>같은 장비의 온도 그래프는 <span class="mono">status_history</span> 를 tag_key 로 읽습니다. 화면과 분석이 서로의 표를 잠그지 않습니다.</div>
+          </div>
+        </div>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>화면 값은 예시다. 두 번째 장비의 온도 61.4 는 예시값이며 실측이 아니다.</aside>
+  </section>
+
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">05. 어떻게 쓰나</span><h2>HANA 에는 RDB 표만 보내고, 이력은 TSDB 에 남깁니다</h2></div>
+        <div class="s-head__r">쓰기량은 발행기 주기의 산술값 · 실측 아님</div>
+      </div>
+      <div class="s-body">
+        <div class="kpi">
+          <div class="kpi__item"><div class="kpi__v">350 행/s</div><div class="kpi__l">status — 350대 · 1초 · 하루 3,024만 행<sup class="ref" data-ref="2">2</sup></div></div>
+          <div class="kpi__item"><div class="kpi__v">5.83 행/s</div><div class="kpi__l">actual — 350대 · 1분 · 하루 50.4만 행</div></div>
+          <div class="kpi__item"><div class="kpi__v">70 행/s</div><div class="kpi__l">artifact — 350대 · 1분 · 12행 · 하루 604.8만 행</div></div>
+          <div class="kpi__item"><div class="kpi__v" style="color:var(--info)">메타만</div><div class="kpi__l">PCD 본체는 스토리지 · DB 는 URI · 크기 · 체크섬</div></div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:26%">HANA 가 원하는 것</th><th style="width:42%">CDC 대상 표</th><th>의미</th></tr></thead>
+            <tbody>
+              <tr><td>최신 상태 + 실적 + 산출물</td><td class="mono">status_current · scan · actual_result · artifact (+ device, tag_catalog)</td><td>기본안. status 원본 전량 보장은 아님</td></tr>
+              <tr><td>모든 status 원본까지</td><td class="mono">위 + rdb.status_event_buffer (선택)</td><td>이력과 같은 트랜잭션에 매 행 저장 · 전달 후 단기 정리</td></tr>
+              <tr><td>압축된 TSDB 이력</td><td>기본 CDC 대상에서 제외</td><td>압축 청크 직접 CDC 는 커넥터 · 버전 별도 검증</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="g2">
+          <div class="note note--warn"><p class="note__t">보존 정책은 후보값</p>status 6시간 청크 · 3일 후 압축 · 31일 보관은 기존 설정에서 가져온 출발점. 행 크기 · 인덱스 · 지연 도착을 실측한 뒤 확정하며, DDL 에 자동 삭제는 넣지 않았습니다.</div>
+          <div class="note note--risk"><p class="note__t">스키마가 재전송을 만들어 주지 않습니다</p>Core NATS 는 구독 없던 구간을 재전달하지 않습니다. HotDBProvider 의 내구성 큐 · ACK 는 별도 구현 조건이고, HANA 까지 무손실이 필요하면 이 구간부터 보완해야 합니다.<sup class="ref" data-ref="8">8</sup></div>
+        </div>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>용량 산정식: 일 행 수 × 실측 bytes/행 × 보관 일수 + WAL · 백업. 압축 배수는 가정하지 않는다.</aside>
+  </section>
+
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">06. 장점과 남은 결정</span><h2>기존 timescaledb 스키마 대비 다섯 가지가 달라집니다</h2></div>
+        <div class="s-head__r">현재 → 제안</div>
+      </div>
+      <div class="s-body">
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:28%">현재</th><th style="width:34%">제안</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">send_topic + param_id 등록부</td><td class="mono">edge_group_id + tag_id → tag_key</td><td>EES 숫자 ID 와 토픽 문자열에서 독립</td></tr>
+              <tr><td>세 채널 모두 TSDB 이력</td><td>status 만 TSDB · actual / artifact 는 RDB</td><td>스캔 · 세그먼트 식별과 파일 상태 갱신이 필요</td></tr>
+              <tr><td>stage · 공정별 완료 컬럼</td><td>원천 입력에서 제외</td><td>최신 payload 에 없음. 판별 결과는 별도 표</td></tr>
+              <tr><td>블록별 산출물 개수 · 대표 URI</td><td>스캔 · 종류 · 세그먼트별 행</td><td>세그먼트 단위 조회 · 복구</td></tr>
+              <tr><td class="mono">kafka_offset · 파티션 · 헤더 컬럼</td><td>만들지 않음 — Kafka 경로 미사용</td><td>전송 정보가 필요하면 별도 감사 로그</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="adv">
+          <div class="adv__i"><p class="adv__t">표가 먼저, Provider 는 맞추는 쪽</p><p class="adv__d">등록부 · 장비 · 스캔 키만 알면 어떤 Provider 든 같은 표에 씀.</p></div>
+          <div class="adv__i"><p class="adv__t">세그먼트 무손실</p><p class="adv__d">자연 키 4개로 10개를 10행으로. 재전송해도 늘지도 줄지도 않음.</p></div>
+          <div class="adv__i"><p class="adv__t">최신값 즉시 조회</p><p class="adv__d">화면은 status_current 350행만. 이력 3,024만 행을 건드리지 않음.</p></div>
+          <div class="adv__i"><p class="adv__t">실패가 보임</p><p class="adv__d">미등록 · 충돌 · 형식 오류가 ingest_reject 에 원문째 남아 조사 가능.</p></div>
+        </div>
+        <div class="note note--info"><p class="note__t">조건부 판단입니다</p>현재 raw 태그 계약(JSON 한 덩어리가 태그 값)과 지금의 조회 요구에 맞춘 선택입니다. 장비별 필드가 수시로 달라지는 수치 태그 서비스로 바뀌면 필드별 측정 행 모델을 다시 검토합니다. 별도 DB 에서 검증한 뒤 전환하며 기존 수집기 · DB · CDC 설정은 건드리지 않습니다.</div>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>"장점" 은 현재 raw 태그 계약과 조회 요구에 대한 조건부 판단이다. 장비별 필드가 수시로 달라지는 수치 태그 서비스로 바뀌면 scalar 측정 모델을 다시 본다.</aside>
+  </section>
+
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">06. 장점과 남은 결정</span><h2>DDL 은 격리 DB 에서 통과했고, 남은 것은 계약 합의입니다</h2></div>
+        <div class="s-head__r">PostgreSQL 17.11 · TimescaleDB 2.29.2</div>
+      </div>
+      <div class="s-body">
+        <div class="g-1-2" style="align-items:start">
+          <div class="note note--ok" style="margin:0"><p class="note__t">격리 DB 에서 실제로 실행한 것<sup class="ref" data-ref="7">7</sup></p>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+              <span class="chip chip--ok">기본 · 선택 DDL 생성</span><span class="chip chip--ok">artifact 선도착</span><span class="chip chip--ok">세그먼트 10 + PCD + 행렬 = 12행</span><span class="chip chip--ok">재전송 후 12행 유지</span><span class="chip chip--ok">중복 PCD 거부</span><span class="chip chip--ok">잘못된 행렬 · 빈 세그먼트 · URI 누락 거부</span><span class="chip chip--ok">UUID 앞 8자 같은 스캔 2건 구분</span><span class="chip chip--ok">진척률 0~100 검사</span><span class="chip chip--ok">status 중복 제거 · 압축 후 조회</span>
+            </div>
+            <p style="margin:10px 0 0;font-size:12.5px">Provider 의 역순 방지 · hash · 충돌 격리 · 재시도 · ACK · HANA 전달은 <b>구현 · 통합 시험이 남아 있습니다.</b> 실행 완료로 표시하지 않습니다.</p>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th style="width:30%">확정할 것</th><th>완료 기준 · 결정</th></tr></thead>
+              <tbody>
+                <tr><td>정정 · 재생성 계약</td><td>revision / supersedes 가 없으면 다른 내용의 재수신은 격리. 같은 스캔의 PROGRESS 가 여러 번 갱신되면 키에 revision 추가</td></tr>
+                <tr><td>수신 내구성</td><td>Core NATS 중단 구간은 재전달 없음. 별도 큐 · ACK 확정 후 무손실 판단</td></tr>
+                <tr><td>파일 무결성</td><td>발행기 checksum 은 16자리 가짜 값. 실제 SHA-256 검증 완료와 혼동 금지</td></tr>
+                <tr><td>현장 합의</td><td>장비 수 · 주기 · 보관 일수 · 지연 허용 · HANA 전체/최신값 여부</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="steps">
+          <div class="step"><span class="step__n">1</span><div class="step__t">계약 합의</div><div class="step__d">장비 수 · 주기 · revision · 보관</div></div>
+          <div class="step"><span class="step__n">2</span><div class="step__t">HotDBProvider 구현</div><div class="step__d">파서 · hash · 격리 · 재시도 · ACK</div></div>
+          <div class="step"><span class="step__n">3</span><div class="step__t">별도 DB 병행 검증</div><div class="step__d">기존 수집기 · CDC 설정은 변경 없음</div></div>
+          <div class="step"><span class="step__n">4</span><div class="step__t">CDC → HANA 전환</div><div class="step__d">연속 완료 구간 기준으로 보존 판정</div></div>
+        </div>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div><aside class="notes"><b>발표자 노트</b>이미 누락된 세그먼트는 새 스키마가 복구하지 못한다. 원본 파일 · 내구성 로그와 대사가 필요하다.</aside>
+  </section>
+
+  <section class="slide">
+    <div class="stage">
+      <div class="s-head">
+        <div class="s-head__l"><span class="kicker">Reference</span><h2>출처</h2></div>
+        <div class="s-head__r">확인일 2026-09-28</div>
+      </div>
+      <div class="s-body">
+        <ol class="refs">
+          <li id="ref-1"><span class="refs__n">1</span><span><span class="refs__src">MQTT 브로커 → Mqtt.Agent 태그 카탈로그</span><span class="refs__meta">doc · latest/mqtt-agent-tag-catalog.html, 2026-09-23 재검증 (등록 CSV 6개 · 태그 1,750개 · 세그먼트 미병합)</span></span></li>
+          <li id="ref-2"><span class="refs__n">2</span><span><span class="refs__src">실제 LiDAR 발행기 payload</span><span class="refs__meta">code · util/mqtt-lidar-sim/lidar-sim.cs StatusPayload:592 / ActualPayload:615 / SegmentPayload:683 (cf538da 작업트리)</span></span></li>
+          <li id="ref-3"><span class="refs__n">3</span><span><span class="refs__src">Agent raw 파서와 TagId 규칙</span><span class="refs__meta">code · intersyslink-v4/src/Edge/Agents/Mqtt/Mqtt.Agent/Core/Domain/MqttPayloadParser.cs AppendRawSample / ResolveChangedAt (fd70c7e7 작업트리)</span></span></li>
+          <li id="ref-4"><span class="refs__n">4</span><span><span class="refs__src">Engine NATS 태그 발행 (Core Publish)</span><span class="refs__meta">code · intersyslink-v4/src/Engine/Engine/Outbound/Nats/Edge/Tags/NatsWorkflowTagChangeStream.cs BuildPipeline / PublishBatchAsync (fd70c7e7 작업트리)</span></span></li>
+          <li id="ref-5"><span class="refs__n">5</span><span><span class="refs__src">기존 timescaledb 스키마 (만들지 않는 Kafka 컬럼의 출처)</span><span class="refs__meta">code · latest/backup/timescaledb/infra/db/init/01-schema.sql (param_id · send_topic · kafka_offset 컬럼)</span></span></li>
+          <li id="ref-6"><span class="refs__n">6</span><span><span class="refs__src">토픽 재정의 (stage 제거 · 태그 수)</span><span class="refs__meta">doc · latest/backup/docs/lidar-topic-tag-respec.html, 2026-09-22</span></span></li>
+          <li id="ref-7"><span class="refs__n">7</span><span><span class="refs__src">설계 상세 · DDL · 검증 fixture</span><span class="refs__meta">doc · latest/lidar-tag-db-schema.html §07 · §09, 2026-09-23 (격리 컨테이너 PostgreSQL 17.11 / TimescaleDB 2.29.2 통과)</span></span></li>
+          <li id="ref-8"><span class="refs__n">8</span><span><span class="refs__src">Core NATS 전달 특성</span><span class="refs__meta">web · https://docs.nats.io/learn/core-nats/ (확인 2026-09-23)</span></span></li>
+        </ol>
+        <div class="note"><p class="note__t">이 덱과 개발 문서의 관계</p>이 덱은 발표용 요약입니다. 전체 DDL · 필드별 매핑 표 · 다른 설계안과의 비교 · 검증 fixture 는 <span class="mono">lidar-tag-db-schema.html</span> 에 있습니다. 수치 중 "산술값" 이라 적은 것은 발행기 주기에서 계산한 값이며 처리 성능 실측이 아닙니다.</div>
+      </div>
+      <div class="s-foot"><span>HotDB 기준 LiDAR RDB · TSDB 스키마</span><span class="pg"></span></div>
+    </div>
+  </section>
+
+</div>
+
+<div class="prog" id="prog"></div>
+<div class="hud no-print">
+  <button id="bPrev" type="button">이전</button>
+  <button id="bNext" type="button">다음</button>
+  <span class="cnt" id="hudCnt">1 / 1</span>
+  <span class="sp"></span>
+  <span class="ttl">방향키 이동 · O 전체보기 · N 노트 · F 전체화면 · T 테마</span>
+  <span class="sp"></span>
+  <button id="bOver" type="button">전체보기</button>
+  <button id="bNote" type="button">노트</button>
+  <button id="bTheme" type="button">테마</button>
+  <button id="bPrint" type="button">PDF</button>
 </div>
 
 <script>
@@ -1693,9 +2062,12 @@ SELECT extversion FROM pg_extension WHERE extname=&#x27;timescaledb&#x27;;
     if (b.top >= a.bottom - 6) return 'b>t';
     return 't>b';
   }
-  function rel(e, base) {
+  function rel(e, base, sc) {
+    /* sc: 조상에 transform:scale 이 걸려 있을 때(발표 덱의 --k) 화면 좌표를 레이아웃 좌표로 되돌리는 배율.
+       getBoundingClientRect 는 화면(확대 후) 값이고 선은 레이아웃(확대 전) 단위로 그리므로 나눠 준다. */
+    sc = sc || 1;
     var r = e.getBoundingClientRect();
-    return { left: r.left - base.left, right: r.right - base.left, top: r.top - base.top, bottom: r.bottom - base.top, width: r.width, height: r.height };
+    return { left: (r.left - base.left) / sc, right: (r.right - base.left) / sc, top: (r.top - base.top) / sc, bottom: (r.bottom - base.top) / sc, width: r.width / sc, height: r.height / sc };
   }
   function translateOf(e) {
     var t = (e.style.translate || '').trim().split(/\s+/);
@@ -1811,6 +2183,8 @@ SELECT extversion FROM pg_extension WHERE extname=&#x27;timescaledb&#x27;;
     mk('방향', '선택 선이 붙는 면을 바꾼다 (자동 → 오른쪽>왼쪽 → …)', function () { self.cyclePort(); });
     mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
     bar.appendChild(el('span', 'dgm__sep'));
+    this.bMax = mk('넓게', '화면 가득 펼치기 (Esc 로 닫기)', function () { self.toggleMax(); });
+    bar.appendChild(el('span', 'dgm__sep'));
     mk('되돌리기', 'Ctrl+Z', function () { self.doUndo(); });
     this.bReset = mk('원래대로', '이 브라우저에 저장된 편집을 지우고 문서 원본으로', function () { self.resetSaved(); });
     bar.appendChild(el('span', 'sp'));
@@ -1866,6 +2240,24 @@ SELECT extversion FROM pg_extension WHERE extname=&#x27;timescaledb&#x27;;
   };
   Flow.prototype.editing = function () { return this.root.classList.contains('is-edit'); };
   Flow.prototype.status = function (t) { if (this.hint) this.hint.textContent = t; };
+
+  /* 화면 가득 펼치기. 다른 그림이 펼쳐져 있으면 먼저 닫는다(.dgm.toggleMax 와 같은 규칙). */
+  Flow.prototype.toggleMax = function (force) {
+    var self = this;
+    var on = (force == null) ? !this.root.classList.contains('is-max') : !!force;
+    if (on) {
+      var cur = document.querySelector('.flow.is-max');
+      if (cur && cur !== this.root && cur.__flow) cur.__flow.toggleMax(false);
+    }
+    this.root.classList.toggle('is-max', on);
+    document.documentElement.classList.toggle('flow-locked', on);
+    if (this.bMax) {
+      this.bMax.classList.toggle('is-on', on);
+      this.bMax.textContent = on ? '닫기' : '넓게';
+      this.bMax.title = on ? '원래 크기로 (Esc)' : '화면 가득 펼치기 (Esc 로 닫기)';
+    }
+    (window.requestAnimationFrame || setTimeout)(function () { self.draw(); });
+  };
 
   Flow.prototype.select = function (s) {
     this.sel = s;
@@ -2092,6 +2484,16 @@ SELECT extversion FROM pg_extension WHERE extname=&#x27;timescaledb&#x27;;
     var r = e.target.closest && e.target.closest('.flow');
     if (r && r.__flow) Flow.active = r.__flow;
   }, true);
+  /* Esc 는 펼쳐 놓은 그림을 닫는다(.dgm 과 같은 규칙). */
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var m = document.querySelector('.flow.is-max');
+    if (m && m.__flow) { ev.preventDefault(); m.__flow.toggleMax(false); }
+  });
+  window.addEventListener('resize', function () {
+    var m = document.querySelector('.flow.is-max');
+    if (m && m.__flow) m.__flow.draw();
+  });
 
   /* ── 그리기 ─────────────────────────────────────────────── */
   Flow.prototype.draw = function () {
@@ -2103,11 +2505,12 @@ SELECT extversion FROM pg_extension WHERE extname=&#x27;timescaledb&#x27;;
     if (!lbls) { lbls = el('div', 'flow__lbls'); inner.appendChild(lbls); }
     svg.innerHTML = ''; lbls.innerHTML = '';
     var base = inner.getBoundingClientRect();
+    var sc = (inner.offsetWidth && base.width) ? base.width / inner.offsetWidth : 1;
     svg.setAttribute('width', inner.scrollWidth); svg.setAttribute('height', inner.scrollHeight);
     var editing = this.editing();
 
     var defs = document.createElementNS(NS, 'defs');
-    [['flow', 'var(--hw)'], ['ok', 'var(--ok)'], ['risk', 'var(--risk)'], ['muted', 'var(--ink4)']].forEach(function (m) {
+    [['flow', 'var(--hw)'], ['ok', 'var(--ok)'], ['risk', 'var(--risk)'], ['muted', 'var(--ink3)']].forEach(function (m) {
       var mk = document.createElementNS(NS, 'marker');
       mk.setAttribute('id', 'fa-' + m[0] + '-' + self.fid);
       mk.setAttribute('viewBox', '0 0 10 10'); mk.setAttribute('refX', '8.5'); mk.setAttribute('refY', '5');
@@ -2121,7 +2524,7 @@ SELECT extversion FROM pg_extension WHERE extname=&#x27;timescaledb&#x27;;
       var a = inner.querySelector('[data-id="' + ln.from + '"]');
       var b = inner.querySelector('[data-id="' + ln.to + '"]');
       if (!a || !b) return;
-      var ra = rel(a, base), rb = rel(b, base);
+      var ra = rel(a, base, sc), rb = rel(b, base, sc);
       var port = (ln.port || autoPort(ra, rb)).split('>');
       var p1 = portOf(ra, port[0]), p2 = portOf(rb, port[1]);
       var d1 = DIR[port[0]], d2 = DIR[port[1]];
@@ -2201,69 +2604,127 @@ SELECT extversion FROM pg_extension WHERE extname=&#x27;timescaledb&#x27;;
 })();
 
 /* ============================================================
-   HW Doc Kit - 개발용 문서 런타임 (TOC 스크롤스파이 / 체크 상태 / 복사)
+   HW Doc Kit - 탭(.tabs) · JSON 한 줄 설명(.jx2) 엔진 (의존성 없음)
+   마크업은 style-guide.md "탭과 JSON 한 줄 설명" 절 참고.
+   ============================================================ */
+(function () {
+  // 탭: data-sync 가 같은 묶음은 같은 탭으로 함께 넘어간다
+  function show(box, key) {
+    box.querySelectorAll(':scope > .tabs__bar .tabs__b').forEach(function (b) { b.classList.toggle('on', b.dataset.t === key); });
+    box.querySelectorAll(':scope > .tabs__p').forEach(function (p) { p.classList.toggle('on', p.dataset.p === key); });
+  }
+  var boxes = document.querySelectorAll('.tabs');
+  boxes.forEach(function (box) {
+    var first = box.querySelector('.tabs__b.on') || box.querySelector('.tabs__b');
+    if (first) show(box, first.dataset.t);
+    box.querySelectorAll(':scope > .tabs__bar .tabs__b').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var sync = box.dataset.sync;
+        boxes.forEach(function (o) { if (o === box || (sync && o.dataset.sync === sync)) show(o, b.dataset.t); });
+      });
+    });
+  });
+
+  // JSON 한 줄 호버 → 몇 번째 줄인지와 설명을 발치 칸에
+  document.querySelectorAll('.jx2').forEach(function (box) {
+    var pos = box.querySelector('.jx2__pos'), fd = box.querySelector('.jx2__fd');
+    if (!pos || !fd) return;
+    var idle = fd.innerHTML;
+    box.querySelectorAll('.jx2__r--k').forEach(function (r) {
+      r.addEventListener('mouseenter', function () {
+        box.classList.add('act');
+        pos.textContent = r.querySelector('.jx2__ln').textContent + '행';
+        fd.innerHTML = '<b></b><code></code><span></span>';
+        fd.children[0].textContent = r.dataset.n;
+        fd.children[1].textContent = r.dataset.k;
+        fd.children[2].textContent = r.dataset.d;
+      });
+      r.addEventListener('mouseleave', function () { box.classList.remove('act'); pos.textContent = '-'; fd.innerHTML = idle; });
+    });
+  });
+})();
+
+/* ============================================================
+   HW Doc Kit - 발표 덱 런타임 (네비게이션 / 배율 / 오버뷰 / 노트)
    ============================================================ */
 (function () {
   'use strict';
-  var KEY = 'hwdoc:' + (document.title || location.pathname);
+  var deck = document.getElementById('deck');
+  if (!deck) return;
+  var slides = Array.prototype.slice.call(deck.querySelectorAll('.slide'));
+  var cur = 0;
 
-  /* --- TOC 자동 생성 (비어 있을 때만) --- */
-  var toc = document.querySelector('.toc');
-  if (toc && !toc.children.length) {
-    document.querySelectorAll('.sec').forEach(function (sec) {
-      if (!sec.id) return;
-      var h = sec.querySelector('h2');
-      var li = document.createElement('li');
-      var a = document.createElement('a');
-      a.href = '#' + sec.id;
-      a.textContent = h
-        ? Array.prototype.map.call(h.childNodes, function (x) { return x.textContent.trim(); })
-          .filter(Boolean).join(' ')
-        : sec.id;
-      li.appendChild(a); toc.appendChild(li);
+  slides.forEach(function (sl, i) {
+    sl.setAttribute('data-n', i + 1);
+    var foot = sl.querySelector('.s-foot .pg');
+    if (foot && !foot.textContent.trim()) foot.textContent = (i + 1) + ' / ' + slides.length;
+    sl.addEventListener('click', function () {
+      if (deck.classList.contains('is-overview')) { go(i); overview(false); }
     });
-  }
-
-  /* --- 스크롤스파이 --- */
-  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
-  var secs = links.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
-  if (window.IntersectionObserver && secs.length) {
-    var io = new IntersectionObserver(function (ents) {
-      ents.forEach(function (e) {
-        if (!e.isIntersecting) return;
-        links.forEach(function (a) { a.classList.toggle('is-cur', a.getAttribute('href') === '#' + e.target.id); });
-      });
-    }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
-    secs.forEach(function (s) { io.observe(s); });
-  }
-
-  /* --- 체크리스트 상태 저장 --- */
-  var saved = {};
-  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { }
-  document.querySelectorAll('.chk input[type="checkbox"]').forEach(function (cb, i) {
-    var id = cb.id || ('chk' + i); cb.id = id;
-    if (saved[id]) cb.checked = true;
-    var sync = function () {
-      cb.closest('li').classList.toggle('is-done', cb.checked);
-      saved[id] = cb.checked;
-      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) { }
-      count();
-    };
-    cb.addEventListener('change', sync);
-    cb.closest('li').classList.toggle('is-done', cb.checked);
   });
-  function count() {
-    document.querySelectorAll('.chk').forEach(function (ul) {
-      var all = ul.querySelectorAll('input[type="checkbox"]');
-      var done = ul.querySelectorAll('input[type="checkbox"]:checked');
-      var badge = ul.previousElementSibling && ul.previousElementSibling.querySelector('.chk-count');
-      if (badge) badge.textContent = done.length + ' / ' + all.length;
-    });
-  }
-  count();
 
-  /* --- 코드 복사 --- */
-  document.querySelectorAll('.code__copy').forEach(function (b) {
+  function scale() {
+    var hud = 46, pad = deck.classList.contains('is-overview') ? 0 : 28;
+    var k = Math.min((window.innerWidth - pad * 2) / 1280, (window.innerHeight - hud - pad) / 720);
+    document.documentElement.style.setProperty('--k', Math.max(.15, k).toFixed(4));
+  }
+
+  function go(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach(function (s, j) { s.classList.toggle('is-cur', j === cur); });
+    var c = document.getElementById('hudCnt');
+    if (c) c.textContent = (cur + 1) + ' / ' + slides.length;
+    var p = document.getElementById('prog');
+    if (p) p.style.width = ((cur + 1) / slides.length * 100).toFixed(2) + '%';
+    if (location.hash !== '#' + (cur + 1)) history.replaceState(null, '', '#' + (cur + 1));
+    if (window.HWDiagram) window.HWDiagram.initAll(slides[cur]);
+    var d = slides[cur].querySelectorAll('.dgm');
+    Array.prototype.forEach.call(d, function (el) { if (el.__dgm) el.__dgm.fit(); });
+  }
+
+  function overview(on) {
+    deck.classList.toggle('is-overview', on == null ? !deck.classList.contains('is-overview') : on);
+    scale();
+    if (deck.classList.contains('is-overview')) window.HWDiagram && window.HWDiagram.initAll(deck);
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (/^(INPUT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'PageDown' || k === ' ') { e.preventDefault(); go(cur + 1); }
+    else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); go(cur - 1); }
+    else if (k === 'Home') go(0);
+    else if (k === 'End') go(slides.length - 1);
+    else if (k === 'o' || k === 'O') overview();
+    else if (k === 'n' || k === 'N') deck.classList.toggle('is-notes');
+    else if (k === 't' || k === 'T') theme();
+    else if (k === 'f' || k === 'F') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }
+  });
+
+  function theme() {
+    var r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  }
+
+  function bind(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+  bind('bPrev', function () { go(cur - 1); });
+  bind('bNext', function () { go(cur + 1); });
+  bind('bOver', function () { overview(); });
+  bind('bNote', function () { deck.classList.toggle('is-notes'); });
+  bind('bTheme', theme);
+  bind('bPrint', function () { window.print(); });
+
+  window.addEventListener('resize', scale);
+  window.addEventListener('hashchange', function () {
+    var n = parseInt(location.hash.slice(1), 10);
+    if (n && n - 1 !== cur) go(n - 1);
+  });
+
+  /* 코드 복사 버튼 */
+  Array.prototype.forEach.call(document.querySelectorAll('.code__copy'), function (b) {
     b.addEventListener('click', function () {
       var pre = b.closest('.code').querySelector('pre');
       try { navigator.clipboard.writeText(pre.innerText); } catch (e) { }
@@ -2272,18 +2733,22 @@ SELECT extversion FROM pg_extension WHERE extname=&#x27;timescaledb&#x27;;
     });
   });
 
-  /* --- 사이드 버튼 --- */
-  function bind(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
-  bind('bTheme', function () {
-    var r = document.documentElement;
-    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  /* 각주 -> 출처 슬라이드 이동 */
+  Array.prototype.forEach.call(document.querySelectorAll('.ref[data-ref]'), function (r) {
+    r.addEventListener('click', function () {
+      var tgt = document.querySelector('#ref-' + r.getAttribute('data-ref'));
+      if (!tgt) return;
+      var sl = tgt.closest('.slide');
+      go(slides.indexOf(sl));
+      tgt.animate([{ background: 'var(--hw-pale)' }, { background: 'transparent' }], { duration: 1400 });
+    });
   });
-  bind('bPrint', function () { window.print(); });
-  bind('bReset', function () {
-    if (!confirm('체크 상태를 모두 초기화할까요?')) return;
-    try { localStorage.removeItem(KEY); } catch (e) { }
-    location.reload();
-  });
+
+  scale();
+  var start = parseInt(location.hash.slice(1), 10);
+  go(start ? start - 1 : 0);
+  window.addEventListener('beforeprint', function () { document.documentElement.style.setProperty('--k', 1); });
+  window.addEventListener('afterprint', scale);
 })();
 </script>
 </body>
