@@ -1,0 +1,72 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 통합 DB — PostgreSQL 17 + TimescaleDB 2.29 + logical WAL
+#
+#   legacy : 레거시 RDB     ← RFC Service 폴링 유입        (계정 rfc_ingest)
+#   svc    : 서비스 생성 RDB ↔ 권역별 서비스 저장 · 조회    (계정 svc_app)
+#            └ CDC → RFC Service, publication svc_cdc_pub (계정 svc_cdc)
+#   tsdb   : 필드 데이터     ← Hot DB Provider 저장         (계정 hotdb_provider)
+#
+#   podman compose up -d          # 올리기
+#   podman compose down [-v]      # 내리기 (-v 면 볼륨 삭제 → init SQL 재실행)
+#
+# init/ 의 SQL 은 볼륨이 처음 만들어질 때 한 번만 실행된다. 스키마를 고쳤으면
+# down -v 로 볼륨까지 지우고 다시 올려야 반영된다.
+# 스키마 · 계정 · publication 까지만 준비한다. 압축은 TimescaleDB 기본 정책 그대로다.
+# ─────────────────────────────────────────────────────────────────────────────
+name: hotdb-tsdb
+
+services:
+  pg:
+    image: timescale/timescaledb:2.29.2-pg17
+    container_name: hotdb-tsdb-pg
+    environment:
+      POSTGRES_DB: hotdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      TZ: Asia/Seoul
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb
+      - -c
+      - timescaledb.telemetry_level=off
+      # podman VM 메모리가 2GiB 라 timescaledb-tune 값 대신 여기서 못 박는다.
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - log_min_duration_statement=1000
+      # timescale 잡 워커(기본 16) · 논리 복제 워커 · 병렬 쿼리가 같이 쓰는 한도. 기본 8 이면 16 이 무의미하다.
+      - -c
+      - max_worker_processes=16
+      # ── svc → RFC Service CDC ─────────────────────────────────────────────
+      - -c
+      - wal_level=logical
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      # 소비자가 멈춘 슬롯이 WAL 을 무한히 붙잡아 디스크를 채우지 않게 상한을 둔다.
+      # 넘으면 슬롯이 무효화되고 CDC 는 재스냅샷이 필요하다 — 디스크 고갈보다 낫다.
+      - -c
+      - max_slot_wal_keep_size=10GB
+      # CDC 클라이언트가 적재에 밀려 응답이 늦어도 바로 끊지 않는다 (embedded-cdc 실측 근거).
+      - -c
+      - wal_sender_timeout=5min
+    # 59248~59347 은 Windows 예약 구간이라 피한다.
+    ports:
+      - "59433:5432"
+    volumes:
+      - hotdb-tsdb-pgdata:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hotdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  hotdb-tsdb-pgdata:
