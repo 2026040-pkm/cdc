@@ -776,7 +776,7 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
         <span class="mono">ot/sensor/{zone}/actual</span>(2개, stage 없음)로, 산출물 토픽은 shop/bay마다 있던 14개에서
         zone마다 2개로 줄었다 — 상태 토픽의 <span class="mono">lidar</span> 세그먼트도 빠졌다. 아래 §02·§03·§05·§06의
         숫자·예시는 그 최종 형태로 고쳐 두었다. 최신 전체 그림·실제 코드 대조는
-        <span class="mono">latest/docs/lidar-topic-tag-respec.html</span>·<span class="mono">latest/docs/message.md</span> 를 본다.
+        <span class="mono">docs/lidar/lidar-topic-tag-respec.html</span>·<span class="mono">docs/lidar/message.md</span> 를 본다.
       </div>
     </section>
 
@@ -857,7 +857,7 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
           <p class="note__t">근거 위치와 남은 불일치</p>
           <ul style="margin:4px 0 0;padding-left:18px">
             <li>발행기 커밋 <span class="mono">e7f4ce4</span>(2026-09-22) · 코드 주석 <span class="mono">util/mqtt-lidar-sim/lidar-sim.cs</span> 26–28행 ·
-              <span class="mono">latest/backup/docs/message.md</span> "실적(actual) 채널 — stage 처리 현황".</li>
+              <span class="mono">docs/lidar/message.md</span> "실적(actual) 채널 — stage 처리 현황".</li>
             <li>원본 <span class="mono">ocean-inshop-process/docs/필드인터페이스정의서.md</span> 는 아직 <b>v0.2(2026-09-02)</b> 이고
               §4.3 · §5.1 · §6.3 에 stage 가 남아 있다 — v0.3 반영 필요 <span class="chip chip--warn">미반영</span></li>
             <li>이미 구현된 조립공장뷰 FR-5 는 레거시 <span class="mono">bayStage</span>(송선 현공정 코드)로 공정 단계를 쓴다.
@@ -1281,8 +1281,8 @@ changedAt  raw_payload.occurred_at                        <span class="cm"># 도
         태그로 재설계했고, 그 스키마(§6.3·§6.4)에는 <span class="mono">id</span>라는 이름의 필드 자체가 없다 —
         <span class="mono">MqttPayloadParser.Parse</span>는 최상위에 <span class="mono">id</span> 문자열이 없으면
         메시지를 통째로 버리므로(로그도 없음), 그 스키마 그대로 발행하면 <b>태그가 0개</b> 나온다. 상세 분석은
-        <span class="mono">latest/docs/lidar-topic-tag-respec.html</span> §04·§07, 실제 토픽 개수까지 반영한 결론은
-        <span class="mono">latest/docs/message.md</span> 참고 — 이 문서는 "지금 동작하는 것"을 다루고, 그 둘은
+        <span class="mono">docs/lidar/lidar-topic-tag-respec.html</span> §04·§07, 실제 토픽 개수까지 반영한 결론은
+        <span class="mono">docs/lidar/message.md</span> 참고 — 이 문서는 "지금 동작하는 것"을 다루고, 그 둘은
         "v0.3에 맞추려면 무엇을 더 정해야 하는지"를 다룬다.
       </div>
     </section>
