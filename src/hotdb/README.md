@@ -1,7 +1,7 @@
 # HotDB — 파란 영역 구현 (Hot DB · 실적 판별 모듈 · RFC Service · DB Agent)
 
 설계 근거는 [`docs/hotdb/BRD.md`](../../docs/hotdb/BRD.md). 구현 설명 · 시나리오 · 측정은
-[`hotdb-cdc-implementation.html`](../../docs/hotdb/hotdb-cdc-implementation.html), 표 · 컬럼 · 필드 흐름은
+[구현 문서 (아티팩트)](https://claude.ai/artifact/GEF6mg1qMZ2PxgKkJpvZQj), 표 · 컬럼 · 필드 흐름은
 [`hotdb-schema-dataflow.html`](../../docs/hotdb/hotdb-schema-dataflow.html) (브라우저로 연다).
 
 ![HotDB 구조](../../docs/hotdb/img/hotdb-architecture-2026-10-06.png)
