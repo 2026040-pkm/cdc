@@ -1,0 +1,3 @@
+[
+  { "targets": ["legacy-exporter:9187"], "labels": { "server": "local" } }
+]

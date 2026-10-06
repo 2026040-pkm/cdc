@@ -1,0 +1,360 @@
+<div class="doc">
+
+  <aside class="side no-print">
+    <div class="side__brand"><span class="bar"></span><b>HotDB 스키마 · 데이터 흐름</b></div>
+    <p class="side__meta">v2.0 · 2026-10-06 · 마이그레이션 v8 기준</p>
+    <div class="side__toch"><span>목차</span><button id="bToc" type="button" aria-expanded="true">접기</button></div>
+    <ul class="toc"></ul>
+    <div class="side__foot">
+      <button id="bTheme" type="button">테마</button>
+      <button id="bPrint" type="button">인쇄</button>
+      <button id="bReset" type="button">체크 초기화</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <header class="doc-head">
+      <span class="kicker">Schema &amp; Data Flow</span>
+      <h1>필드 데이터는 tsdb 에 쌓이고, 판별 모듈 RDB 로 CDC 되어 다시 SAP 로 갑니다</h1>
+      <p class="sub">Hot DB(PostgreSQL 한 대)에 만들어진 스키마 · 표 · 컬럼 전체와, 필드 한 칸이 MQTT 메시지에서 tsdb 를 거쳐 판별 모듈 RDB · SAP 까지,
+        그리고 레거시(SAP · Oracle) 표가 폴링으로 Hot DB 에 들어오는 길을 적습니다. 표 정의는 손으로 옮긴 것이 아니라 <b>기동 중인 DB 에서 조회해 생성</b>했습니다<sup class="ref" data-ref="1">1</sup>.</p>
+      <div class="meta">
+        <span class="chip chip--info">스키마 10 · 계정 10 · publication 2 · 슬롯 5</span>
+        <span class="chip">tsdb 5표 · 판별 모듈 5표 × 4 (관계형) · ops 5표 · 레거시 178표</span>
+        <span class="chip chip--neutral">Flyway v8 · TimescaleDB 2.29.2 · PG 17.11</span>
+        <span class="chip chip--warn">페이로드는 ISL 벤더 합의 전 제안 규격</span>
+      </div>
+    </header>
+
+    <!-- 00 -->
+    <section class="sec" id="s0">
+      <h2><span class="n">00</span>이 문서를 읽는 법</h2>
+      <p class="why">스키마가 바뀌면 손으로 고치지 않고 <span class="mono">bash src/hotdb/scripts/schema-doc/make.sh</span> 로 다시 만듭니다 (기동 중인 HotDB 를 조회).</p>
+      <div class="g2">
+        <div class="card card--accent">
+          <p class="card__t">담은 것</p>
+          <ul style="margin:6px 0 0">
+            <li>데이터가 들어와서 나가기까지의 전체 경로 (§01)</li>
+            <li>스키마별 주인 · 독자 · CDC 여부와 계정 권한 (§02)</li>
+            <li>tsdb · 권역 RDB · ops 표의 컬럼 전부 — 타입 · NULL · PK · 기본값 (§03 · §05 · §06)</li>
+            <li>필드 단위 계보: MQTT 필드 → tsdb 컬럼 → 권역 컬럼 (§04)</li>
+            <li>CDC 경로의 publication · 슬롯 · 시간 컬럼 (§07), 레거시 표 목록 (§08)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <p class="card__t">담지 않은 것</p>
+          <ul style="margin:6px 0 0">
+            <li>레거시 표의 컬럼 상세 · 주석 — 원본 덤프에 실데이터와 실명이 섞여 있어 표 이름 · PK 까지만</li>
+            <li>CDC 엔진 · 라우트 문법 · 테스트 — <span class="mono">hotdb-cdc-implementation.html</span></li>
+            <li>설계 결정의 이유 — <span class="mono">BRD.md</span></li>
+          </ul>
+        </div>
+      </div>
+      <figure class="shot">
+        <img src="@@IMG@@" alt="HotDB 구조 — 파란 영역: Hot DB(Legacy RDB sap · oracle · TSDB · RDB field data), RFC Service, DB Agent, 실적 판별 모듈">
+        <figcaption>목표 구조 (2026-10-06 갱신). Hot DB 의 네 칸 = 이 문서의 스키마 — Legacy RDB sap = <span class="mono">erp</span> · Legacy RDB oracle = <span class="mono">mes · lgs · geo</span> (둘은 별도 레거시 DB) · TSDB field data = <span class="mono">tsdb</span> · RDB field data = <span class="mono">svc</span></figcaption>
+      </figure>
+      <div class="note note--info">
+        <p class="note__t">판별 모듈 표는 하나만 적습니다</p>
+        판별 모듈의 RDB 는 스키마 <span class="mono">svc</span> 하나입니다(V9). 모든 표에 <span class="mono">module</span> 컬럼이 있고, 행 수준 보안이 계정 <span class="mono">svc_&lt;모듈&gt;</span> 에게 자기 행만 보이게 합니다.
+        모듈은 <span class="mono">ops.provision_module()</span> 로 늘립니다. 레거시 표(erp · mes · lgs · geo)는 별도 레거시 DB 에 있습니다(V10). 레거시 표는 이름 · 값을 지어낸 시험용 178표입니다.
+      </div>
+    </section>
+
+    <!-- 01 -->
+    <section class="sec" id="s1">
+      <h2><span class="n">01</span>데이터 흐름 전체</h2>
+      <p class="why">카드에 마우스를 올리면 그 카드에 붙은 선만 남습니다. 흐린 카드는 범위 밖(HotDB Provider)입니다.</p>
+@@FLOW:all@@
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:4%">#</th><th style="width:20%">구간</th><th style="width:20%">누가</th><th style="width:20%">어디에 쓰나</th><th style="width:16%">주기 · 양 (×1)</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>장비 → MQTT 브로커 → MQTT Agent</td><td>MQTT Agent (ISL4 Agent)</td><td class="mono">ot/device · ot/sensor · ot/pipeline → 태그</td><td>≈ 426 msg/초</td><td><span class="chip chip--neutral">기존</span></td></tr>
+            <tr><td>2</td><td>MQTT Agent → tsdb</td><td>HotDB Provider</td><td class="mono">tsdb.*_history</td><td>≈ 3,680만 행/일</td><td><span class="chip chip--neutral">범위 밖 · 발행기가 대신</span></td></tr>
+            <tr><td>3</td><td>tsdb → 판별 모듈 RDB</td><td>실적 판별 모듈 ×N (CDC)</td><td class="mono">svc.*</td><td>p99 0.10 ~ 0.26초 지연</td><td><span class="chip chip--ok">구현</span></td></tr>
+            <tr><td>4</td><td>모듈 RDB → SAP</td><td>RFC Service ② (CDC)</td><td>SAP Z 표 <span class="mono">zhotdb_actual_result</span></td><td>실적 · 판정당 한 번</td><td><span class="chip chip--ok">구현</span> 로컬은 SAP 대역</td></tr>
+            <tr><td>5</td><td>SAP → 레거시 DB</td><td>RFC Service ① (폴링)</td><td class="mono">erp.*</td><td>작업 3개 · 60초 / 10초</td><td><span class="chip chip--ok">구현</span> 로컬은 SAP 대역</td></tr>
+            <tr><td>6</td><td>Oracle → 레거시 DB</td><td>DB Agent (폴링)</td><td class="mono">mes · lgs · geo</td><td>작업 64개(PK 없는 24개는 replace) · 60초 / 10초</td><td><span class="chip chip--ok">구현</span> 로컬은 Oracle 대역</td></tr>
+          </tbody>
+        </table>
+      </div>
+@@FLOW:rel@@
+    </section>
+
+    <!-- 02 -->
+    <section class="sec" id="s2">
+      <h2><span class="n">02</span>스키마 지도와 계정</h2>
+      <p class="why">영역마다 쓰는 주체는 하나입니다. 남의 영역에 쓰는 것은 계정 권한이 막습니다 (통합 테스트 <span class="mono">HotdbSchemaIT</span> 로 확인).</p>
+      <h3>전체 스키마 지도 — 그림의 Hot DB 네 칸</h3>
+      <p class="small">카드 하나 = 스키마 하나. 위 줄 네 장이 그림의 Legacy RDB sap · Legacy RDB oracle · TSDB field data · RDB field data 입니다.
+        카드 아래 칩은 쓰는 쪽 · 계정 · CDC 로 내보내는 publication, 표 옆의 <span class="mono">→</span> 는 FK 의 부모입니다.</p>
+@@SMAP@@
+
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:17%">스키마</th><th style="width:21%">담는 것</th><th style="width:15%">쓰는 계정</th><th style="width:20%">읽는 계정</th><th style="width:13%">publication</th><th>만드는 곳</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">tsdb</td><td>필드 데이터 5표</td><td class="mono">hotdb_provider</td><td class="mono">svc_reader · hotdb_monitor</td><td class="mono">tsdb_cdc_pub</td><td class="mono">V2</td></tr>
+            <tr><td class="mono">_timescaledb_internal</td><td>하이퍼테이블 청크 (TimescaleDB 내부)</td><td>(tsdb 쓰기가 여기로)</td><td>—</td><td class="mono">tsdb_cdc_pub</td><td>TimescaleDB</td></tr>
+            <tr><td class="mono">svc</td><td>판별 모듈 RDB 5표 (관계형 · module 컬럼)</td><td>svc_writer — 행 수준 보안으로 자기 모듈 행만</td><td class="mono">rfc_provider · hotdb_monitor</td><td class="mono">svc_cdc_pub</td><td class="mono">V9</td></tr>
+            <tr><td class="mono">ops</td><td>module · rfc_sent · heartbeat · dead letter · flyway 이력</td><td>CDC 소비자 · 에이전트 · 관리자</td><td class="mono">hotdb_monitor</td><td>heartbeat 만</td><td class="mono">V4 · V6 · V7</td></tr>
+            <tr><td class="mono">erp (레거시 DB)</td><td>SAP 사본 · 시험용 114표</td><td class="mono">rfc_agent</td><td class="mono">hotdb_monitor</td><td>—</td><td class="mono">legacy-db V2</td></tr>
+            <tr><td class="mono">mes · lgs · geo (레거시 DB)</td><td>Oracle 사본 · 시험용 64표</td><td class="mono">db_agent</td><td class="mono">hotdb_monitor</td><td>—</td><td class="mono">legacy-db V2</td></tr>
+            <tr><td class="mono">public</td><td>TimescaleDB 함수</td><td>CREATE 금지</td><td>모두 (USAGE)</td><td>—</td><td class="mono">V1 · V5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>계정 권한 행렬</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:17%">계정</th><th style="width:10%">로그인 · 복제</th><th>tsdb</th><th>자기 svc_*</th><th>남의 svc_*</th><th>ops</th><th>레거시</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">hotdb_provider</td><td>O · X</td><td>SELECT · INSERT · (device · tag_catalog UPDATE)</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td class="mono">svc_asm 등 4 (svc_writer)</td><td>O · O</td><td>SELECT</td><td>SELECT · INSERT · UPDATE · DELETE</td><td>—</td><td>heartbeat 쓰기 · dead letter INSERT</td><td>SELECT</td></tr>
+            <tr><td class="mono">svc_reader</td><td>X · X</td><td colspan="5">위 권역 계정 넷이 공통으로 받는 읽기 묶음 (역할)</td></tr>
+            <tr><td class="mono">rfc_provider</td><td>O · O</td><td>—</td><td colspan="2">모듈 전부 SELECT (CDC)</td><td>heartbeat · dead letter · rfc_sent 쓰기</td><td>—</td></tr>
+            <tr><td class="mono">rfc_agent</td><td>O · X</td><td>—</td><td>—</td><td>—</td><td>—</td><td>레거시 DB 만: <span class="mono">erp</span> · poll_state 쓰기 (RFC Service ①)</td></tr>
+            <tr><td class="mono">db_agent</td><td>O · X</td><td>—</td><td>—</td><td>—</td><td>—</td><td>레거시 DB 만: <span class="mono">mes · lgs · geo</span> · poll_state 쓰기 (DB Agent)</td></tr>
+            <tr><td class="mono">hotdb_monitor</td><td>O · X</td><td>SELECT</td><td colspan="2">SELECT</td><td>SELECT</td><td>SELECT · <span class="mono">pg_monitor</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--warn"><p class="note__t">비밀번호</p>V1 은 로컬용으로 계정명 = 비밀번호입니다. 서버에 올릴 때 <span class="mono">ALTER ROLE … PASSWORD</span> 로 바꿉니다.</div>
+    </section>
+
+    <!-- 03 -->
+    <section class="sec" id="s3">
+      <h2><span class="n">03</span>tsdb — 필드 데이터</h2>
+      <p class="why">세 채널(status · actual · artifact)을 채널별 하이퍼테이블에 둡니다. "출처" 칸은 태그 카탈로그 v1 의 실제 발행 필드입니다<sup class="ref" data-ref="2">2</sup>.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:22%">하이퍼테이블</th><th style="width:12%">청크</th><th style="width:14%">압축</th><th style="width:12%">보존</th><th style="width:16%">segmentby · orderby</th><th>CHECK 제약</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">status_history</td><td>6시간</td><td>7일 뒤</td><td>90일</td><td class="mono small">tag_key · event_time DESC</td><td>status 4종 · scan_rate ≥ 0</td></tr>
+            <tr><td class="mono">actual_history</td><td>1일</td><td>7일 뒤</td><td>90일</td><td class="mono small">tag_key · event_time DESC</td><td>event_type 3종 · 진척률 0~100 · 신뢰도 0~1</td></tr>
+            <tr><td class="mono">artifact_history</td><td>1일</td><td>7일 뒤</td><td>90일</td><td class="mono small">tag_key · event_time DESC</td><td>종류 3종 · SEGMENTED 만 segment_key · MATRIX 는 16원소 · 나머지는 storage_uri 필수</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note note--risk"><p class="note__t">압축을 7일 뒤로 미룬 이유</p>
+        압축은 원본 청크의 행을 이벤트 없이 비웁니다. 권역 서비스가 아직 읽지 않은 행이 압축되면 그 행은 CDC 로 나오지 않습니다.
+        TimescaleDB 2.29 가 자동으로 붙이는 기본 압축 정책은 V2 에서 지우고 7일로 다시 겁니다.</div>
+<h3>연관관계 — 컬럼 단위 ER</h3>
+@@ER_TSDB@@
+@@T:tsdb.device@@
+@@T:tsdb.tag_catalog@@
+@@T:tsdb.status_history@@
+@@T:tsdb.actual_history@@
+@@T:tsdb.artifact_history@@
+      <p class="small">외래키: 이력 3표 <span class="mono">tag_key → tag_catalog.tag_key</span>, <span class="mono">tag_catalog (site, device_id) → device</span>.
+        인덱스: 하이퍼테이블마다 <span class="mono">event_time DESC</span>(자동), actual · artifact 는 <span class="mono">scan_id</span>.</p>
+    </section>
+
+    <!-- 04 -->
+    <section class="sec" id="s4">
+      <h2><span class="n">04</span>필드 단위 흐름 — MQTT 에서 판별 모듈 RDB · SAP 까지</h2>
+      <p class="why">필드 하나가 어느 표 어느 컬럼으로 가는지, 그리고 어디서 버려지는지입니다. 이 표가 바뀌면 V 마이그레이션과 라우트 설정을 함께 고칩니다.</p>
+@@FLOW:status@@
+
+      <h3>tsdb → RDB → SAP 새 표 — 컬럼이 옮겨 가는 길</h3>
+@@ER_SAP@@
+      <h3>status — <span class="mono">ot/device/{zone}/status</span> · 1초 · 장비당 1행</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:26%">MQTT 필드</th><th style="width:26%">tsdb</th><th style="width:26%">svc_* (라우트)</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">id</td><td class="mono">tag_catalog.source_id · device.device_id</td><td class="mono">device_status_current.device_id · change.device_id</td><td>이력엔 <span class="mono">tag_key</span> 만, 권역 표는 lookup 으로 되돌림</td></tr>
+            <tr><td class="mono">site · zone · shop · bay · device_role</td><td class="mono">device.*</td><td>— (zone 은 거르는 데만)</td><td>1초마다 안 바뀌어 이력에 안 실음</td></tr>
+            <tr><td class="mono">status</td><td class="mono">status_history.status</td><td class="mono">current.status · change.status</td><td>change 는 바뀔 때만</td></tr>
+            <tr><td class="mono">error_code</td><td class="mono">status_history.error_code</td><td class="mono">current.error_code · change.error_code</td><td></td></tr>
+            <tr><td class="mono">last_heartbeat_at · scan_rate_pts_per_sec · temperature_c · connectivity_rssi · fov_mode</td><td class="mono">status_history.(같은 이름)</td><td class="mono">current.(같은 이름)</td><td>change 에는 없음</td></tr>
+            <tr><td class="mono">occurred_at</td><td class="mono">event_time + source_time_text</td><td class="mono">current.src_event_time · change.changed_at</td><td>원문 7자리는 source_time_text 에만</td></tr>
+            <tr><td class="mono">ingested_at</td><td class="mono">source_ingested_at</td><td>—</td><td></td></tr>
+            <tr><td>(Provider 수신)</td><td class="mono">received_at</td><td class="mono">src_received_at</td><td>지연 기준점</td></tr>
+            <tr><td class="mono">idempotency_key</td><td>— 버림</td><td>—</td><td>PK (tag_key, event_time) 충돌이 대신 판정</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>actual — <span class="mono">ot/sensor/{zone}/actual</span> · 1분 · 장비당 1행</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:26%">MQTT 필드</th><th style="width:26%">tsdb</th><th style="width:26%">svc_* (라우트)</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">id</td><td class="mono">tag_key 로</td><td class="mono">scan.device_id · actual_result.device_id</td><td>lookup</td></tr>
+            <tr><td class="mono">scan_id</td><td class="mono">actual_history.scan_id</td><td class="mono">scan.scan_id · actual_result.scan_id</td><td>artifact 와 조인 키</td></tr>
+            <tr><td class="mono">event_type</td><td class="mono">event_type</td><td class="mono">scan.last_event_type</td><td>COMPLETE 만 actual_result 로</td></tr>
+            <tr><td class="mono">hull_no · block_id</td><td class="mono">hull_no · block_id</td><td class="mono">scan · actual_result</td><td>실적 키</td></tr>
+            <tr><td class="mono">block_progress_rate · match_confidence · reference_cad_id · model_version</td><td class="mono">(같은 이름)</td><td class="mono">scan · actual_result (같은 이름)</td><td>scan 은 매번 덮음, actual_result 는 COMPLETE 시점 값</td></tr>
+            <tr><td class="mono">occurred_at</td><td class="mono">event_time</td><td class="mono">scan.first_event_at (keep) · last_event_at · completed_at · actual_result.completed_at</td><td>first 는 START 시각이 남음</td></tr>
+            <tr><td class="mono">scanned_at</td><td class="mono">scanned_at</td><td>—</td><td></td></tr>
+            <tr><td class="mono">zone · site · shop · bay · record_type · input_method · source_system · idempotency_key</td><td>— 버림</td><td>—</td><td>위치는 device 에, 나머지는 고정값</td></tr>
+            <tr><td>(판별 로직)</td><td>—</td><td class="mono">actual_result.judged_status</td><td>지금은 PENDING 고정 · 2단계</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>artifact — <span class="mono">ot/pipeline/{zone}/artifact</span> · 1분 · 스캔당 12행</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:26%">MQTT 필드</th><th style="width:26%">tsdb</th><th style="width:26%">svc_* (라우트)</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">id (…-REGISTERED_PCD 등)</td><td class="mono">tag_key 로 (종류별 태그)</td><td class="mono">artifact.device_id</td><td>접미사 뗀 장비 id</td></tr>
+            <tr><td class="mono">scan_id · artifact_type</td><td class="mono">(같은 이름)</td><td class="mono">artifact (같은 이름)</td><td>PK 일부</td></tr>
+            <tr><td class="mono">segment_id</td><td class="mono">segment_key</td><td class="mono">artifact.segment_key</td><td>null → '' · SEG-01 ~ SEG-10</td></tr>
+            <tr><td class="mono">hull_no · block_id · storage_uri · file_size_bytes · checksum · produced_by_device_id · model_version</td><td class="mono">(같은 이름)</td><td class="mono">artifact (같은 이름)</td><td>파일 본체는 NAS · DB 엔 위치만</td></tr>
+            <tr><td class="mono">transformation_matrix</td><td class="mono">real[]</td><td class="mono">artifact.transformation_matrix real[]</td><td>16원소 그대로</td></tr>
+            <tr><td class="mono">occurred_at</td><td class="mono">event_time</td><td class="mono">artifact.src_event_time</td><td></td></tr>
+            <tr><td class="mono">zone · site · shop · bay</td><td>— 버림</td><td>—</td><td>device 에 있음</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section class="sec" id="s5">
+      <h2><span class="n">05</span>svc_&lt;모듈&gt; — 판별 모듈 RDB (관계형)</h2>
+      <p class="why">"값 식" 칸은 <span class="mono">zone-service/src/main/resources/application.yml</span> 의 라우트 그대로입니다<sup class="ref" data-ref="3">3</sup>. <span class="mono">row.</span> = tsdb 행, <span class="mono">tag.</span> = 태그 lookup, <span class="mono">$now</span> = DB 시각.</p>
+<h3>연관관계 — 컬럼 단위 ER</h3>
+@@ER_RDB@@
+@@T:svc.device_status_current@@
+@@T:svc.device_status_change@@
+@@T:svc.scan@@
+@@T:svc.actual_result@@
+@@T:svc.artifact@@
+      <div class="note note--info"><p class="note__t">관계와 도착 순서</p>
+        모듈 안 FK(<span class="mono">device_status_change → current</span>, <span class="mono">actual_result · artifact → scan</span>)는 <span class="mono">DEFERRABLE INITIALLY DEFERRED</span> 라 커밋 때 검사합니다.
+        한 배치는 라우트 설정 순서(부모 먼저)로 쓰고, 산출물이 START 보다 먼저 오면 <span class="mono">scan-stub</span> 라우트가 <span class="mono">last_event_at = -infinity</span> · <span class="mono">PENDING</span> 인 부모 자리를 먼저 만듭니다.
+        장비 마스터 FK(<span class="mono">(site, device_id) → tsdb.device</span>)는 즉시 검사 — 장비 행은 이력보다 항상 먼저 있습니다(tag_catalog FK).</div>
+      <p class="small">인덱스: <span class="mono">device_status_current (applied_at)</span> · <span class="mono">scan (hull_no, block_id)</span> · <span class="mono">scan (device_id)</span> · <span class="mono">actual_result (scan_id)</span> · <span class="mono">artifact (applied_at)</span>.
+        모듈 사이 · 레거시와는 FK 없이 키 값(<span class="mono">hull_no · block_id</span>)으로 잇습니다.</p>
+    </section>
+
+    <!-- 06 -->
+    <section class="sec" id="s6">
+      <h2><span class="n">06</span>ops — CDC 운영</h2>
+      <p class="why">데이터가 아니라 파이프라인의 상태를 담습니다.</p>
+@@T:ops.cdc_heartbeat@@
+@@T:ops.cdc_dead_letter@@
+@@T:ops.module@@
+@@T:ops.poll_state@@
+@@T:ops.rfc_sent@@
+      <p class="small"><span class="mono">ops.flyway_schema_history</span> 는 Flyway 가 관리합니다 — 어떤 V · R 파일이 언제 적용됐는지.</p>
+    </section>
+
+    <!-- 07 -->
+    <section class="sec" id="s7">
+      <h2><span class="n">07</span>CDC 경로 — publication · 슬롯 · 시간 컬럼</h2>
+      <p class="why">CDC 는 표가 아니라 publication 과 슬롯으로 정해집니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:16%">publication</th><th style="width:34%">실린 것</th><th style="width:22%">읽는 슬롯</th><th>소비자가 거르는 것</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">tsdb_cdc_pub</td><td><span class="mono">tsdb.device · tsdb.tag_catalog · ops.cdc_heartbeat</span> + 스키마째 <span class="mono">_timescaledb_internal</span> (청크 · 압축 뭉치 · bgw 통계)</td><td class="mono">zone_&lt;모듈&gt; (지금 zone_mch · asm · oft · pnt)</td><td>include 정규식 <span class="mono">_hyper_[0-9]+_[0-9]+_chunk</span> 만 — 압축 뭉치 · bgw 버림</td></tr>
+            <tr><td class="mono">svc_cdc_pub</td><td>모듈마다 <span class="mono">svc_&lt;모듈&gt;.actual_result</span> 만 (V6 · <span class="mono">provision_module</span> 이 더함) + <span class="mono">ops.cdc_heartbeat</span></td><td class="mono">rfc_provider</td><td>include 정규식 <span class="mono">svc_[a-z][a-z0-9]*\.actual_result</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>시간 컬럼 — 한 행이 지나는 네 시각</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:24%">컬럼</th><th style="width:16%">어느 표</th><th style="width:20%">누구 시계</th><th>뜻</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">event_time (src_event_time)</td><td>tsdb · svc_*</td><td>장비 · 추론 WS</td><td>일이 일어난 시각 (occurred_at). 최신값 판정 기준</td></tr>
+            <tr><td class="mono">source_ingested_at</td><td>tsdb</td><td>Edge 발행기</td><td>MQTT 로 보낸 시각</td></tr>
+            <tr><td class="mono">received_at (src_received_at)</td><td>tsdb · svc_*</td><td>HotDB</td><td>tsdb 에 들어온 시각 — 지연 측정 시작점</td></tr>
+            <tr><td class="mono">applied_at</td><td>svc_*</td><td>HotDB</td><td>권역 표에 반영된 시각. <span class="mono">applied_at - src_received_at</span> = CDC 지연 (같은 DB 시계라 서버 시계 편차 없음)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 08 -->
+    <section class="sec" id="s8">
+      <h2><span class="n">08</span>레거시 스키마와 폴링</h2>
+      <p class="why">레거시 표는 별도 레거시 DB(<span class="mono">hotdb-legacy-db</span>)에 있고, 폴링 경로를 시험하려고 지어낸 표입니다 — 이름 · 컬럼 · 값은 지어냈고 표 수 · PK · 컬럼 수만 실제와 비슷합니다(<span class="mono">scripts/gen-sample-legacy.py</span>). 데이터는 RFC Service · DB Agent 가 폴링으로 채웁니다<sup class="ref" data-ref="4">4</sup>.</p>
+@@LEGACY@@
+      <h3>폴링 작업 — 원천 표 → 레거시 DB 표 (예시 7개 — DB Agent 는 Oracle 사본 64표 전부, poll-jobs.yml)</h3>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:15%">에이전트</th><th style="width:22%">원천 (로컬 대역)</th><th style="width:18%">대상</th><th style="width:22%">워터마크</th><th>주기</th></tr></thead>
+          <tbody>
+            <tr><td>RFC Service ①</td><td class="mono">erpsrc.item</td><td class="mono">erp.item</td><td class="mono">upd_date || upd_time</td><td>60초</td></tr>
+            <tr><td>RFC Service ①</td><td class="mono">erpsrc.part</td><td class="mono">erp.part</td><td class="mono">upd_date || upd_time</td><td>60초</td></tr>
+            <tr><td>RFC Service ①</td><td class="mono">erpsrc.order_line</td><td class="mono">erp.order_line</td><td class="mono">upd_date || upd_time</td><td>10초</td></tr>
+            <tr><td>DB Agent</td><td class="mono">MES.WORK_LOG</td><td class="mono">mes.work_log</td><td class="mono">upd_date || upd_time</td><td>60초</td></tr>
+            <tr><td>DB Agent</td><td class="mono">MES.ALARM</td><td class="mono">mes.alarm</td><td class="mono">upd_date || upd_time</td><td>60초</td></tr>
+            <tr><td>DB Agent</td><td class="mono">LGS.SHIPMENT</td><td class="mono">lgs.shipment</td><td class="mono">upd_date || upd_time</td><td>60초</td></tr>
+            <tr><td>DB Agent</td><td class="mono">LGS.TRACKING</td><td class="mono">lgs.tracking</td><td class="mono">upd_date || upd_time</td><td>10초</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small">컬럼은 원천 · 대상 양쪽에 있는 것만 옮기고, 키는 대상 PK 입니다. 워터마크 이상(<span class="mono">&gt;=</span>)을 다시 읽어 UPSERT 하고 모든 행을 쓴 뒤 <span class="mono">ops.poll_state</span> 에 저장합니다.
+        작업 목록은 <span class="mono">app/rfc-provider</span> · <span class="mono">app/db-agent</span> 의 <span class="mono">application.yml</span> (<span class="mono">hotdb.poll.jobs</span>) .</p>
+      <div class="note note--info"><p class="note__t">컬럼 타입</p>시험용 표는 <span class="mono">text · numeric · date</span> 셋만 씁니다. 실제 원천에 붙일 때는 표마다 증분 기준 컬럼(변경 일시)을 정해 작업 목록만 바꿉니다.</div>
+    </section>
+
+    <!-- 09 -->
+    <section class="sec" id="s9">
+      <h2><span class="n">09</span>참고 자료</h2>
+      <ol class="refs">
+        <li id="ref-1"><span class="refs__n">1</span><span><span class="refs__src">표 정의 원자료</span>
+          <span class="refs__meta">run · 2026-10-06 hotdb-pg 의 information_schema · pg_constraint · timescaledb_information 조회 (Flyway v5 적용 상태) · 원본 SQL src/hotdb/db/migration/V1~V5</span></span></li>
+        <li id="ref-2"><span class="refs__n">2</span><span><span class="refs__src">MQTT → Agent 태그 카탈로그 v1</span>
+          <span class="refs__meta">doc · docs/backup/latest/mqtt-agent-tag-catalog.html (2026-09-22) — 필드 정의서 §6.2~§6.4 제안 규격, ISL 벤더 합의 전</span></span></li>
+        <li id="ref-3"><span class="refs__n">3</span><span><span class="refs__src">권역 서비스 라우트</span>
+          <span class="refs__meta">code · src/hotdb/app/zone-service/src/main/resources/application.yml</span></span></li>
+        <li id="ref-4"><span class="refs__n">4</span><span><span class="refs__src">레거시 DB 시험용 표</span>
+          <span class="refs__meta">code · src/hotdb/db/legacy-db/V2__sample_tables.sql · scripts/legacy-sim.py (대역 원천 시드)</span></span></li>
+        <li id="ref-5"><span class="refs__n">5</span><span><span class="refs__src">구현 문서 · BRD</span>
+          <span class="refs__meta">doc · docs/hotdb/hotdb-cdc-implementation.html · docs/hotdb/BRD.md v0.2</span></span></li>
+      </ol>
+    </section>
+
+    <!-- 10 -->
+    <section class="sec" id="gloss">
+      <h2><span class="n">10</span>용어</h2>
+      <p class="why">이 문서의 스키마 · 계정 · 컬럼 이름입니다. 이름이 바뀌면 이 표부터 고칩니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl gloss">
+          <thead><tr><th style="width:20%">용어</th><th style="width:11%">종류</th><th style="width:33%">뜻</th><th>이 문서에서</th></tr></thead>
+          <tbody>
+            <tr class="gloss__g"><td colspan="4">스키마</td></tr>
+            <tr><td>tsdb</td><td>스키마</td><td>time-series DB. 필드 데이터</td><td>CDC 원천. hotdb_provider 만 씀</td></tr>
+            <tr><td>svc_&lt;모듈&gt;</td><td>스키마</td><td>svc = service. 판별 모듈 RDB — mch 가공(machining) · asm 조립(assembly) · oft 의장(outfitting) · pnt 도장(painting)</td><td>그 모듈만 씀 · 그림의 RDB field data</td></tr>
+            <tr><td>ops.module · provision_module</td><td>표 · 함수</td><td>판별 모듈 등록부 · 모듈 만들기</td><td>한 줄로 스키마 · 계정 · 표 · FK · publication</td></tr>
+            <tr><td>ops.poll_state</td><td>표</td><td>폴링 작업 상태</td><td>워터마크 · 마지막 성공 · 오류</td></tr>
+            <tr><td>워터마크</td><td>개념</td><td>어디까지 읽었는지</td><td><span class="mono">upd_date || upd_time</span> (최종 수정 일자 · 시각)</td></tr>
+            <tr><td>scan-stub</td><td>라우트</td><td>부모 스캔 자리를 먼저 만드는 라우트</td><td>산출물이 START 보다 먼저 올 때 · PENDING</td></tr>
+            <tr><td>RFC Service · DB Agent</td><td>서비스</td><td>그림의 O-8 · O-6</td><td>rfc-provider · db-agent 모듈</td></tr>
+            <tr><td>Z 표 (zhotdb_actual_result)</td><td>SAP</td><td>SAP 고객 정의 표</td><td>RFC Service ② 가 실적을 쓰는 곳 · PK = 실적 키 + 판정</td></tr>
+            <tr><td>ops</td><td>스키마</td><td>operations</td><td>heartbeat · dead letter · flyway 이력</td></tr>
+            <tr><td>_timescaledb_internal</td><td>스키마</td><td>TimescaleDB 내부. 청크가 사는 곳</td><td>publication 에 스키마째 실림</td></tr>
+            <tr><td>erp · mes · lgs · geo</td><td>스키마</td><td>레거시 DB 의 시험용 사본 (지어낸 이름)</td><td>erp = SAP 사본 · mes = Oracle 생산 쪽 · lgs = Oracle 물류 쪽 · geo = Oracle 구역 지도</td></tr>
+            <tr><td>erpsrc</td><td>스키마</td><td>SAP 대역의 원천 스키마</td><td>폴링 원천 표 · Z 표가 있는 곳 (로컬)</td></tr>
+            <tr class="gloss__g"><td colspan="4">컬럼 · 값</td></tr>
+            <tr><td>tag_key</td><td>컬럼</td><td>태그 등록부의 숫자 키</td><td>이력 행의 유일한 장비 단서. lookup 으로 장비 · 권역을 풂</td></tr>
+            <tr><td>tag_id</td><td>컬럼</td><td>Mqtt.Agent 가 만드는 문자열 태그</td><td>{id}.{토픽}.raw_payload</td></tr>
+            <tr><td>scan_id</td><td>컬럼</td><td>스캔 1회 식별자 (uuid)</td><td>actual · artifact · scan · actual_result 를 잇는 키</td></tr>
+            <tr><td>segment_key</td><td>컬럼</td><td>세그먼트 id. null 은 ''</td><td>PK 에 null 을 못 넣어 정규화</td></tr>
+            <tr><td>hull_no · block_id</td><td>컬럼</td><td>호선 · 블록</td><td>실적의 업무 키</td></tr>
+            <tr><td>judged_status</td><td>컬럼</td><td>실적 판별 결과</td><td>PENDING 고정 · 판별 로직 2단계</td></tr>
+            <tr><td>event_time · received_at · applied_at</td><td>컬럼</td><td>발생 · 수신 · 반영 시각</td><td>§07 시간 컬럼</td></tr>
+            <tr class="gloss__g"><td colspan="4">계정 · CDC</td></tr>
+            <tr><td>hotdb_provider</td><td>계정</td><td>tsdb 적재</td><td>지금은 발행기가 씀</td></tr>
+            <tr><td>svc_reader</td><td>역할</td><td>권역 계정 공통 읽기 묶음</td><td>tsdb SELECT</td></tr>
+            <tr><td>rfc_agent · db_agent · rfc_provider</td><td>계정</td><td>레거시 유입 · 유출</td><td>RFC Service ①(erp) · DB Agent(mes · lgs · geo) · RFC Service ②(CDC)</td></tr>
+            <tr><td>hotdb_monitor</td><td>계정</td><td>모니터링</td><td>postgres_exporter · Grafana DB 데이터소스</td></tr>
+            <tr><td>publication · 슬롯</td><td>PG</td><td>내보낼 표 묶음 · 소비자 위치</td><td>tsdb_cdc_pub · svc_cdc_pub · zone_{권역}</td></tr>
+            <tr><td>하이퍼테이블 · 청크</td><td>TimescaleDB</td><td>시간으로 나뉜 표 · 그 조각</td><td>WAL 에는 청크 이름(_hyper_N_M_chunk)으로 나옴</td></tr>
+            <tr><td>lookup (tag)</td><td>설정</td><td>tag_catalog ⋈ device 메모리 캐시</td><td>tag_key → device_id · zone</td></tr>
+            <tr><td>라우트</td><td>설정</td><td>원천 표 → 권역 표 규칙</td><td>§05 의 "값 식"</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>

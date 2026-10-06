@@ -218,3 +218,7 @@ latest/legacy-schema/oracle/
 # 생성기(tools/)와 결과 문서에도 조회 조건·호선·사번 같은 실데이터가 박혀 있어 통째로 뺀다
 latest/legacy-schema/
 latest/legacy-tables-by-domain.html
+
+### HotDB
+# 서버별 접속 정보
+src/hotdb/.env

@@ -1,0 +1,1 @@
+[ { "targets": ["podman-exporter:9882"], "labels": { "server": "local" } } ]

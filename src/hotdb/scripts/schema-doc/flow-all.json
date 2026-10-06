@@ -1,0 +1,34 @@
+{
+  "key": "schema-all-v2",
+  "title": "데이터 흐름 전체",
+  "hint": "주황 띠가 이번에 만든 것 · 회색은 바깥 시스템 · 흐린 카드는 범위 밖(HotDB Provider)",
+  "cols": "repeat(6, 1fr)",
+  "cells": [
+    {"type": "node", "id": "lidar", "col": 1, "row": 1, "title": "MQTT Agent", "sub": "장비 MQTT → 태그 · status 1초 · actual · artifact 1분", "ic": "broker", "role": "isl", "tag": "ISL4 Agent"},
+    {"type": "node", "id": "prov", "col": 2, "row": 1, "title": "HotDB Provider", "sub": "MQTT Agent 태그 → tsdb", "ic": "inbox", "role": "dim", "tag": "범위 밖"},
+    {"type": "node", "id": "sim", "col": 2, "row": 2, "title": "field-simulator", "sub": "Provider 대신 직접 적재", "ic": "send", "role": "new", "tag": "hotdb_provider"},
+    {"type": "node", "id": "tsdb", "col": 3, "row": 1, "rowspan": 2, "align": "center", "title": "tsdb", "sub": "device · tag_catalog · *_history 3", "ic": "db", "role": "store src", "tag": "tsdb_cdc_pub"},
+    {"type": "node", "id": "zone", "col": 4, "row": 1, "rowspan": 2, "align": "center", "title": "실적 판별 모듈 ×N", "sub": "가공 · 조립 · 의장 · 도장 — 자기 권역만", "ic": "code", "role": "new", "tag": "Debezium Embedded"},
+    {"type": "node", "id": "svc", "col": 5, "row": 1, "rowspan": 2, "align": "center", "title": "svc_<모듈>", "sub": "RDB field data · 관계형 5표", "ic": "db", "role": "store new", "tag": "svc_cdc_pub = 실적"},
+    {"type": "node", "id": "rfc", "col": 6, "row": 2, "rowspan": 2, "align": "center", "title": "RFC Service", "sub": "① SAP 폴링 → erp ② 실적 CDC → SAP", "ic": "link", "role": "new", "tag": "rfc-provider"},
+    {"type": "node", "id": "zsap", "col": 6, "row": 1, "title": "SAP Z 표", "sub": "zhotdb_actual_result", "ic": "server", "role": "isl", "tag": "SAP RDB field data"},
+    {"type": "node", "id": "sap", "col": 6, "row": 4, "title": "SAP HANA 원천", "sub": "YDEH050M · YDEH060M · YCPS301M …", "ic": "server", "role": "isl", "tag": "Legacy RDB sap"},
+    {"type": "node", "id": "erp", "col": 5, "row": 3, "title": "erp", "sub": "레거시 DB · 114표", "ic": "db", "role": "store", "tag": "rfc_agent"},
+    {"type": "node", "id": "ora", "col": 6, "row": 5, "title": "Oracle 원천", "sub": "생산 · 물류", "ic": "server", "role": "isl", "tag": "Legacy RDB oracle"},
+    {"type": "node", "id": "dba", "col": 5, "row": 5, "title": "DB Agent", "sub": "JDBC 폴링 · 워터마크", "ic": "retry", "role": "new", "tag": "db-agent"},
+    {"type": "node", "id": "mes", "col": 4, "row": 5, "title": "mes · lgs · geo", "sub": "레거시 DB · 64표", "ic": "db", "role": "store", "tag": "db_agent"}
+  ],
+  "links": [
+    {"from": "lidar", "to": "prov", "kind": "muted"},
+    {"from": "prov", "to": "tsdb", "kind": "muted"},
+    {"from": "sim", "to": "tsdb", "kind": "flow"},
+    {"from": "tsdb", "to": "zone", "kind": "flow"},
+    {"from": "zone", "to": "svc", "kind": "ok"},
+    {"from": "svc", "to": "rfc", "kind": "flow"},
+    {"from": "rfc", "to": "zsap", "kind": "ok", "port": "t>b"},
+    {"from": "sap", "to": "rfc", "kind": "flow", "port": "t>b"},
+    {"from": "rfc", "to": "erp", "kind": "ok"},
+    {"from": "ora", "to": "dba", "kind": "flow"},
+    {"from": "dba", "to": "mes", "kind": "ok"}
+  ]
+}

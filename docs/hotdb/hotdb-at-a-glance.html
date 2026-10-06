@@ -1,0 +1,2829 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HotDB 한눈에</title><style>
+.hero{display:flex;align-items:stretch;gap:10px;margin:14px 0 12px;flex-wrap:wrap}
+.hero__step{flex:1;min-width:150px;background:var(--bg);border:1px solid var(--line);border-top:4px solid var(--hw);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:3px}
+.hero__step b{font-size:22px;letter-spacing:-.01em}
+.hero__step span:last-child{color:var(--ink3);font-size:13.5px}
+.hero__step--alt{border-top-color:var(--info)}
+.hero__ar{align-self:center;font-size:26px;color:var(--hw);font-weight:700}
+.hero__sep{width:1px;background:var(--line2);margin:0 4px}
+.hero__n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--hw);color:#fff;font-size:12px;font-weight:700;margin-right:6px}
+.hero__step--alt .hero__n{background:var(--info)}
+.dbq{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:10px 0}
+@media (max-width:1100px){.dbq{grid-template-columns:repeat(2,1fr)}}
+.dbq__c{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border-top:5px solid var(--line2)}
+.dbq__c--field{border-top-color:var(--hw)}
+.dbq__c--rdb{border-top-color:var(--ok)}
+.dbq__c--sap{border-top-color:var(--info)}
+.dbq__c--ora{border-top-color:var(--warn)}
+.dbq__k{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase}
+.dbq__t{font-size:20px;font-weight:800;margin:2px 0 6px;line-height:1.2}
+.dbq__t small{display:block;font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--ink3);margin-top:2px}
+.dbq__d{margin:0 0 10px;font-size:14px;line-height:1.5}
+.dbq__io{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.dbq__io span{font-size:12.5px;border-radius:6px;padding:3px 8px}
+.dbq__io .in{background:var(--hw-pale);color:var(--hw-dp)}
+.dbq__io .out{background:var(--bg2);color:var(--ink2);border:1px solid var(--line)}
+.dbq__c ul{margin:0;padding-left:16px;font-size:13px;color:var(--ink2)}
+.trace{display:flex;align-items:stretch;gap:8px;margin:12px 0;flex-wrap:wrap}
+.trace__s{flex:1;min-width:140px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:6px}
+.trace__s--end{border-color:var(--ok);background:var(--ok-bg)}
+.trace__h{font-weight:700;font-size:13.5px;display:flex;align-items:center}
+.trace__v{font-size:13px;line-height:1.5}
+.trace__v b{font-family:var(--mono);font-size:12.5px}
+.trace__t{font-family:var(--mono);font-size:12px;color:var(--ink3);margin-top:auto}
+.trace__ar{align-self:center;color:var(--hw);font-weight:700;font-size:20px}
+
+.smap{border:2px solid var(--info);border-radius:14px;background:var(--info-bg);padding:12px 14px 10px;font-size:12.5px;color:var(--ink)}
+.smap__hd{display:flex;align-items:baseline;gap:10px;margin:0 0 10px}
+.smap__hd b{font-size:15px}
+.smap__hd .sp{flex:1}
+.smap__hd span{color:var(--ink3);font-size:12px}
+.smap__row{display:grid;gap:10px;margin-bottom:10px}
+.smap__row--4{grid-template-columns:1fr 1fr 1.15fr 1.25fr}
+.smap__row--3{grid-template-columns:1.6fr 1fr .8fr}
+.sbox{background:var(--bg);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;box-shadow:var(--shadow);position:relative;min-width:0}
+.sbox--cdc{border-top:4px solid var(--hw)}
+.sbox--multi{box-shadow:4px 4px 0 -1px var(--bg),4px 4px 0 0 var(--line2),8px 8px 0 -1px var(--bg),8px 8px 0 0 var(--line2),var(--shadow)}
+.sbox--sys{background:var(--bg2);border-style:dashed}
+.sbox__k{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+.sbox__n{font-family:var(--mono);font-weight:700;font-size:14px;margin:1px 0 4px;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.sbox__n small{font-family:var(--font);font-weight:600;font-size:11px;color:var(--ink3)}
+.sbox ul{list-style:none;margin:4px 0 6px;padding:0}
+.sbox li{display:flex;gap:6px;align-items:baseline;padding:2px 0;border-bottom:1px dotted var(--line)}
+.sbox li:last-child{border-bottom:0}
+.sbox li .t{font-family:var(--mono);font-size:11.5px;white-space:nowrap}
+.sbox li .d{color:var(--ink3);font-size:10.5px;margin-left:auto;text-align:right}
+.sbox li .fk{color:var(--hw-dk);font-family:var(--mono);font-size:10.5px;white-space:nowrap}
+.sbox li.ind{padding-left:12px}
+.sbox__w{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.sbox__w span{font-size:10.5px;border:1px solid var(--line2);border-radius:999px;padding:1px 7px;background:var(--bg2);white-space:nowrap}
+.sbox__w span.w{border-color:var(--hw-tint);background:var(--hw-pale);color:var(--hw-dp)}
+.sbox__w span.c{border-color:var(--info);color:var(--info);background:var(--info-bg)}
+.smap__pub{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.smap__pub div{background:var(--bg);border:1px dashed var(--hw);border-radius:8px;padding:6px 10px;font-size:11.5px}
+.smap__pub b{font-family:var(--mono)}
+.smap__pub .ar{color:var(--hw-dk);font-weight:700;margin:0 4px}
+
+
+.er{margin:12px 0 18px;padding:10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);overflow-x:auto}
+.er svg{display:block;width:100%;min-width:760px;height:auto;font-family:var(--font)}
+.er figcaption{font-size:12.5px;color:var(--ink3);margin-top:6px}
+.er-box{fill:var(--bg);stroke:var(--line2);stroke-width:1.2}
+.er-zebra{fill:var(--bg2)}
+.er-hd{stroke:none}
+.er-t--field .er-hd{fill:var(--hw-tint)} .er-t--field .er-box{stroke:var(--hw)}
+.er-t--rdb .er-hd{fill:var(--ok-bg)} .er-t--rdb .er-box{stroke:var(--ok)}
+.er-t--sap .er-hd{fill:var(--info-bg)} .er-t--sap .er-box{stroke:var(--info)}
+.er-t--ops .er-hd{fill:var(--bg3)}
+.er-t--ext .er-hd{fill:var(--bg3)} .er-t--ext .er-box{stroke-dasharray:5 3}
+.er-tt{font-family:var(--mono);font-weight:700;font-size:13.5px;fill:var(--ink)}
+.er-ts{font-size:11px;fill:var(--ink3)}
+.er-c{font-family:var(--mono);font-size:12px;fill:var(--ink)}
+.er-c--pk{font-weight:700}
+.er-ty{font-family:var(--mono);font-size:10.5px;fill:var(--ink3)}
+.er-pk{fill:var(--hw)} .er-fk{fill:none;stroke:var(--hw-dk);stroke-width:1.2}
+.er-bt{font-size:8.5px;font-weight:700;fill:#fff;font-family:var(--font)} .er-bt--fk{fill:var(--hw-dk)}
+.er-e{fill:none;stroke-width:1.6}
+.er-e--fk{stroke:var(--ink3)}
+.er-e--cdc{stroke:var(--hw);stroke-width:2}
+.er-e--send{stroke:var(--info);stroke-width:2}
+.er-e--same{stroke:var(--ink4);stroke-dasharray:5 4}
+.er-ah{fill:var(--ink3)} .er-dot{fill:var(--bg);stroke:var(--ink3);stroke-width:1.4}
+.er-lb rect{fill:var(--bg);stroke:var(--line2)} .er-lb text{font-size:11px;fill:var(--ink2);font-family:var(--font)}
+.er-lb--cdc rect{stroke:var(--hw)} .er-lb--send rect{stroke:var(--info)}
+.er-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink3);margin:-8px 0 14px}
+.er-legend i{display:inline-block;width:22px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+
+</style>
+<style>
+/* ============================================================
+   HW Doc Kit - design tokens & base primitives
+   금지: 이모지, 보라/바이올렛/인디고 계열, 무지개 그라데이션
+   기준색: 한화 오렌지 계열
+   ============================================================ */
+:root{
+  /* brand */
+  --hw:#F37321;          /* 기본 오렌지 */
+  --hw-dk:#D2590F;       /* 진한 오렌지 (호버/강조선) */
+  --hw-dp:#A8420A;       /* 가장 진한 오렌지 (제목 강조) */
+  --hw-lt:#FFB27A;       /* 밝은 오렌지 (보조 채움) */
+  --hw-pale:#FFF1E7;     /* 아주 옅은 오렌지 (배경 톤) */
+  --hw-tint:#FDE3D1;     /* 옅은 오렌지 (테두리/칩) */
+
+  /* ink & surface */
+  --ink:#141414; --ink2:#3F3F3F; --ink3:#6E6E6E; --ink4:#9A9A9A;
+  --bg:#FFFFFF; --bg2:#FAF8F6; --bg3:#F2EEEA;
+  --line:#E4E1DE; --line2:#CFCAC5;
+
+  /* semantic (보라 금지 - 보색은 청록/황토/벽돌색으로) */
+  --ok:#2E7D5B; --ok-bg:#E8F3EE;
+  --warn:#B8791A; --warn-bg:#FBF1DF;
+  --risk:#C0392B; --risk-bg:#FBEAE7;
+  --info:#2A6F97; --info-bg:#E7F0F6;
+
+  --radius:10px; --radius-sm:6px;
+  --shadow:0 1px 2px rgba(20,20,20,.06), 0 8px 24px rgba(20,20,20,.06);
+  --font:"Pretendard","Malgun Gothic","Apple SD Gothic Neo","Segoe UI",system-ui,sans-serif;
+  --mono:"D2Coding","Cascadia Mono","Consolas","JetBrains Mono",ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --hw:#FF8A3D; --hw-dk:#F37321; --hw-dp:#FFB27A; --hw-lt:#7A3E14; --hw-pale:#241812; --hw-tint:#4A2A15;
+  --ink:#F2EFEC; --ink2:#CFC9C3; --ink3:#9E9691; --ink4:#77706B;
+  --bg:#141312; --bg2:#1C1A18; --bg3:#252220;
+  --line:#332F2C; --line2:#464038;
+  --ok:#5CB58C; --ok-bg:#17251F; --warn:#D9A445; --warn-bg:#2A2317;
+  --risk:#E2705F; --risk-bg:#2A1917; --info:#6BA6CC; --info-bg:#161F26;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font); color:var(--ink); background:var(--bg2);
+  -webkit-font-smoothing:antialiased; line-height:1.55;
+  font-variant-numeric:tabular-nums;
+}
+h1,h2,h3,h4{margin:0; line-height:1.25; font-weight:700; letter-spacing:-.01em}
+p{margin:0 0 .6em}
+a{color:var(--hw-dk); text-underline-offset:2px}
+:root[data-theme="dark"] a{color:var(--hw)}
+code,kbd,pre,samp{font-family:var(--mono)}
+hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+
+/* ---------- 공통 프리미티브 ---------- */
+.kicker{
+  font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--hw-dk);
+}
+.rule{height:3px;background:var(--hw);border-radius:2px;width:56px}
+.muted{color:var(--ink3)}
+.small{font-size:13px}
+.mono{font-family:var(--mono);font-size:.92em}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;
+  background:var(--hw-pale);color:var(--hw-dp);border:1px solid var(--hw-tint);
+}
+.chip--ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.chip--warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.chip--risk{background:var(--risk-bg);color:var(--risk);border-color:var(--risk)}
+.chip--info{background:var(--info-bg);color:var(--info);border-color:var(--info)}
+.chip--neutral{background:var(--bg3);color:var(--ink2);border-color:var(--line2)}
+
+.card{
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;
+}
+.card--accent{border-left:4px solid var(--hw)}
+.card__t{font-size:16px;font-weight:700;margin:0 0 6px}
+.card__d{font-size:14px;color:var(--ink2);margin:0}
+
+.kpi{display:flex;gap:14px;flex-wrap:wrap}
+.kpi__item{
+  flex:1 1 0;min-width:140px;background:var(--bg);border:1px solid var(--line);
+  border-top:3px solid var(--hw);border-radius:var(--radius);padding:14px 16px;
+}
+.kpi__v{font-size:30px;font-weight:800;letter-spacing:-.02em;color:var(--hw-dp)}
+:root[data-theme="dark"] .kpi__v{color:var(--hw)}
+.kpi__l{font-size:12px;color:var(--ink3);font-weight:600}
+
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:var(--bg)}
+.tbl th,.tbl td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+.tbl thead th{background:var(--hw-pale);color:var(--hw-dp);font-size:12.5px;
+  letter-spacing:.03em;text-transform:uppercase;border-color:var(--hw-tint)}
+.tbl tbody tr:nth-child(even){background:var(--bg2)}
+.tbl td.num{text-align:right;font-family:var(--mono)}
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius-sm)}
+
+.note{
+  border:1px solid var(--line);border-left:4px solid var(--ink3);
+  background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-size:14px;
+}
+.note__t{font-weight:700;font-size:13px;margin:0 0 4px;letter-spacing:.02em}
+.note--info{border-left-color:var(--info);background:var(--info-bg)}
+.note--info .note__t{color:var(--info)}
+.note--ok{border-left-color:var(--ok);background:var(--ok-bg)}
+.note--ok .note__t{color:var(--ok)}
+.note--warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.note--warn .note__t{color:var(--warn)}
+.note--risk{border-left-color:var(--risk);background:var(--risk-bg)}
+.note--risk .note__t{color:var(--risk)}
+
+/* 코드 블록 */
+.code{border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg)}
+.code__bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;color:var(--ink3)
+}
+.code__copy{
+  border:1px solid var(--line2);background:var(--bg);color:var(--ink2);
+  border-radius:5px;padding:2px 9px;font-size:11.5px;font-weight:700;cursor:pointer
+}
+.code__copy:hover{border-color:var(--hw);color:var(--hw-dk)}
+.code pre{margin:0;padding:12px 14px;overflow-x:auto;font-size:13px;line-height:1.6}
+.code .cm{color:var(--ink4)}
+.code .hl{color:var(--hw-dk);font-weight:700}
+
+/* 단계 흐름 */
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.step{
+  flex:1 1 0;min-width:150px;position:relative;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px
+}
+.step__n{
+  display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:50%;background:var(--hw);color:#fff;font-size:12px;font-weight:800;margin-bottom:6px
+}
+.step__t{font-weight:700;font-size:14px}
+.step__d{font-size:12.5px;color:var(--ink3)}
+
+/* UI 목업 프레임 */
+.ui{border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--bg);box-shadow:var(--shadow)}
+.ui__bar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border-bottom:1px solid var(--line)}
+.ui__dot{width:9px;height:9px;border-radius:50%;background:var(--line2)}
+.ui__addr{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+  padding:2px 8px;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+.ui__body{padding:14px}
+.ui-row{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.ui-row:last-child{border-bottom:0}
+.ui-btn{background:var(--hw);color:#fff;border:0;border-radius:5px;padding:6px 14px;font-size:12.5px;font-weight:700}
+.ui-btn--ghost{background:transparent;color:var(--hw-dk);border:1px solid var(--hw)}
+.ui-field{flex:1;border:1px solid var(--line2);border-radius:5px;padding:6px 9px;font-size:12.5px;color:var(--ink3);background:var(--bg2)}
+
+/* 출처 표기 */
+.ref{
+  font-size:.62em;font-weight:800;vertical-align:super;color:var(--hw-dk);
+  background:var(--hw-pale);border:1px solid var(--hw-tint);border-radius:4px;
+  padding:0 4px;margin-left:2px;cursor:pointer;text-decoration:none
+}
+.refs{list-style:none;padding:0;margin:0;font-size:13px}
+.refs li{display:grid;grid-template-columns:26px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.refs li:last-child{border-bottom:0}
+.refs .refs__n{color:var(--hw-dk);font-weight:800;font-family:var(--mono)}
+.refs .refs__src{color:var(--ink);font-weight:600}
+.refs .refs__meta{color:var(--ink3);font-size:12px;font-family:var(--mono);word-break:break-all}
+
+/* 그리드 */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g-2-1{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.g-1-2{display:grid;grid-template-columns:1fr 2fr;gap:16px}
+.stack{display:flex;flex-direction:column;gap:12px}
+
+/* ── 탭 (.tabs) — 같은 모양·다른 값 여러 건을 한 자리에서 비교 ── */
+.tabs{margin:10px 0 16px}
+.tabs__bar{display:flex;gap:4px;flex-wrap:wrap;padding:4px;background:var(--bg3);border-radius:10px;width:fit-content;max-width:100%;margin-bottom:12px}
+.tabs__b{border:0;background:transparent;padding:6px 14px;border-radius:7px;font:inherit;font-size:13.5px;font-weight:700;color:var(--ink3);
+  cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;line-height:1.3}
+.tabs__b small{font-family:var(--mono);font-size:10.5px;font-weight:400;color:var(--ink4)}
+.tabs__b:hover{color:var(--ink)}
+.tabs__b.on{background:var(--bg);color:var(--hw-dk);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.tabs__p{display:none}
+.tabs__p.on{display:block}
+
+/* ── JSON 한 줄 = 설명 한 줄 (.jx2) — 필드에 마우스를 올리면 뜻이 옆(그리고 발치)에 뜬다 ── */
+.code.jx2{margin-bottom:6px}
+.jx2__meta{margin-left:auto;font-family:inherit;font-size:11.5px;color:var(--ink3);display:flex;align-items:center;gap:6px}
+.jx2__head,.jx2__r{display:grid;grid-template-columns:40px minmax(0,1.15fr) minmax(0,1fr)}
+.jx2__head{font-size:11px;font-weight:800;color:var(--ink3);background:var(--bg2);border-bottom:1px solid var(--line)}
+.jx2__head span{padding:5px 12px}
+.jx2__scroll{max-height:460px;overflow:auto;overscroll-behavior:contain}
+.jx2__r{min-height:28px;align-items:stretch}
+.jx2__r--k{cursor:default}
+.jx2__ln{font-family:var(--mono);font-size:11px;color:var(--ink4);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;
+  background:var(--bg2);border-right:1px solid var(--line)}
+.jx2__c{display:block;line-height:28px;white-space:pre;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;padding:0 12px;border-right:1px dashed var(--line);background:transparent}
+.jx2__e{display:flex;align-items:center;gap:8px;padding:0 12px;min-width:0;font-size:13px}
+.jx2__n{font-weight:700;white-space:nowrap}
+.jx2__tag{font-size:10.5px;line-height:1.5;padding:0 7px;border-radius:9px;background:var(--hw-tint);color:var(--hw-dp);font-weight:700;white-space:nowrap}
+.jx2__tag--warn{background:var(--warn-bg);color:var(--warn)}
+.jx2__v{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.jx2__v b{color:var(--ink)} .jx2__v .chip{font-size:11px}
+.jx2 .jk{color:var(--ink3)} .jx2 .js{color:var(--ink)} .jx2 .jn{color:var(--info);font-weight:700} .jx2 .jz{color:var(--ink4);font-style:italic}
+.jx2__r--k:hover,.jx2__r.on{background:var(--hw-pale)}
+.jx2__r--k:hover .jx2__ln,.jx2__r.on .jx2__ln{background:var(--hw);color:#fff;font-weight:800}
+.jx2__r--k:hover .jx2__c,.jx2__r.on .jx2__c{box-shadow:inset 3px 0 0 var(--hw)}
+.jx2__foot{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border-top:1px solid var(--line);background:var(--bg2);font-size:12.5px;min-height:40px;color:var(--ink3)}
+.jx2__pos{font-family:var(--mono);font-size:11.5px;color:#fff;background:var(--ink4);border-radius:4px;padding:1px 7px;white-space:nowrap}
+.jx2.act .jx2__pos{background:var(--hw)}
+.jx2__fd b{color:var(--ink)} .jx2__fd code{font-size:11.5px;color:var(--ink4);margin:0 6px}
+@media (max-width:760px){
+  .jx2__head,.jx2__r{grid-template-columns:32px minmax(0,1fr)}
+  .jx2__head span:last-child,.jx2__e{display:none}
+}
+@media print{
+  .tabs__bar{display:none} .tabs__p{display:block!important;margin-bottom:18px}
+  .jx2__scroll{max-height:none}
+}
+
+/* ---------- 다이어그램 캔버스 ---------- */
+.dgm{
+  position:relative;border:1px solid var(--line);border-radius:12px;
+  background:var(--bg);overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 1px 2px rgba(20,20,20,.04)
+}
+.dgm__bar{
+  display:flex;align-items:center;gap:4px;flex-wrap:wrap;
+  padding:7px 10px;border-bottom:1px solid var(--line);background:var(--bg2);flex:0 0 auto
+}
+.dgm__bar .sp{flex:1}
+.dgm__sep{width:1px;height:15px;background:var(--line2);margin:0 5px;flex:0 0 auto}
+.dgm__btn{
+  border:1px solid transparent;background:transparent;color:var(--ink2);
+  border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:var(--font);line-height:1.5;
+  transition:background .12s ease,color .12s ease,border-color .12s ease
+}
+.dgm__btn:hover{background:var(--bg);border-color:var(--line2);color:var(--hw-dk)}
+.dgm__btn:focus-visible{outline:2px solid var(--hw);outline-offset:1px}
+.dgm__btn.is-on{background:var(--hw);border-color:var(--hw);color:#fff}
+.dgm__hint{font-size:11px;color:var(--ink4);letter-spacing:-.01em}
+.dgm__svg{display:block;width:100%;flex:1 1 auto;min-height:0;touch-action:none;cursor:grab;
+  background:radial-gradient(circle at 1px 1px, var(--line) .9px, transparent 0) 0 0/26px 26px, var(--bg)}
+.dgm__svg.is-panning{cursor:grabbing}
+.dgm[data-edit="off"] .dgm__bar{display:none}
+
+/* 화면 가득 펼치기 — 툴바의 "넓게" 버튼 / Esc 로 닫는다 */
+.dgm.is-max{
+  position:fixed;inset:14px;z-index:80;
+  width:auto !important;max-width:none !important;height:auto !important;
+  box-shadow:0 12px 48px rgba(20,20,20,.28);border-color:var(--line2)
+}
+html.dgm-locked,html.dgm-locked body{overflow:hidden}
+
+.dgm-node{cursor:move}
+.dgm-node .box{
+  fill:var(--bg);stroke:var(--line2);stroke-width:1.25;
+  filter:drop-shadow(0 1px 1.5px rgba(20,20,20,.07))
+}
+.dgm-node:hover .box{stroke:var(--hw-lt)}
+.dgm-node .lbl{
+  font-family:var(--font);font-size:13.5px;font-weight:700;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;text-align:center;padding:6px 10px;line-height:1.32;overflow:hidden;
+  letter-spacing:-.01em
+}
+.dgm-node .lbl .sub{font-size:11px;font-weight:500;color:var(--ink3);margin-top:3px;line-height:1.35}
+.dgm-node .lbl[contenteditable="true"]{outline:2px solid var(--hw);background:var(--bg);border-radius:4px}
+.dgm-node.is-sel .box{stroke:var(--hw);stroke-width:2.5}
+.dgm-node[data-tone="primary"] .box{fill:var(--hw);stroke:var(--hw-dk)}
+.dgm-node[data-tone="primary"] .lbl{color:#fff}
+.dgm-node[data-tone="primary"] .lbl .sub{color:rgba(255,255,255,.88)}
+.dgm-node[data-tone="accent"] .box{fill:var(--hw-pale);stroke:var(--hw)}
+.dgm-node[data-tone="accent"] .lbl{color:var(--hw-dp)}
+.dgm-node[data-tone="accent"] .lbl .sub{color:var(--hw-dk)}
+.dgm-node[data-tone="muted"] .box{fill:var(--bg3);stroke:var(--line2)}
+.dgm-node[data-tone="muted"] .lbl{color:var(--ink3)}
+.dgm-node[data-tone="ok"] .box{fill:var(--ok-bg);stroke:var(--ok)}
+.dgm-node[data-tone="ok"] .lbl{color:var(--ok)}
+.dgm-node[data-tone="warn"] .box{fill:var(--warn-bg);stroke:var(--warn)}
+.dgm-node[data-tone="warn"] .lbl{color:var(--warn)}
+.dgm-node[data-tone="risk"] .box{fill:var(--risk-bg);stroke:var(--risk)}
+.dgm-node[data-tone="risk"] .lbl{color:var(--risk)}
+.dgm-node[data-tone="info"] .box{fill:var(--info-bg);stroke:var(--info)}
+.dgm-node[data-tone="info"] .lbl{color:var(--info)}
+
+.dgm-grp .box{fill:none;stroke:var(--line2);stroke-dasharray:5 5;stroke-width:1.25}
+.dgm-grp .gl{font-family:var(--font);font-size:10.5px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;fill:var(--ink4)}
+.dgm-grp{cursor:move}
+
+.dgm-edge .wire{fill:none;stroke:var(--ink4);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.dgm-edge .hit{fill:none;stroke:transparent;stroke-width:16;cursor:pointer}
+.dgm-edge:hover .wire{stroke:var(--ink2)}
+.dgm-edge.is-sel .wire{stroke:var(--hw);stroke-width:2.6}
+.dgm-edge[data-style="dash"] .wire{stroke-dasharray:5 5}
+.dgm-edge[data-tone="primary"] .wire{stroke:var(--hw);stroke-width:2.2}
+.dgm-edge[data-tone="risk"] .wire{stroke:var(--risk)}
+.dgm-edge[data-tone="ok"] .wire{stroke:var(--ok)}
+.dgm-edge .elbl{
+  font-family:var(--font);font-size:10.5px;font-weight:600;color:var(--ink3);
+  display:flex;align-items:center;justify-content:center;height:100%;text-align:center;
+}
+.dgm-edge .elbl span{background:var(--bg);padding:2px 8px;border-radius:999px;
+  border:1px solid var(--line);white-space:nowrap;letter-spacing:-.01em}
+
+.dgm__modal{
+  position:absolute;inset:0;background:rgba(0,0,0,.45);display:none;
+  align-items:center;justify-content:center;padding:24px;z-index:9
+}
+.dgm__modal.is-open{display:flex}
+.dgm__modal .pane{background:var(--bg);border-radius:var(--radius);width:min(680px,100%);
+  max-height:100%;display:flex;flex-direction:column;border:1px solid var(--line2)}
+.dgm__modal textarea{
+  flex:1;min-height:240px;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:12px;font-family:var(--mono);font-size:12px;resize:vertical;background:var(--bg2);color:var(--ink)
+}
+.dgm__modal .head,.dgm__modal .foot{display:flex;align-items:center;gap:8px;padding:10px 12px}
+.dgm__modal .head b{font-size:14px}
+.dgm__modal .sp{flex:1}
+
+/* ── 차트 (scripts/make-chart.sh 산출물) ─────────────────────────────────── */
+.cht{ margin:16px 0 18px; padding:14px 14px 10px; border:1px solid var(--line); border-radius:var(--radius); background:var(--bg2) }
+.cht__t{ margin:0 0 8px; font-size:13.5px; font-weight:700; color:var(--ink); letter-spacing:-.01em }
+.cht svg{ display:block; width:100%; height:auto; font-family:inherit }
+.cht rect, .cht circle{ cursor:default }
+.cht rect:hover, .cht circle:hover{ opacity:.75 }
+.cht__c{ margin:8px 0 0; font-size:12px; line-height:1.65; color:var(--ink3) }
+
+/* 인쇄 */
+@media print{
+  .cht{ page-break-inside:avoid; background:transparent }
+  body{background:#fff}
+  .no-print{display:none !important}
+  .dgm__bar{display:none !important}
+  .dgm__svg{background:none}
+  .dgm.is-max{position:static;inset:auto;box-shadow:none}
+}
+
+/* ── 한글 줄바꿈 ─────────────────────────────────────────────────────────────
+   브라우저 기본값은 낱말 한가운데를 끊는다. "남은 결/정" 처럼 갈라지면 제목이
+   읽히지 않는다. keep-all 은 띄어쓰기에서만 줄을 바꾼다.
+   반대로 긴 영문 식별자나 경로는 keep-all 이면 칸을 넘치므로 overflow-wrap 으로 받고,
+   코드·경로 계열은 어디서든 끊어 넘침을 막는다. */
+h1, h2, h3, h4, p, li, td, th, dt, dd,
+.card__d, .step__d, .note, .lead, .sub, figcaption {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.mono, pre, code, .refs__meta { word-break: break-all; overflow-wrap: normal }
+
+/* 용어 표 — 문서 맨 끝 (.tbl gloss) */
+.gloss td:first-child{font-family:var(--mono);font-weight:700;color:var(--hw-dk);white-space:nowrap}
+.gloss td:nth-child(2){color:var(--ink3);font-size:12.5px}
+.gloss .gloss__g td{background:var(--bg3);color:var(--ink2);font-family:var(--font);font-weight:700;font-size:12.5px;white-space:normal}
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 레이아웃 (사이드 TOC + 본문 단일 컬럼)
+   ============================================================ */
+body{ background:var(--bg2) }
+
+.doc{
+  display:grid; grid-template-columns:270px minmax(0,1fr); align-items:start;
+  max-width:1600px; margin:0 auto;
+  transition:grid-template-columns .18s ease;
+}
+.doc.side-collapsed{ grid-template-columns:0px minmax(0,1fr) }
+
+/* 사이드바 */
+.side{
+  position:sticky; top:0; height:100vh; overflow:auto;
+  background:var(--bg); border-right:1px solid var(--line); padding:20px 16px 40px;
+  transition:opacity .15s ease;
+}
+.doc.side-collapsed .side{ opacity:0; pointer-events:none; overflow:hidden; padding:20px 0 40px }
+.side-reopen{
+  display:none; position:fixed; top:16px; left:16px; z-index:60;
+  border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:8px;
+  padding:7px 12px; font-size:12.5px; font-weight:700; cursor:pointer; box-shadow:var(--shadow);
+  font-family:var(--font);
+}
+.side-reopen:hover{ border-color:var(--hw); color:var(--hw-dk) }
+.side-reopen.is-shown{ display:inline-flex; align-items:center }
+.side__brand{ display:flex; align-items:center; gap:9px; margin-bottom:6px }
+.side__brand .bar{ width:5px; height:26px; background:var(--hw); border-radius:2px }
+.side__brand b{ font-size:14.5px; letter-spacing:-.01em }
+.side__meta{ font-size:11.5px; color:var(--ink4); margin:0 0 16px; font-family:var(--mono) }
+.side__toch{
+  display:flex; align-items:center; justify-content:space-between; margin:0 0 6px;
+  font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--ink4);
+}
+.side__toch button{
+  border:0; background:transparent; color:var(--ink3); font-size:11px; font-weight:700;
+  cursor:pointer; padding:2px 4px; font-family:var(--font); text-transform:none; letter-spacing:0;
+}
+.side__toch button:hover{ color:var(--hw-dk) }
+.toc{ list-style:none; margin:0; padding:0; font-size:13.5px; overflow:hidden }
+.toc.is-collapsed{ display:none }
+.toc li{ margin:1px 0 }
+.toc a{
+  display:block; padding:5px 10px; border-radius:6px; color:var(--ink2);
+  text-decoration:none; border-left:2px solid transparent;
+}
+.toc a:hover{ background:var(--bg3); color:var(--ink) }
+.toc a.is-cur{ background:var(--hw-pale); color:var(--hw-dp); font-weight:700; border-left-color:var(--hw) }
+.toc .sub a{ padding-left:22px; font-size:12.5px; color:var(--ink3) }
+.side__foot{ margin-top:18px; padding-top:14px; border-top:1px solid var(--line); display:flex; gap:6px; flex-wrap:wrap }
+.side__foot button{
+  border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:5px;
+  padding:3px 9px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:var(--font);
+}
+.side__foot button:hover{ border-color:var(--hw); color:var(--hw-dk) }
+
+/* 본문 */
+/* 넓게 잡고(1220) 가운데 정렬한다 — margin:auto 가 핵심: 사이드바를 접어 이 칸이
+   넓어져도(grid-template-columns 가 0px ...로 바뀌어도) 본문은 그 안에서 계속
+   가운데에 남는다. 정작 산문(.sec > p 등)은 아래에서 다시 좁혀 읽기 좋은 길이를
+   유지하고, 흐름도·표·나란히 비교(.g2 계열)만 이 넓은 폭을 그대로 쓴다 —
+   6~7칸짜리 흐름도가 좁은 폭에 갇혀 카드가 잘려 나가는 것을 막는 값이다. */
+.main{ padding:34px 44px 100px; max-width:1220px; margin:0 auto; }
+.doc-head{ border-bottom:2px solid var(--hw); padding-bottom:18px; margin-bottom:26px }
+.doc-head h1{ font-size:32px; letter-spacing:-.025em; margin:6px 0 8px }
+.doc-head .sub{ font-size:15px; color:var(--ink2); max-width:80ch }
+.doc-head .meta{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px }
+/* 산문만 좁게. 흐름도·다이어그램·표·코드·나란히 비교는 .main 의 넓은 폭 그대로 쓴다. */
+.sec > p, .sec > .why, .sec > ul, .sec > ol{ max-width:860px }
+
+.sec{ margin:0 0 44px; scroll-margin-top:18px }
+.sec > h2{
+  font-size:21px; margin:0 0 4px; display:flex; align-items:baseline; gap:10px;
+}
+.sec > h2 .n{ font-family:var(--mono); font-size:14px; font-weight:800; color:var(--hw) }
+.sec > .why{ font-size:13.5px; color:var(--ink3); margin:0 0 16px; padding-left:2px }
+.sec h3{ font-size:16px; margin:24px 0 10px; padding-left:10px; border-left:3px solid var(--hw-tint) }
+.sec h4{ font-size:14px; margin:16px 0 6px; color:var(--ink2) }
+.sec p, .sec li{ font-size:14.5px }
+.sec ul, .sec ol{ margin:0 0 12px; padding-left:20px }
+.sec li{ margin:3px 0 }
+
+/* 체크리스트 */
+.chk{ list-style:none; padding:0; margin:0 }
+.chk li{
+  display:flex; gap:10px; align-items:flex-start; padding:9px 12px;
+  border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--bg); margin-bottom:6px;
+}
+.chk input{ margin-top:3px; width:15px; height:15px; accent-color:var(--hw); flex:0 0 auto }
+.chk li.is-done{ background:var(--bg2); border-color:var(--line) }
+.chk li.is-done .t{ text-decoration:line-through; color:var(--ink4) }
+.chk .t{ font-weight:600; font-size:14px }
+.chk .d{ font-size:12.5px; color:var(--ink3); display:block; margin-top:2px }
+
+/* 시나리오 (Given/When/Then) */
+.gwt{ border:1px solid var(--line); border-left:4px solid var(--hw); border-radius:var(--radius-sm);
+  background:var(--bg); padding:14px 16px; margin:0 0 12px }
+.gwt__t{ font-weight:700; font-size:14.5px; margin:0 0 8px }
+.gwt dl{ margin:0; display:grid; grid-template-columns:64px 1fr; gap:4px 10px; font-size:13.5px }
+.gwt dt{ font-weight:800; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--hw-dk); padding-top:2px }
+.gwt dd{ margin:0; color:var(--ink2) }
+
+/* 작업 단위 카드 */
+.slice{ border:1px solid var(--line); border-radius:var(--radius); background:var(--bg); overflow:hidden; margin-bottom:12px }
+.slice__h{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg3); border-bottom:1px solid var(--line) }
+.slice__h .no{ font-family:var(--mono); font-weight:800; color:#fff; background:var(--hw);
+  border-radius:5px; padding:1px 8px; font-size:12px }
+.slice__h b{ font-size:14.5px }
+.slice__h .sp{ flex:1 }
+.slice__b{ padding:12px 14px; font-size:13.5px }
+.slice__b dl{ margin:0; display:grid; grid-template-columns:110px 1fr; gap:6px 12px }
+.slice__b dt{ color:var(--ink3); font-size:12.5px; font-weight:700 }
+.slice__b dd{ margin:0; color:var(--ink2) }
+
+/* 의사결정 기록 */
+.adr{ border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; background:var(--bg); margin-bottom:12px }
+.adr__t{ font-size:15px; font-weight:700; margin:0 0 8px }
+.adr dl{ margin:0; display:grid; grid-template-columns:96px 1fr; gap:5px 12px; font-size:13.5px }
+.adr dt{ color:var(--hw-dk); font-weight:700; font-size:12.5px }
+.adr dd{ margin:0; color:var(--ink2) }
+
+/* 높이는 diagram.js 의 autoHeight 가 내용 비율에 맞춰 인라인으로 잡는다.
+   아래 값은 스크립트가 돌기 전의 자리 잡기용이다. */
+.dgm{ margin:0 0 16px; height:420px }
+/* 예전엔 사이드바 오른쪽 전체로 폭을 늘렸지만(100vw 기준), 그러면 사이드바를
+   접었을 때 본문(.main)만 가운데 남고 다이어그램은 화면 가장자리까지 벌어져
+   버린다 — 카드 사이도 성겨 보였다. .main 폭(위 .main margin:auto) 그대로
+   쓰는 쪽이 사이드바 상태와 무관하게 항상 가운데 · 컴팩트하다. */
+.tbl-wrap{ margin-bottom:14px }
+.note{ margin-bottom:12px }
+.code{ margin-bottom:14px }
+
+@media (max-width:1000px){
+  .doc{ grid-template-columns:1fr }
+  .side{ position:static; height:auto; border-right:0; border-bottom:1px solid var(--line) }
+  .main{ padding:24px 20px 60px }
+}
+@media print{
+  @page{ size:A4; margin:14mm }
+  .side{ display:none }
+  .doc{ display:block }
+  .main{ max-width:none; padding:0 }
+  .sec{ page-break-inside:avoid }
+  .dgm{ height:340px !important; width:auto }
+}
+
+/* ============================================================
+   flow — 웹 스타일 워크플로우 그림 (카드 + 곡선 연결 + 흐르는 점 + 인라인 편집)
+   마크업: .flow > .flow__head + .flow__in(그리드) > .fnode[data-id]  +  script.flow-links(JSON)
+   엔진: flow.js · 작성 안내: references/flow.md · 생성기: scripts/make-flow.py
+   ============================================================ */
+.flow{
+  --f-gap-x: 46px; --f-gap-y: 30px;
+  position:relative; margin:14px 0 22px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0/22px 22px,
+    var(--bg2);
+  border:1px solid var(--line); border-radius:18px;
+  padding:18px 22px 16px; overflow-x:auto;
+}
+/* 화면 가득 펼치기 — 툴바의 "넓게" 버튼 / Esc 로 닫는다 (.dgm.is-max 와 같은 규칙) */
+.flow.is-max{
+  position:fixed; inset:14px; z-index:80; overflow:auto;
+  width:auto !important; max-width:none !important; height:auto !important;
+  box-shadow:0 12px 48px rgba(20,20,20,.28); border-color:var(--line2);
+}
+html.flow-locked, html.flow-locked body{ overflow:hidden }
+/* 예전엔 사이드바 오른쪽 전체로 폭을 늘렸지만, 그러면 사이드바를 접었을 때
+   본문(.main)만 가운데 남고 흐름도는 화면 가장자리까지 벌어져 카드 사이가
+   성겨 보였다. .main 폭(위 dev.css 의 .main margin:auto) 을 그대로 쓰는 쪽이
+   사이드바 상태와 무관하게 항상 가운데·컴팩트하다 — 카드가 더 필요하면
+   .flow 자체의 overflow-x:auto 로 옆으로 스크롤한다. */
+/* 슬라이드: 무대 안에 들어가도록 최소 폭을 풀고 카드를 줄인다 */
+.slide .flow{ margin:6px 0; padding:12px 14px 10px; overflow:visible; display:flex; flex-direction:column }
+.slide .flow__in{ flex:1; align-content:center }
+.slide .flow__in{ min-width:0; column-gap:34px }
+.slide .fnode{ padding:8px 10px 8px 9px; min-height:0 }
+.slide .fnode__s{ font-size:11.5px }
+.flow__head{ display:flex; align-items:center; gap:12px; margin:0 0 14px; flex-wrap:wrap }
+.flow__title{ font-weight:700; font-size:14px; color:var(--ink) }
+.flow__hint{ font-size:12px; color:var(--ink4) }
+.flow__head .sp{ flex:1 }
+.flow__seg{ display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:999px; padding:3px }
+.flow__seg button{
+  border:0; background:transparent; color:var(--ink3); font:inherit; font-size:12px; font-weight:600;
+  padding:5px 12px; border-radius:999px; cursor:pointer;
+}
+.flow__seg button.on{ background:var(--hw); color:#fff }
+.flow__in{ position:relative; display:grid; column-gap:var(--f-gap-x); row-gap:var(--f-gap-y); align-items:center; min-width:1080px }
+.flow__links{ position:absolute; left:0; top:0; pointer-events:none; overflow:visible; z-index:0 }
+.flow__lbls{ position:absolute; left:0; top:0; width:0; height:0; z-index:2; pointer-events:none }
+
+/* ── 노드 카드 ─────────────────────────────────────────── */
+.fnode{
+  position:relative; z-index:1; display:flex; gap:10px; align-items:flex-start;
+  background:var(--bg); border:1px solid var(--line); border-radius:14px;
+  padding:11px 12px 11px 11px; min-height:58px; min-width:0;
+  box-shadow:0 1px 2px rgba(20,20,20,.04), 0 8px 22px -12px rgba(20,20,20,.18);
+  transition:transform .18s ease, box-shadow .18s ease, opacity .25s ease, border-color .18s ease;
+}
+.fnode:hover{ transform:translateY(-2px); box-shadow:0 2px 4px rgba(20,20,20,.05), 0 14px 30px -14px rgba(20,20,20,.28); border-color:var(--line2) }
+.fnode__ic{
+  flex:0 0 34px; width:34px; height:34px; border-radius:10px; display:grid; place-items:center;
+  background:var(--bg3); color:var(--ink3);
+}
+.fnode__ic svg{ width:18px; height:18px }
+.fnode__body{ min-width:0 }
+/* min-width:0 만으로는 부족하다 — 칸이 줄어도 점(.)으로만 이어진 긴 문자열
+   (토픽·호스트명 등, 띄어쓰기가 없어 줄바꿈할 곳이 없다)은 안 줄어들고 카드
+   폭 전체를, 나아가 grid 트랙 전체를 억지로 넓힌다. 어디서든 끊기게 한다. */
+.fnode__t{ font-weight:700; font-size:13.5px; line-height:1.3; color:var(--ink); overflow-wrap:anywhere }
+.fnode__s{ font-size:11.8px; line-height:1.45; color:var(--ink3); margin-top:2px; overflow-wrap:anywhere }
+.fnode__tag{
+  display:inline-block; margin-top:6px; font-family:var(--mono); font-size:10.8px; color:var(--ink3);
+  background:var(--bg2); border:1px solid var(--line); border-radius:6px; padding:1px 6px;
+  max-width:100%; overflow-wrap:anywhere;
+}
+.fnode__no{
+  position:absolute; top:-9px; left:-9px; width:22px; height:22px; border-radius:50%;
+  background:var(--ink); color:var(--bg); font-size:11px; font-weight:700; display:grid; place-items:center;
+  box-shadow:0 0 0 3px var(--bg2);
+}
+.fnode__badge{
+  position:absolute; top:-10px; right:10px; font-size:10.5px; font-weight:700; letter-spacing:.02em;
+  padding:2px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--line2); color:var(--ink2);
+}
+
+/* 역할별 */
+.fnode--src{ border-color:var(--hw-tint) }
+.fnode--src .fnode__ic{ background:var(--hw); color:#fff }
+.fnode--new{ border-color:var(--hw-tint); background:linear-gradient(var(--bg),var(--bg)) padding-box }
+.fnode--new::before{ content:""; position:absolute; left:14px; right:14px; top:-1px; height:3px; border-radius:0 0 3px 3px; background:var(--hw) }
+.fnode--new .fnode__ic{ background:var(--hw-pale); color:var(--hw-dk) }
+.fnode--isl .fnode__ic{ background:var(--bg3); color:var(--ink2) }
+.fnode--store .fnode__ic{ background:color-mix(in srgb, var(--info) 12%, var(--bg)); color:var(--info) }
+.fnode--ok{ border-color:color-mix(in srgb, var(--ok) 35%, var(--line)) }
+.fnode--ok .fnode__ic{ background:color-mix(in srgb, var(--ok) 13%, var(--bg)); color:var(--ok) }
+.fnode--risk{ border-color:color-mix(in srgb, var(--risk) 40%, var(--line)); background:color-mix(in srgb, var(--risk) 4%, var(--bg)) }
+.fnode--risk .fnode__ic{ background:color-mix(in srgb, var(--risk) 13%, var(--bg)); color:var(--risk) }
+.fnode--risk .fnode__badge{ color:var(--risk); border-color:color-mix(in srgb, var(--risk) 45%, var(--line)) }
+.fnode--warn{ border-color:color-mix(in srgb, var(--warn) 40%, var(--line)) }
+.fnode--warn .fnode__ic{ background:color-mix(in srgb, var(--warn) 14%, var(--bg)); color:var(--warn) }
+.fnode--dim{ background:var(--bg2); box-shadow:none }
+.fnode--dim .fnode__t{ color:var(--ink3) }
+.fnode--decide .fnode__ic{ background:var(--bg); border:1.5px dashed var(--line2); color:var(--ink2); transform:rotate(45deg); border-radius:8px }
+.fnode--decide .fnode__ic svg{ transform:rotate(-45deg) }
+.fnode--small{ min-height:0; padding:8px 10px 8px 9px }
+.fnode--small .fnode__ic{ flex-basis:28px; width:28px; height:28px; border-radius:8px }
+.fnode--small .fnode__ic svg{ width:15px; height:15px }
+.fnode--small .fnode__t{ font-size:12.5px }
+
+/* 우회 띠 (B 경로가 건너뛰는 구간) */
+.fbypass{
+  position:relative; z-index:1; height:48px; border-radius:999px; display:flex; align-items:center; justify-content:center; gap:10px;
+  border:1.5px dashed var(--hw-lt); background:color-mix(in srgb, var(--hw) 5%, transparent);
+  color:var(--hw-dk); font-size:12.5px; font-weight:600;
+}
+.fbypass svg{ width:16px; height:16px }
+.fbypass [data-ic]{ display:inline-grid }
+
+/* 레인 머리 */
+.flane{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:2px 0; z-index:1; position:relative }
+.flane__k{ font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--hw-dk) }
+.flane__n{ font-weight:700; font-size:13.5px; color:var(--ink) }
+.flane__m{ display:inline-flex; gap:6px; flex-wrap:wrap }
+.flane__m span{ font-size:11.5px; font-family:var(--mono); padding:2px 8px; border-radius:999px; background:var(--bg); border:1px solid var(--line); color:var(--ink2) }
+.flane__m span.bad{ color:var(--risk); border-color:color-mix(in srgb, var(--risk) 40%, var(--line)) }
+.flane__m span.good{ color:var(--ok); border-color:color-mix(in srgb, var(--ok) 40%, var(--line)) }
+
+/* ── 연결선 ───────────────────────────────────────────── */
+.flow__links path.ln{ fill:none; stroke:var(--line2); stroke-width:1.8; transition:opacity .25s ease, stroke-width .15s ease }
+.flow__links path.ln--flow{ stroke:var(--hw); stroke-width:2.2; stroke-opacity:.55 }
+.flow__links path.ln--ok{ stroke:var(--ok); stroke-width:2.2; stroke-opacity:.6 }
+.flow__links path.ln--risk{ stroke:var(--risk); stroke-dasharray:6 6; animation:flow-dash 1.2s linear infinite; stroke-opacity:.8 }
+.flow__links path.ln--muted{ stroke:var(--ink3); stroke-dasharray:2.5 3.5; stroke-opacity:.85 }
+.flow__links circle.dot{ fill:var(--hw) }
+.flow__links circle.dot--ok{ fill:var(--ok) }
+@keyframes flow-dash{ to{ stroke-dashoffset:-24 } }
+.flbl{
+  position:absolute; transform:translate(-50%,-50%); white-space:nowrap;
+  font-size:11px; font-weight:600; color:var(--ink2); background:var(--bg); border:1px solid var(--line);
+  border-radius:999px; padding:1px 8px; box-shadow:0 2px 6px -3px rgba(20,20,20,.2); transition:opacity .25s ease;
+}
+.flbl--risk{ color:var(--risk); border-color:color-mix(in srgb, var(--risk) 40%, var(--line)) }
+.flbl--flow{ color:var(--hw-dk); border-color:var(--hw-tint) }
+.flbl--ok{ color:var(--ok); border-color:color-mix(in srgb, var(--ok) 40%, var(--line)) }
+
+/* 강조: 레인 토글 · 호버 */
+.flow[data-focus="a"] [data-lane="b"], .flow[data-focus="b"] [data-lane="a"]{ opacity:.18 }
+.flow.is-hover .ln:not(.hot), .flow.is-hover .flbl:not(.hot), .flow.is-hover .dot:not(.hot){ opacity:.15 }
+.flow.is-hover .ln.hot{ stroke-width:3; stroke-opacity:1 }
+
+/* 범례 */
+.flow__legend{ display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; padding-top:10px; border-top:1px dashed var(--line); font-size:11.5px; color:var(--ink3) }
+.flow__legend i{ display:inline-block; vertical-align:middle; width:26px; height:0; margin-right:6px; border-top:2.2px solid var(--hw) }
+.flow__legend i.ok{ border-top-color:var(--ok) }
+.flow__legend i.risk{ border-top:2px dashed var(--risk) }
+.flow__legend i.muted{ border-top:2px dashed var(--ink3) }
+.flow__legend b.nw{ display:inline-block; width:14px; height:4px; border-radius:2px; background:var(--hw); vertical-align:middle; margin-right:6px }
+
+/* ── 편집 모드 ───────────────────────────────────────── */
+.flow__edit{ display:inline-flex; gap:6px }
+.flow__bar{ margin:-4px 0 12px; border-radius:10px; flex-wrap:wrap }
+.flow:not(.is-edit) .flow__bar{ display:none }
+.flow.is-edit{ border-color:var(--hw-lt); box-shadow:0 0 0 3px var(--hw-pale) }
+.flow.is-edit .fnode{ cursor:grab; user-select:none }
+.flow.is-edit .fnode.is-drag{ cursor:grabbing; transition:none; box-shadow:0 18px 40px -16px rgba(20,20,20,.35) }
+.flow.is-edit .fnode:hover{ transform:none }
+.flow .is-sel.fnode{ outline:2px solid var(--hw); outline-offset:3px }
+.flow .is-from.fnode{ outline:2px dashed var(--hw); outline-offset:3px }
+.flow.is-edit .flow__links .ln-hit{ fill:none; stroke:transparent; stroke-width:14; pointer-events:stroke; cursor:pointer }
+.flow.is-edit .flbl{ pointer-events:auto; cursor:text }
+.flow .flow__links path.ln.is-sel{ stroke-width:3.6; stroke-opacity:1 }
+.flow .flbl.is-sel{ box-shadow:0 0 0 2px var(--hw) }
+.flow [contenteditable="true"]{ outline:2px solid var(--hw); outline-offset:2px; border-radius:4px; background:var(--bg); cursor:text; user-select:text }
+.flow .dgm__modal{ position:fixed; z-index:50 }
+.flow__status{ max-width:48ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+@media (prefers-reduced-motion: reduce){ .flow__links circle.dot{ display:none } .flow__links path.ln--risk{ animation:none } }
+@media print{
+  .flow{ width:auto; overflow:visible; background:var(--bg); page-break-inside:avoid }
+  .flow__seg, .flow__edit, .flow__bar{ display:none }
+  .flow__links circle.dot{ display:none }
+  .flow.is-max{ position:static; inset:auto; box-shadow:none }
+}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <aside class="side no-print">
+    <div class="side__brand"><span class="bar"></span><b>HotDB 한눈에</b></div>
+    <p class="side__meta">2026-10-06 · 5초 요약</p>
+    <div class="side__toch"><span>목차</span><button id="bToc" type="button" aria-expanded="true">접기</button></div>
+    <ul class="toc"></ul>
+    <div class="side__foot">
+      <button id="bTheme" type="button">테마</button>
+      <button id="bPrint" type="button">인쇄</button>
+      <button id="bReset" type="button">체크 초기화</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <header class="doc-head">
+      <span class="kicker">HotDB at a Glance</span>
+      <h1>현장 데이터는 쌓이고 → 실적으로 바뀌어 → SAP 로 갑니다</h1>
+      <div class="hero">
+        <div class="hero__step"><span class="hero__n">1</span><b>쌓는다</b><span>장비 데이터를 TSDB 에 그대로</span></div>
+        <div class="hero__ar">→</div>
+        <div class="hero__step"><span class="hero__n">2</span><b>바꾼다</b><span>판별 모듈이 RDB 에 실적으로</span></div>
+        <div class="hero__ar">→</div>
+        <div class="hero__step"><span class="hero__n">3</span><b>보낸다</b><span>RFC Service 가 SAP 로</span></div>
+        <div class="hero__sep"></div>
+        <div class="hero__step hero__step--alt"><span class="hero__n">+</span><b>가져온다</b><span>SAP · Oracle 레거시를 주기적으로 복사</span></div>
+      </div>
+      <div class="meta">
+        <span class="chip">DB 는 PostgreSQL 한 대 (Hot DB)</span>
+        <span class="chip chip--neutral">한 건이 SAP 까지 약 0.5초</span>
+        <span class="chip chip--neutral">Kafka 없이 DB 변경 감지(CDC)</span>
+      </div>
+    </header>
+
+    <!-- 01 -->
+    <section class="sec" id="s1">
+      <h2><span class="n">01</span>흐름 한 장</h2>
+      <p class="why">번호를 따라 읽으면 됩니다. 카드에 마우스를 올리면 그 카드의 선만 남습니다.</p>
+<div class="flow" data-key="glance-main">
+  <div class="flow__head"><span class="flow__title">데이터가 가는 길</span><span class="flow__hint">위 줄 = 현장 데이터가 SAP 까지 (번호 순) · 아래 두 줄 = 레거시를 가져오기 · 흐린 카드 = 범위 밖</span><span class="sp"></span></div>
+  <div class="flow__in" style="grid-template-columns:repeat(7, 1fr);">
+    <div style="grid-column:1 / span 1;grid-row:1 / span 1;" class="fnode fnode--isl" data-id="a"><span class="fnode__no">1</span><span class="fnode__ic" data-ic="broker"></span><div class="fnode__body"><div class="fnode__t">MQTT Agent</div><div class="fnode__s">장비 → 태그</div></div></div>
+    <div style="grid-column:2 / span 1;grid-row:1 / span 1;" class="fnode fnode--dim" data-id="b"><span class="fnode__no">2</span><span class="fnode__ic" data-ic="inbox"></span><div class="fnode__body"><div class="fnode__t">Provider</div><div class="fnode__s">태그 → 표</div></div></div>
+    <div style="grid-column:3 / span 1;grid-row:1 / span 1;" class="fnode fnode--store fnode--new" data-id="c"><span class="fnode__no">3</span><span class="fnode__ic" data-ic="db"></span><div class="fnode__body"><div class="fnode__t">TSDB</div><div class="fnode__s">원본 그대로</div></div></div>
+    <div style="grid-column:4 / span 1;grid-row:1 / span 1;" class="fnode fnode--src fnode--new" data-id="d"><span class="fnode__no">4</span><span class="fnode__ic" data-ic="code"></span><div class="fnode__body"><div class="fnode__t">판별 모듈</div><div class="fnode__s">×4 · CDC</div></div></div>
+    <div style="grid-column:5 / span 1;grid-row:1 / span 1;" class="fnode fnode--store fnode--new" data-id="e"><span class="fnode__no">5</span><span class="fnode__ic" data-ic="db"></span><div class="fnode__body"><div class="fnode__t">RDB</div><div class="fnode__s">실적으로 정리</div></div></div>
+    <div style="grid-column:6 / span 1;grid-row:1 / span 1;" class="fnode fnode--new" data-id="f"><span class="fnode__no">6</span><span class="fnode__ic" data-ic="link"></span><div class="fnode__body"><div class="fnode__t">RFC Service</div><div class="fnode__s">실적만 전송</div></div></div>
+    <div style="grid-column:7 / span 1;grid-row:1 / span 1;" class="fnode fnode--ok" data-id="g"><span class="fnode__no">7</span><span class="fnode__ic" data-ic="server"></span><div class="fnode__body"><div class="fnode__t">SAP</div><div class="fnode__s">Z 표에 기록</div></div></div>
+    <div style="grid-column:7 / span 1;grid-row:2 / span 1;" class="fnode fnode--isl" data-id="s"><span class="fnode__ic" data-ic="server"></span><div class="fnode__body"><div class="fnode__t">SAP 원천</div><div class="fnode__s">레거시</div></div></div>
+    <div style="grid-column:6 / span 1;grid-row:2 / span 1;" class="fnode fnode--new" data-id="f2"><span class="fnode__ic" data-ic="retry"></span><div class="fnode__body"><div class="fnode__t">RFC Service</div><div class="fnode__s">폴링</div></div></div>
+    <div style="grid-column:5 / span 1;grid-row:2 / span 1;" class="fnode fnode--store" data-id="erp"><span class="fnode__ic" data-ic="db"></span><div class="fnode__body"><div class="fnode__t">SAP 사본</div><div class="fnode__s">erp</div></div></div>
+    <div style="grid-column:7 / span 1;grid-row:3 / span 1;" class="fnode fnode--isl" data-id="o"><span class="fnode__ic" data-ic="server"></span><div class="fnode__body"><div class="fnode__t">Oracle</div><div class="fnode__s">레거시</div></div></div>
+    <div style="grid-column:6 / span 1;grid-row:3 / span 1;" class="fnode fnode--new" data-id="da"><span class="fnode__ic" data-ic="retry"></span><div class="fnode__body"><div class="fnode__t">DB Agent</div><div class="fnode__s">폴링</div></div></div>
+    <div style="grid-column:5 / span 1;grid-row:3 / span 1;" class="fnode fnode--store" data-id="or"><span class="fnode__ic" data-ic="db"></span><div class="fnode__body"><div class="fnode__t">Oracle 사본</div><div class="fnode__s">mes · lgs · geo</div></div></div>
+  </div>
+  <div class="flow__legend"><span><i></i>데이터 흐름</span><span><i class="ok"></i>저장 · 확정</span><span><i class="risk"></i>실패 · 유실되는 경로</span><span><i class="muted"></i>버림 · 보류</span><span><b class="nw"></b>이번에 만드는 구성요소</span><span>카드에 마우스를 올리면 연결된 선만 강조됩니다 · 편집 버튼으로 바로 고칠 수 있습니다</span></div>
+  <script type="application/json" class="flow-links">[{"from": "a", "to": "b", "kind": "flow"}, {"from": "b", "to": "c", "kind": "flow"}, {"from": "c", "to": "d", "kind": "flow"}, {"from": "d", "to": "e", "kind": "flow"}, {"from": "e", "to": "f", "kind": "flow"}, {"from": "f", "to": "g", "kind": "ok"}, {"from": "s", "to": "f2", "kind": "flow"}, {"from": "f2", "to": "erp", "kind": "ok"}, {"from": "o", "to": "da", "kind": "flow"}, {"from": "da", "to": "or", "kind": "ok"}]</script>
+</div>
+
+    </section>
+
+    <!-- 02 -->
+    <section class="sec" id="s2">
+      <h2><span class="n">02</span>Hot DB 의 네 칸</h2>
+      <p class="why">DB 한 대를 네 칸으로 나눴습니다. 칸마다 <b>넣는 쪽은 하나</b>입니다.</p>
+      <div class="dbq">
+        <div class="dbq__c dbq__c--field">
+          <div class="dbq__k">현장 원본</div>
+          <div class="dbq__t">TSDB <small>tsdb</small></div>
+          <p class="dbq__d">장비가 보낸 값을 <b>시간순 그대로</b>. 1초마다 쌓임.</p>
+          <div class="dbq__io"><span class="in">넣음 · HotDB Provider</span><span class="out">읽음 · 서비스 · API</span></div>
+          <ul><li><b>status</b> 장비 상태</li><li><b>actual</b> 스캔 진행</li><li><b>artifact</b> 산출물 위치</li></ul>
+        </div>
+        <div class="dbq__c dbq__c--rdb">
+          <div class="dbq__k">정리된 결과</div>
+          <div class="dbq__t">RDB <small>svc_&lt;모듈&gt; × 4</small></div>
+          <p class="dbq__d">모듈마다 <b>최신 상태 · 스캔 · 실적</b>으로 정리. 서로 연결된 표.</p>
+          <div class="dbq__io"><span class="in">넣음 · 판별 모듈</span><span class="out">읽음 · RFC Service</span></div>
+          <ul><li><b>현재 상태</b> 장비당 1줄</li><li><b>스캔</b> → <b>실적</b> · <b>산출물</b></li><li>가공 · 조립 · 의장 · 도장 각자</li></ul>
+        </div>
+        <div class="dbq__c dbq__c--sap">
+          <div class="dbq__k">SAP 사본</div>
+          <div class="dbq__t">Legacy RDB sap <small>erp</small></div>
+          <p class="dbq__d">SAP 표를 <b>바뀐 것만 주기적으로</b> 별도 레거시 DB 에 복사.</p>
+          <div class="dbq__io"><span class="in">넣음 · RFC Service</span><span class="out">읽음 · 서비스 · API</span></div>
+          <ul><li>시험용 114개 표 (레거시 DB)</li><li>예: 품목 · 부품 · 주문 행</li><li>60초 / 10초마다</li></ul>
+        </div>
+        <div class="dbq__c dbq__c--ora">
+          <div class="dbq__k">Oracle 사본</div>
+          <div class="dbq__t">Legacy RDB oracle <small>mes · lgs · geo</small></div>
+          <p class="dbq__d">Oracle 표를 <b>바뀐 것만 주기적으로</b> 별도 레거시 DB 에 복사.</p>
+          <div class="dbq__io"><span class="in">넣음 · DB Agent</span><span class="out">읽음 · 서비스 · API</span></div>
+          <ul><li>시험용 64개 표 (레거시 DB)</li><li>예: 작업 기록 · 경보 · 출하 · 위치 추적</li><li>60초 / 10초마다</li></ul>
+        </div>
+      </div>
+      <p class="small">그 밖에 운영용 칸 <span class="mono">ops</span> 가 있습니다 — 모듈 목록 · 폴링 진행 · SAP 로 보낸 기록 · 실패 건.</p>
+    </section>
+
+    <!-- 03 -->
+    <section class="sec" id="s3">
+      <h2><span class="n">03</span>한 건 따라가기</h2>
+      <p class="why">조립 구역 LiDAR <span class="mono">LDR-ASM-007</span> 의 스캔 하나가 끝났을 때 — 2026-10-06 실제로 흐른 값입니다.</p>
+      <div class="trace">
+        <div class="trace__s"><div class="trace__h"><span class="hero__n">1</span>장비</div><div class="trace__v">스캔 완료<br><b>H1213 · B163P · 100%</b></div><div class="trace__t">MQTT Agent 태그</div></div>
+        <div class="trace__ar">→</div>
+        <div class="trace__s"><div class="trace__h"><span class="hero__n">3</span>TSDB</div><div class="trace__v">actual_history 1줄<br><b>COMPLETE</b></div><div class="trace__t">15:01:25.110</div></div>
+        <div class="trace__ar">→</div>
+        <div class="trace__s"><div class="trace__h"><span class="hero__n">4</span>조립 판별 모듈</div><div class="trace__v">조립 구역 장비 →<br><b>내 몫</b></div><div class="trace__t">변경 감지 (CDC)</div></div>
+        <div class="trace__ar">→</div>
+        <div class="trace__s"><div class="trace__h"><span class="hero__n">5</span>RDB svc_asm</div><div class="trace__v">scan 닫힘 · actual_result<br><b>PENDING</b></div><div class="trace__t">15:01:25.414</div></div>
+        <div class="trace__ar">→</div>
+        <div class="trace__s trace__s--end"><div class="trace__h"><span class="hero__n">7</span>SAP Z 표</div><div class="trace__v">실적 1줄<br><b>asm · H1213 · B163P</b></div><div class="trace__t">15:01:25.615</div></div>
+      </div>
+      <div class="g2">
+        <div class="note note--ok"><p class="note__t">약 0.5초</p>TSDB 에 들어오고 SAP 표에 적히기까지. 같은 실적은 한 번만 보내고, 판정이 바뀌면 다시 보냅니다.</div>
+        <div class="note note--info"><p class="note__t">다른 구역 장비면</p>조립 모듈은 그냥 넘깁니다. 의장 장비는 의장 모듈만, 도장은 도장 모듈만 가져갑니다.</div>
+      </div>
+    </section>
+
+    <!-- 04 -->
+    <section class="sec" id="s4er">
+      <h2><span class="n">04</span>칸별 연관관계 — 자세히</h2>
+      <p class="why">표 안의 컬럼까지 그렸습니다. <b>PK</b> = 이 표의 열쇠, <b>FK</b> = 다른 표를 가리키는 컬럼, 선은 화살표 쪽이 부모입니다.</p>
+      <h3>TSDB field data — 장비 ◀ 태그 ◀ 이력 세 표</h3>
+      <p>이력 행에는 장비 id 가 없고 <span class="mono">tag_key</span> 숫자만 있습니다. 태그 등록부를 거쳐야 어느 장비 · 어느 구역인지 압니다.</p>
+<div class="er-legend"><span><i style="border-color:var(--ink3)"></i>FK (자식 → 부모)</span><span><i style="border-color:var(--hw)"></i>CDC 로 옮김 (라우트)</span><span><i style="border-color:var(--info)"></i>SAP 로 보냄</span><span><i style="border-top-style:dashed;border-color:var(--ink4)"></i>같은 키 (FK 없음)</span><span><b style="color:var(--hw)">PK</b> 기본키 · <b style="color:var(--hw-dk)">FK</b> 외래키 · 오른쪽 글자 = 타입 또는 값 출처</span></div><figure class="er"><svg viewBox="0 0 1020 732" role="img" aria-label="TSDB field data (스키마 tsdb) — 이력 세 표는 tag_key 하나로 태그 등록부에 매달리고, 태그 등록부가 장비 마스터에 매달린다. 실적과 산출물은 FK 없이 scan_id 로 같은 스캔을 가리킨다.">
+<defs><marker id="er-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="er-ah"/></marker><marker id="er-o" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6"><circle cx="5" cy="5" r="3.2" class="er-dot"/></marker></defs>
+<path d="M420,193.0 C360,193.0 380,83.0 320,83.0" class="er-e er-e--fk" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<g class="er-lb er-lb--fk"><rect x="304.8" y="128.0" width="130.4" height="20" rx="10"/><text x="370.0" y="142.0" text-anchor="middle">(site, device_id)</text></g>
+<path d="M170.0,330 C170.0,280 570.0,320 570.0,270" class="er-e er-e--fk" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<g class="er-lb er-lb--fk"><rect x="340.8" y="290.0" width="58.4" height="20" rx="10"/><text x="370.0" y="304.0" text-anchor="middle">tag_key</text></g>
+<path d="M510.0,330 C510.0,280 570.0,320 570.0,270" class="er-e er-e--fk" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M850.0,330 C850.0,280 570.0,320 570.0,270" class="er-e er-e--fk" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M660,415.0 C720,415.0 640,415.0 700,415.0" class="er-e er-e--same" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<g class="er-lb er-lb--same"><rect x="650.8" y="405.0" width="58.4" height="20" rx="10"/><text x="680.0" y="419.0" text-anchor="middle">scan_id</text></g>
+<g class="er-t er-t--field"><rect x="20" y="20" width="300" height="184" rx="8" class="er-box"/><path d="M20,28 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="30" y="40" class="er-tt">tsdb.device</text><text x="310" y="40" text-anchor="end" class="er-ts">장비 마스터 · 일반 표</text>
+<rect x="28" y="55" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="64.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="65" class="er-c er-c--pk">site</text><text x="310" y="65" text-anchor="end" class="er-ty">text</text>
+<rect x="21" y="72" width="298" height="22" class="er-zebra"/>
+<rect x="28" y="77" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="86.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="87" class="er-c er-c--pk">device_id</text><text x="310" y="87" text-anchor="end" class="er-ty">text</text>
+<text x="32" y="109" class="er-c">device_role</text><text x="310" y="109" text-anchor="end" class="er-ty">text</text>
+<rect x="21" y="116" width="298" height="22" class="er-zebra"/>
+<text x="32" y="131" class="er-c">zone</text><text x="310" y="131" text-anchor="end" class="er-ty">text</text>
+<text x="32" y="153" class="er-c">shop</text><text x="310" y="153" text-anchor="end" class="er-ty">text</text>
+<rect x="21" y="160" width="298" height="22" class="er-zebra"/>
+<text x="32" y="175" class="er-c">bay</text><text x="310" y="175" text-anchor="end" class="er-ty">text</text>
+<text x="32" y="197" class="er-c">active</text><text x="310" y="197" text-anchor="end" class="er-ty">bool</text>
+</g>
+<g class="er-t er-t--field"><rect x="420" y="20" width="300" height="250" rx="8" class="er-box"/><path d="M420,28 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="430" y="40" class="er-tt">tsdb.tag_catalog</text><text x="710" y="40" text-anchor="end" class="er-ts">태그 등록부 · 일반 표</text>
+<rect x="428" y="55" width="20" height="12" rx="3" class="er-pk"/><text x="438" y="64.5" text-anchor="middle" class="er-bt">PK</text><text x="476" y="65" class="er-c er-c--pk">tag_key</text><text x="710" y="65" text-anchor="end" class="er-ty">bigint</text>
+<rect x="421" y="72" width="298" height="22" class="er-zebra"/>
+<text x="432" y="87" class="er-c">edge_group_id</text><text x="710" y="87" text-anchor="end" class="er-ty">text</text>
+<text x="432" y="109" class="er-c">tag_id</text><text x="710" y="109" text-anchor="end" class="er-ty">varchar(100)</text>
+<rect x="421" y="116" width="298" height="22" class="er-zebra"/>
+<text x="432" y="131" class="er-c">mqtt_topic</text><text x="710" y="131" text-anchor="end" class="er-ty">text</text>
+<text x="432" y="153" class="er-c">source_id</text><text x="710" y="153" text-anchor="end" class="er-ty">text</text>
+<rect x="421" y="160" width="298" height="22" class="er-zebra"/>
+<rect x="428" y="165" width="20" height="12" rx="3" class="er-fk"/><text x="438" y="174.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="476" y="175" class="er-c">site</text><text x="710" y="175" text-anchor="end" class="er-ty">text</text>
+<rect x="428" y="187" width="20" height="12" rx="3" class="er-fk"/><text x="438" y="196.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="476" y="197" class="er-c">device_id</text><text x="710" y="197" text-anchor="end" class="er-ty">text</text>
+<rect x="421" y="204" width="298" height="22" class="er-zebra"/>
+<text x="432" y="219" class="er-c">channel</text><text x="710" y="219" text-anchor="end" class="er-ty">text</text>
+<text x="432" y="241" class="er-c">artifact_type</text><text x="710" y="241" text-anchor="end" class="er-ty">text</text>
+<rect x="421" y="248" width="298" height="22" class="er-zebra"/>
+<text x="432" y="263" class="er-c">active</text><text x="710" y="263" text-anchor="end" class="er-ty">bool</text>
+</g>
+<g class="er-t er-t--field"><rect x="20" y="330" width="300" height="294" rx="8" class="er-box"/><path d="M20,338 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="30" y="350" class="er-tt">tsdb.status_history</text><text x="310" y="350" text-anchor="end" class="er-ts">하이퍼 · 6h · 1초</text>
+<rect x="28" y="365" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="374.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="375" class="er-c er-c--pk">event_time</text><text x="310" y="375" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="21" y="382" width="298" height="22" class="er-zebra"/>
+<rect x="28" y="387" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="396.5" text-anchor="middle" class="er-bt">PK</text><rect x="51" y="387" width="20" height="12" rx="3" class="er-fk"/><text x="61" y="396.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="78" y="397" class="er-c er-c--pk">tag_key</text><text x="310" y="397" text-anchor="end" class="er-ty">bigint</text>
+<text x="32" y="419" class="er-c">status</text><text x="310" y="419" text-anchor="end" class="er-ty">text</text>
+<rect x="21" y="426" width="298" height="22" class="er-zebra"/>
+<text x="32" y="441" class="er-c">error_code</text><text x="310" y="441" text-anchor="end" class="er-ty">text</text>
+<text x="32" y="463" class="er-c">last_heartbeat_at</text><text x="310" y="463" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="21" y="470" width="298" height="22" class="er-zebra"/>
+<text x="32" y="485" class="er-c">scan_rate_pts_per_sec</text><text x="310" y="485" text-anchor="end" class="er-ty">integer</text>
+<text x="32" y="507" class="er-c">temperature_c</text><text x="310" y="507" text-anchor="end" class="er-ty">real</text>
+<rect x="21" y="514" width="298" height="22" class="er-zebra"/>
+<text x="32" y="529" class="er-c">connectivity_rssi</text><text x="310" y="529" text-anchor="end" class="er-ty">smallint</text>
+<text x="32" y="551" class="er-c">fov_mode</text><text x="310" y="551" text-anchor="end" class="er-ty">text</text>
+<rect x="21" y="558" width="298" height="22" class="er-zebra"/>
+<text x="32" y="573" class="er-c">source_time_text</text><text x="310" y="573" text-anchor="end" class="er-ty">text</text>
+<text x="32" y="595" class="er-c">source_ingested_at</text><text x="310" y="595" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="21" y="602" width="298" height="22" class="er-zebra"/>
+<text x="32" y="617" class="er-c">received_at</text><text x="310" y="617" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--field"><rect x="360" y="330" width="300" height="338" rx="8" class="er-box"/><path d="M360,338 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="370" y="350" class="er-tt">tsdb.actual_history</text><text x="650" y="350" text-anchor="end" class="er-ts">하이퍼 · 1d · 1분</text>
+<rect x="368" y="365" width="20" height="12" rx="3" class="er-pk"/><text x="378" y="374.5" text-anchor="middle" class="er-bt">PK</text><text x="416" y="375" class="er-c er-c--pk">event_time</text><text x="650" y="375" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="361" y="382" width="298" height="22" class="er-zebra"/>
+<rect x="368" y="387" width="20" height="12" rx="3" class="er-pk"/><text x="378" y="396.5" text-anchor="middle" class="er-bt">PK</text><rect x="391" y="387" width="20" height="12" rx="3" class="er-fk"/><text x="401" y="396.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="418" y="397" class="er-c er-c--pk">tag_key</text><text x="650" y="397" text-anchor="end" class="er-ty">bigint</text>
+<rect x="368" y="409" width="20" height="12" rx="3" class="er-pk"/><text x="378" y="418.5" text-anchor="middle" class="er-bt">PK</text><text x="416" y="419" class="er-c er-c--pk">scan_id</text><text x="650" y="419" text-anchor="end" class="er-ty">uuid</text>
+<rect x="361" y="426" width="298" height="22" class="er-zebra"/>
+<rect x="368" y="431" width="20" height="12" rx="3" class="er-pk"/><text x="378" y="440.5" text-anchor="middle" class="er-bt">PK</text><text x="416" y="441" class="er-c er-c--pk">event_type</text><text x="650" y="441" text-anchor="end" class="er-ty">text</text>
+<text x="372" y="463" class="er-c">hull_no</text><text x="650" y="463" text-anchor="end" class="er-ty">text</text>
+<rect x="361" y="470" width="298" height="22" class="er-zebra"/>
+<text x="372" y="485" class="er-c">block_id</text><text x="650" y="485" text-anchor="end" class="er-ty">text</text>
+<text x="372" y="507" class="er-c">scanned_at</text><text x="650" y="507" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="361" y="514" width="298" height="22" class="er-zebra"/>
+<text x="372" y="529" class="er-c">block_progress_rate</text><text x="650" y="529" text-anchor="end" class="er-ty">real</text>
+<text x="372" y="551" class="er-c">match_confidence</text><text x="650" y="551" text-anchor="end" class="er-ty">real</text>
+<rect x="361" y="558" width="298" height="22" class="er-zebra"/>
+<text x="372" y="573" class="er-c">reference_cad_id</text><text x="650" y="573" text-anchor="end" class="er-ty">text</text>
+<text x="372" y="595" class="er-c">model_version</text><text x="650" y="595" text-anchor="end" class="er-ty">text</text>
+<rect x="361" y="602" width="298" height="22" class="er-zebra"/>
+<text x="372" y="617" class="er-c">source_time_text</text><text x="650" y="617" text-anchor="end" class="er-ty">text</text>
+<text x="372" y="639" class="er-c">source_ingested_at</text><text x="650" y="639" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="361" y="646" width="298" height="22" class="er-zebra"/>
+<text x="372" y="661" class="er-c">received_at</text><text x="650" y="661" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--field"><rect x="700" y="330" width="300" height="382" rx="8" class="er-box"/><path d="M700,338 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="710" y="350" class="er-tt">tsdb.artifact_history</text><text x="990" y="350" text-anchor="end" class="er-ts">하이퍼 · 1d</text>
+<rect x="708" y="365" width="20" height="12" rx="3" class="er-pk"/><text x="718" y="374.5" text-anchor="middle" class="er-bt">PK</text><text x="756" y="375" class="er-c er-c--pk">event_time</text><text x="990" y="375" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="701" y="382" width="298" height="22" class="er-zebra"/>
+<rect x="708" y="387" width="20" height="12" rx="3" class="er-pk"/><text x="718" y="396.5" text-anchor="middle" class="er-bt">PK</text><rect x="731" y="387" width="20" height="12" rx="3" class="er-fk"/><text x="741" y="396.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="758" y="397" class="er-c er-c--pk">tag_key</text><text x="990" y="397" text-anchor="end" class="er-ty">bigint</text>
+<rect x="708" y="409" width="20" height="12" rx="3" class="er-pk"/><text x="718" y="418.5" text-anchor="middle" class="er-bt">PK</text><text x="756" y="419" class="er-c er-c--pk">scan_id</text><text x="990" y="419" text-anchor="end" class="er-ty">uuid</text>
+<rect x="701" y="426" width="298" height="22" class="er-zebra"/>
+<rect x="708" y="431" width="20" height="12" rx="3" class="er-pk"/><text x="718" y="440.5" text-anchor="middle" class="er-bt">PK</text><text x="756" y="441" class="er-c er-c--pk">artifact_type</text><text x="990" y="441" text-anchor="end" class="er-ty">text</text>
+<rect x="708" y="453" width="20" height="12" rx="3" class="er-pk"/><text x="718" y="462.5" text-anchor="middle" class="er-bt">PK</text><text x="756" y="463" class="er-c er-c--pk">segment_key</text><text x="990" y="463" text-anchor="end" class="er-ty">text</text>
+<rect x="701" y="470" width="298" height="22" class="er-zebra"/>
+<text x="712" y="485" class="er-c">hull_no</text><text x="990" y="485" text-anchor="end" class="er-ty">text</text>
+<text x="712" y="507" class="er-c">block_id</text><text x="990" y="507" text-anchor="end" class="er-ty">text</text>
+<rect x="701" y="514" width="298" height="22" class="er-zebra"/>
+<text x="712" y="529" class="er-c">storage_uri</text><text x="990" y="529" text-anchor="end" class="er-ty">text</text>
+<text x="712" y="551" class="er-c">file_size_bytes</text><text x="990" y="551" text-anchor="end" class="er-ty">bigint</text>
+<rect x="701" y="558" width="298" height="22" class="er-zebra"/>
+<text x="712" y="573" class="er-c">checksum</text><text x="990" y="573" text-anchor="end" class="er-ty">text</text>
+<text x="712" y="595" class="er-c">transformation_matrix</text><text x="990" y="595" text-anchor="end" class="er-ty">real[]</text>
+<rect x="701" y="602" width="298" height="22" class="er-zebra"/>
+<text x="712" y="617" class="er-c">produced_by_device_id</text><text x="990" y="617" text-anchor="end" class="er-ty">text</text>
+<text x="712" y="639" class="er-c">model_version</text><text x="990" y="639" text-anchor="end" class="er-ty">text</text>
+<rect x="701" y="646" width="298" height="22" class="er-zebra"/>
+<text x="712" y="661" class="er-c">source_time_text</text><text x="990" y="661" text-anchor="end" class="er-ty">text</text>
+<text x="712" y="683" class="er-c">source_ingested_at</text><text x="990" y="683" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="701" y="690" width="298" height="22" class="er-zebra"/>
+<text x="712" y="705" class="er-c">received_at</text><text x="990" y="705" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+</svg>
+<figcaption>TSDB field data (스키마 tsdb) — 이력 세 표는 tag_key 하나로 태그 등록부에 매달리고, 태그 등록부가 장비 마스터에 매달린다. 실적과 산출물은 FK 없이 scan_id 로 같은 스캔을 가리킨다.</figcaption>
+</figure>
+
+      <h3>RDB field data — 장비 ◀ 현재 상태 ◀ 변경 이력 · 장비 ◀ 스캔 ◀ 실적 · 산출물</h3>
+      <p>판별 모듈마다 같은 다섯 표(<span class="mono">svc_mch · asm · oft · pnt</span>). 실적과 산출물은 반드시 스캔에 매달립니다 — 부모 없는 실적은 들어가지 않습니다.</p>
+<div class="er-legend"><span><i style="border-color:var(--ink3)"></i>FK (자식 → 부모)</span><span><i style="border-color:var(--hw)"></i>CDC 로 옮김 (라우트)</span><span><i style="border-color:var(--info)"></i>SAP 로 보냄</span><span><i style="border-top-style:dashed;border-color:var(--ink4)"></i>같은 키 (FK 없음)</span><span><b style="color:var(--hw)">PK</b> 기본키 · <b style="color:var(--hw-dk)">FK</b> 외래키 · 오른쪽 글자 = 타입 또는 값 출처</span></div><figure class="er"><svg viewBox="0 0 1080 1042" role="img" aria-label="RDB field data (스키마 svc 하나, 모든 표에 module 컬럼 · 행 수준 보안으로 모듈별 분리). 모듈 안 FK 는 커밋 때 검사(DEFERRABLE) — 한 배치 안 순서가 섞여도 된다. 장비 마스터 FK 는 다른 칸(tsdb.device)의 (site, device_id) 를 가리킨다.">
+<defs><marker id="er-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="er-ah"/></marker><marker id="er-o" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6"><circle cx="5" cy="5" r="3.2" class="er-dot"/></marker></defs>
+<path d="M380,105.0 C320,105.0 380,183.0 320,183.0" class="er-e er-e--fk" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M380,437.0 C320,437.0 380,183.0 320,183.0" class="er-e er-e--fk" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M760,83.0 C700,83.0 740,105.0 680,105.0" class="er-e er-e--fk" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M760,437.0 C700,437.0 740,393.0 680,393.0" class="er-e er-e--fk" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M760,703.0 C700,703.0 740,393.0 680,393.0" class="er-e er-e--fk" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<g class="er-lb er-lb--fk"><rect x="690.8" y="538.0" width="58.4" height="20" rx="10"/><text x="720.0" y="552.0" text-anchor="middle">scan_id</text></g>
+<g class="er-t er-t--ext"><rect x="20" y="120" width="300" height="96" rx="8" class="er-box"/><path d="M20,128 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="30" y="140" class="er-tt">tsdb.device</text><text x="310" y="140" text-anchor="end" class="er-ts">다른 칸 · 장비 마스터</text>
+<rect x="28" y="155" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="164.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="165" class="er-c er-c--pk">site</text><text x="310" y="165" text-anchor="end" class="er-ty">text</text>
+<rect x="21" y="172" width="298" height="22" class="er-zebra"/>
+<rect x="28" y="177" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="186.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="187" class="er-c er-c--pk">device_id</text><text x="310" y="187" text-anchor="end" class="er-ty">text</text>
+<text x="32" y="209" class="er-c">zone</text><text x="310" y="209" text-anchor="end" class="er-ty">모듈을 가르는 값</text>
+</g>
+<g class="er-t er-t--rdb"><rect x="380" y="20" width="300" height="316" rx="8" class="er-box"/><path d="M380,28 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="390" y="40" class="er-tt">device_status_current</text><text x="670" y="40" text-anchor="end" class="er-ts">장비당 1행</text>
+<text x="392" y="65" class="er-c">module</text><text x="670" y="65" text-anchor="end" class="er-ty">text</text>
+<rect x="381" y="72" width="298" height="22" class="er-zebra"/>
+<rect x="388" y="77" width="20" height="12" rx="3" class="er-fk"/><text x="398" y="86.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="436" y="87" class="er-c">site</text><text x="670" y="87" text-anchor="end" class="er-ty">text</text>
+<rect x="388" y="99" width="20" height="12" rx="3" class="er-pk"/><text x="398" y="108.5" text-anchor="middle" class="er-bt">PK</text><rect x="411" y="99" width="20" height="12" rx="3" class="er-fk"/><text x="421" y="108.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="438" y="109" class="er-c er-c--pk">device_id</text><text x="670" y="109" text-anchor="end" class="er-ty">text</text>
+<rect x="381" y="116" width="298" height="22" class="er-zebra"/>
+<text x="392" y="131" class="er-c">status</text><text x="670" y="131" text-anchor="end" class="er-ty">text</text>
+<text x="392" y="153" class="er-c">error_code</text><text x="670" y="153" text-anchor="end" class="er-ty">text</text>
+<rect x="381" y="160" width="298" height="22" class="er-zebra"/>
+<text x="392" y="175" class="er-c">last_heartbeat_at</text><text x="670" y="175" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="392" y="197" class="er-c">scan_rate_pts_per_sec</text><text x="670" y="197" text-anchor="end" class="er-ty">integer</text>
+<rect x="381" y="204" width="298" height="22" class="er-zebra"/>
+<text x="392" y="219" class="er-c">temperature_c</text><text x="670" y="219" text-anchor="end" class="er-ty">real</text>
+<text x="392" y="241" class="er-c">connectivity_rssi</text><text x="670" y="241" text-anchor="end" class="er-ty">smallint</text>
+<rect x="381" y="248" width="298" height="22" class="er-zebra"/>
+<text x="392" y="263" class="er-c">fov_mode</text><text x="670" y="263" text-anchor="end" class="er-ty">text</text>
+<text x="392" y="285" class="er-c">src_event_time</text><text x="670" y="285" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="381" y="292" width="298" height="22" class="er-zebra"/>
+<text x="392" y="307" class="er-c">src_received_at</text><text x="670" y="307" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="392" y="329" class="er-c">applied_at</text><text x="670" y="329" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--rdb"><rect x="760" y="20" width="300" height="184" rx="8" class="er-box"/><path d="M760,28 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="770" y="40" class="er-tt">device_status_change</text><text x="1050" y="40" text-anchor="end" class="er-ts">바뀔 때만</text>
+<text x="772" y="65" class="er-c">module</text><text x="1050" y="65" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="72" width="298" height="22" class="er-zebra"/>
+<rect x="768" y="77" width="20" height="12" rx="3" class="er-pk"/><text x="778" y="86.5" text-anchor="middle" class="er-bt">PK</text><rect x="791" y="77" width="20" height="12" rx="3" class="er-fk"/><text x="801" y="86.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="818" y="87" class="er-c er-c--pk">device_id</text><text x="1050" y="87" text-anchor="end" class="er-ty">text</text>
+<rect x="768" y="99" width="20" height="12" rx="3" class="er-pk"/><text x="778" y="108.5" text-anchor="middle" class="er-bt">PK</text><text x="816" y="109" class="er-c er-c--pk">changed_at</text><text x="1050" y="109" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="761" y="116" width="298" height="22" class="er-zebra"/>
+<text x="772" y="131" class="er-c">status</text><text x="1050" y="131" text-anchor="end" class="er-ty">text</text>
+<text x="772" y="153" class="er-c">error_code</text><text x="1050" y="153" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="160" width="298" height="22" class="er-zebra"/>
+<text x="772" y="175" class="er-c">src_received_at</text><text x="1050" y="175" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="772" y="197" class="er-c">applied_at</text><text x="1050" y="197" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--rdb"><rect x="380" y="330" width="300" height="382" rx="8" class="er-box"/><path d="M380,338 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="390" y="350" class="er-tt">scan</text><text x="670" y="350" text-anchor="end" class="er-ts">스캔 1건 · 실적 · 산출물의 부모</text>
+<text x="392" y="375" class="er-c">module</text><text x="670" y="375" text-anchor="end" class="er-ty">text</text>
+<rect x="381" y="382" width="298" height="22" class="er-zebra"/>
+<rect x="388" y="387" width="20" height="12" rx="3" class="er-pk"/><text x="398" y="396.5" text-anchor="middle" class="er-bt">PK</text><text x="436" y="397" class="er-c er-c--pk">scan_id</text><text x="670" y="397" text-anchor="end" class="er-ty">uuid</text>
+<rect x="388" y="409" width="20" height="12" rx="3" class="er-fk"/><text x="398" y="418.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="436" y="419" class="er-c">site</text><text x="670" y="419" text-anchor="end" class="er-ty">text</text>
+<rect x="381" y="426" width="298" height="22" class="er-zebra"/>
+<rect x="388" y="431" width="20" height="12" rx="3" class="er-fk"/><text x="398" y="440.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="436" y="441" class="er-c">device_id</text><text x="670" y="441" text-anchor="end" class="er-ty">text</text>
+<text x="392" y="463" class="er-c">hull_no</text><text x="670" y="463" text-anchor="end" class="er-ty">text</text>
+<rect x="381" y="470" width="298" height="22" class="er-zebra"/>
+<text x="392" y="485" class="er-c">block_id</text><text x="670" y="485" text-anchor="end" class="er-ty">text</text>
+<text x="392" y="507" class="er-c">first_event_at</text><text x="670" y="507" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="381" y="514" width="298" height="22" class="er-zebra"/>
+<text x="392" y="529" class="er-c">last_event_at</text><text x="670" y="529" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="392" y="551" class="er-c">last_event_type</text><text x="670" y="551" text-anchor="end" class="er-ty">text</text>
+<rect x="381" y="558" width="298" height="22" class="er-zebra"/>
+<text x="392" y="573" class="er-c">block_progress_rate</text><text x="670" y="573" text-anchor="end" class="er-ty">real</text>
+<text x="392" y="595" class="er-c">match_confidence</text><text x="670" y="595" text-anchor="end" class="er-ty">real</text>
+<rect x="381" y="602" width="298" height="22" class="er-zebra"/>
+<text x="392" y="617" class="er-c">reference_cad_id</text><text x="670" y="617" text-anchor="end" class="er-ty">text</text>
+<text x="392" y="639" class="er-c">model_version</text><text x="670" y="639" text-anchor="end" class="er-ty">text</text>
+<rect x="381" y="646" width="298" height="22" class="er-zebra"/>
+<text x="392" y="661" class="er-c">completed_at</text><text x="670" y="661" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="392" y="683" class="er-c">src_received_at</text><text x="670" y="683" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="381" y="690" width="298" height="22" class="er-zebra"/>
+<text x="392" y="705" class="er-c">applied_at</text><text x="670" y="705" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--rdb"><rect x="760" y="330" width="300" height="316" rx="8" class="er-box"/><path d="M760,338 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="770" y="350" class="er-tt">actual_result</text><text x="1050" y="350" text-anchor="end" class="er-ts">COMPLETE · 판정</text>
+<text x="772" y="375" class="er-c">module</text><text x="1050" y="375" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="382" width="298" height="22" class="er-zebra"/>
+<rect x="768" y="387" width="20" height="12" rx="3" class="er-pk"/><text x="778" y="396.5" text-anchor="middle" class="er-bt">PK</text><text x="816" y="397" class="er-c er-c--pk">hull_no</text><text x="1050" y="397" text-anchor="end" class="er-ty">text</text>
+<rect x="768" y="409" width="20" height="12" rx="3" class="er-pk"/><text x="778" y="418.5" text-anchor="middle" class="er-bt">PK</text><text x="816" y="419" class="er-c er-c--pk">block_id</text><text x="1050" y="419" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="426" width="298" height="22" class="er-zebra"/>
+<rect x="768" y="431" width="20" height="12" rx="3" class="er-pk"/><text x="778" y="440.5" text-anchor="middle" class="er-bt">PK</text><rect x="791" y="431" width="20" height="12" rx="3" class="er-fk"/><text x="801" y="440.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="818" y="441" class="er-c er-c--pk">scan_id</text><text x="1050" y="441" text-anchor="end" class="er-ty">uuid</text>
+<text x="772" y="463" class="er-c">device_id</text><text x="1050" y="463" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="470" width="298" height="22" class="er-zebra"/>
+<text x="772" y="485" class="er-c">completed_at</text><text x="1050" y="485" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="772" y="507" class="er-c">block_progress_rate</text><text x="1050" y="507" text-anchor="end" class="er-ty">real</text>
+<rect x="761" y="514" width="298" height="22" class="er-zebra"/>
+<text x="772" y="529" class="er-c">match_confidence</text><text x="1050" y="529" text-anchor="end" class="er-ty">real</text>
+<text x="772" y="551" class="er-c">reference_cad_id</text><text x="1050" y="551" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="558" width="298" height="22" class="er-zebra"/>
+<text x="772" y="573" class="er-c">model_version</text><text x="1050" y="573" text-anchor="end" class="er-ty">text</text>
+<text x="772" y="595" class="er-c">judged_status</text><text x="1050" y="595" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="602" width="298" height="22" class="er-zebra"/>
+<text x="772" y="617" class="er-c">src_received_at</text><text x="1050" y="617" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="772" y="639" class="er-c">applied_at</text><text x="1050" y="639" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--rdb"><rect x="760" y="640" width="300" height="382" rx="8" class="er-box"/><path d="M760,648 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="770" y="660" class="er-tt">artifact</text><text x="1050" y="660" text-anchor="end" class="er-ts">산출물 위치</text>
+<text x="772" y="685" class="er-c">module</text><text x="1050" y="685" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="692" width="298" height="22" class="er-zebra"/>
+<rect x="768" y="697" width="20" height="12" rx="3" class="er-pk"/><text x="778" y="706.5" text-anchor="middle" class="er-bt">PK</text><rect x="791" y="697" width="20" height="12" rx="3" class="er-fk"/><text x="801" y="706.5" text-anchor="middle" class="er-bt er-bt--fk">FK</text><text x="818" y="707" class="er-c er-c--pk">scan_id</text><text x="1050" y="707" text-anchor="end" class="er-ty">uuid</text>
+<rect x="768" y="719" width="20" height="12" rx="3" class="er-pk"/><text x="778" y="728.5" text-anchor="middle" class="er-bt">PK</text><text x="816" y="729" class="er-c er-c--pk">artifact_type</text><text x="1050" y="729" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="736" width="298" height="22" class="er-zebra"/>
+<rect x="768" y="741" width="20" height="12" rx="3" class="er-pk"/><text x="778" y="750.5" text-anchor="middle" class="er-bt">PK</text><text x="816" y="751" class="er-c er-c--pk">segment_key</text><text x="1050" y="751" text-anchor="end" class="er-ty">text</text>
+<text x="772" y="773" class="er-c">device_id</text><text x="1050" y="773" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="780" width="298" height="22" class="er-zebra"/>
+<text x="772" y="795" class="er-c">hull_no</text><text x="1050" y="795" text-anchor="end" class="er-ty">text</text>
+<text x="772" y="817" class="er-c">block_id</text><text x="1050" y="817" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="824" width="298" height="22" class="er-zebra"/>
+<text x="772" y="839" class="er-c">storage_uri</text><text x="1050" y="839" text-anchor="end" class="er-ty">text</text>
+<text x="772" y="861" class="er-c">file_size_bytes</text><text x="1050" y="861" text-anchor="end" class="er-ty">bigint</text>
+<rect x="761" y="868" width="298" height="22" class="er-zebra"/>
+<text x="772" y="883" class="er-c">checksum</text><text x="1050" y="883" text-anchor="end" class="er-ty">text</text>
+<text x="772" y="905" class="er-c">transformation_matrix</text><text x="1050" y="905" text-anchor="end" class="er-ty">real[]</text>
+<rect x="761" y="912" width="298" height="22" class="er-zebra"/>
+<text x="772" y="927" class="er-c">produced_by_device_id</text><text x="1050" y="927" text-anchor="end" class="er-ty">text</text>
+<text x="772" y="949" class="er-c">model_version</text><text x="1050" y="949" text-anchor="end" class="er-ty">text</text>
+<rect x="761" y="956" width="298" height="22" class="er-zebra"/>
+<text x="772" y="971" class="er-c">src_event_time</text><text x="1050" y="971" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="772" y="993" class="er-c">src_received_at</text><text x="1050" y="993" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="761" y="1000" width="298" height="22" class="er-zebra"/>
+<text x="772" y="1015" class="er-c">applied_at</text><text x="1050" y="1015" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+</svg>
+<figcaption>RDB field data (스키마 svc 하나, 모든 표에 module 컬럼 · 행 수준 보안으로 모듈별 분리). 모듈 안 FK 는 커밋 때 검사(DEFERRABLE) — 한 배치 안 순서가 섞여도 된다. 장비 마스터 FK 는 다른 칸(tsdb.device)의 (site, device_id) 를 가리킨다.</figcaption>
+</figure>
+
+      <h3>SAP 쪽 새 표 — tsdb → RDB → SAP 로 컬럼이 옮겨 가는 길</h3>
+      <p>SAP 에 새로 만드는 표는 <span class="mono">zhotdb_actual_result</span> 하나. RDB 의 <span class="mono">actual_result</span> 컬럼이 그대로 옮겨 가고, 같은 실적 · 같은 판정은 한 번만 적힙니다.</p>
+<div class="er-legend"><span><i style="border-color:var(--ink3)"></i>FK (자식 → 부모)</span><span><i style="border-color:var(--hw)"></i>CDC 로 옮김 (라우트)</span><span><i style="border-color:var(--info)"></i>SAP 로 보냄</span><span><i style="border-top-style:dashed;border-color:var(--ink4)"></i>같은 키 (FK 없음)</span><span><b style="color:var(--hw)">PK</b> 기본키 · <b style="color:var(--hw-dk)">FK</b> 외래키 · 오른쪽 글자 = 타입 또는 값 출처</span></div><figure class="er"><svg viewBox="0 0 1100 748" role="img" aria-label="tsdb → RDB → SAP 로 컬럼이 옮겨 가는 길. 주황 = 판별 모듈의 CDC 라우트, 파랑 = RFC Service 가 SAP Z 표에 쓰는 컬럼. zone 은 원천 행의 module 컬럼에서, sent_at 은 SAP 쪽 시각. 점선 = RFC Service 가 SAP 에 쓰기 전에 ops.rfc_sent 에 먼저 기록하고, 이미 있으면 보내지 않는다. Z 표와 ops.rfc_sent 의 PK(zone · hull_no · block_id · scan_id · judged_status)가 같은 실적을 두 번 쓰지 않게 막는다.">
+<defs><marker id="er-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="er-ah"/></marker><marker id="er-o" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6"><circle cx="5" cy="5" r="3.2" class="er-dot"/></marker></defs>
+<path d="M320,105.0 C380,105.0 340,83.0 400,83.0" class="er-e er-e--cdc" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<g class="er-lb er-lb--cdc"><rect x="305.6" y="84.0" width="108.8" height="20" rx="10"/><text x="360.0" y="98.0" text-anchor="middle">status-current</text></g>
+<path d="M320,285.0 C380,285.0 340,201.0 400,201.0" class="er-e er-e--cdc" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<g class="er-lb er-lb--cdc"><rect x="341.6" y="233.0" width="36.8" height="20" rx="10"/><text x="360.0" y="247.0" text-anchor="middle">scan</text></g>
+<path d="M320,329.0 C380,329.0 340,363.0 400,363.0" class="er-e er-e--cdc" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<g class="er-lb er-lb--cdc"><rect x="320.0" y="336.0" width="80.0" height="20" rx="10"/><text x="360.0" y="350.0" text-anchor="middle">COMPLETE 만</text></g>
+<path d="M320,545.0 C380,545.0 340,651.0 400,651.0" class="er-e er-e--cdc" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<g class="er-lb er-lb--cdc"><rect x="327.2" y="588.0" width="65.6" height="20" rx="10"/><text x="360.0" y="602.0" text-anchor="middle">artifact</text></g>
+<path d="M700,363.0 C760,363.0 720,363.0 780,363.0" class="er-e er-e--send" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M700,385.0 C760,385.0 720,385.0 780,385.0" class="er-e er-e--send" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M700,407.0 C760,407.0 720,407.0 780,407.0" class="er-e er-e--send" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M700,561.0 C760,561.0 720,429.0 780,429.0" class="er-e er-e--send" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M700,429.0 C760,429.0 720,451.0 780,451.0" class="er-e er-e--send" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M700,451.0 C760,451.0 720,473.0 780,473.0" class="er-e er-e--send" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M700,473.0 C760,473.0 720,495.0 780,495.0" class="er-e er-e--send" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M700,495.0 C760,495.0 720,517.0 780,517.0" class="er-e er-e--send" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<path d="M700,363.0 C760,363.0 720,83.0 780,83.0" class="er-e er-e--same" marker-start="url(#er-o)" marker-end="url(#er-a)"/>
+<g class="er-t er-t--field"><rect x="20" y="20" width="300" height="140" rx="8" class="er-box"/><path d="M20,28 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="30" y="40" class="er-tt">tsdb.status_history</text><text x="310" y="40" text-anchor="end" class="er-ts">TSDB</text>
+<rect x="28" y="55" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="64.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="65" class="er-c er-c--pk">event_time</text><text x="310" y="65" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="21" y="72" width="298" height="22" class="er-zebra"/>
+<rect x="28" y="77" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="86.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="87" class="er-c er-c--pk">tag_key</text><text x="310" y="87" text-anchor="end" class="er-ty">bigint</text>
+<text x="32" y="109" class="er-c">status</text><text x="310" y="109" text-anchor="end" class="er-ty">text</text>
+<rect x="21" y="116" width="298" height="22" class="er-zebra"/>
+<text x="32" y="131" class="er-c">error_code</text><text x="310" y="131" text-anchor="end" class="er-ty">text</text>
+<text x="32" y="153" class="er-c">received_at</text><text x="310" y="153" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--field"><rect x="20" y="200" width="300" height="228" rx="8" class="er-box"/><path d="M20,208 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="30" y="220" class="er-tt">tsdb.actual_history</text><text x="310" y="220" text-anchor="end" class="er-ts">TSDB</text>
+<rect x="28" y="235" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="244.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="245" class="er-c er-c--pk">event_time</text><text x="310" y="245" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="21" y="252" width="298" height="22" class="er-zebra"/>
+<rect x="28" y="257" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="266.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="267" class="er-c er-c--pk">tag_key</text><text x="310" y="267" text-anchor="end" class="er-ty">bigint</text>
+<rect x="28" y="279" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="288.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="289" class="er-c er-c--pk">scan_id</text><text x="310" y="289" text-anchor="end" class="er-ty">uuid</text>
+<rect x="21" y="296" width="298" height="22" class="er-zebra"/>
+<rect x="28" y="301" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="310.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="311" class="er-c er-c--pk">event_type</text><text x="310" y="311" text-anchor="end" class="er-ty">text</text>
+<text x="32" y="333" class="er-c">hull_no</text><text x="310" y="333" text-anchor="end" class="er-ty">text</text>
+<rect x="21" y="340" width="298" height="22" class="er-zebra"/>
+<text x="32" y="355" class="er-c">block_id</text><text x="310" y="355" text-anchor="end" class="er-ty">text</text>
+<text x="32" y="377" class="er-c">block_progress_rate</text><text x="310" y="377" text-anchor="end" class="er-ty">real</text>
+<rect x="21" y="384" width="298" height="22" class="er-zebra"/>
+<text x="32" y="399" class="er-c">match_confidence</text><text x="310" y="399" text-anchor="end" class="er-ty">real</text>
+<text x="32" y="421" class="er-c">received_at</text><text x="310" y="421" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--field"><rect x="20" y="460" width="300" height="184" rx="8" class="er-box"/><path d="M20,468 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="30" y="480" class="er-tt">tsdb.artifact_history</text><text x="310" y="480" text-anchor="end" class="er-ts">TSDB</text>
+<rect x="28" y="495" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="504.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="505" class="er-c er-c--pk">event_time</text><text x="310" y="505" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="21" y="512" width="298" height="22" class="er-zebra"/>
+<rect x="28" y="517" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="526.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="527" class="er-c er-c--pk">tag_key</text><text x="310" y="527" text-anchor="end" class="er-ty">bigint</text>
+<rect x="28" y="539" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="548.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="549" class="er-c er-c--pk">scan_id</text><text x="310" y="549" text-anchor="end" class="er-ty">uuid</text>
+<rect x="21" y="556" width="298" height="22" class="er-zebra"/>
+<rect x="28" y="561" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="570.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="571" class="er-c er-c--pk">artifact_type</text><text x="310" y="571" text-anchor="end" class="er-ty">text</text>
+<rect x="28" y="583" width="20" height="12" rx="3" class="er-pk"/><text x="38" y="592.5" text-anchor="middle" class="er-bt">PK</text><text x="76" y="593" class="er-c er-c--pk">segment_key</text><text x="310" y="593" text-anchor="end" class="er-ty">text</text>
+<rect x="21" y="600" width="298" height="22" class="er-zebra"/>
+<text x="32" y="615" class="er-c">storage_uri</text><text x="310" y="615" text-anchor="end" class="er-ty">text</text>
+<text x="32" y="637" class="er-c">received_at</text><text x="310" y="637" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--rdb"><rect x="400" y="20" width="300" height="118" rx="8" class="er-box"/><path d="M400,28 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="410" y="40" class="er-tt">device_status_current</text><text x="690" y="40" text-anchor="end" class="er-ts">RDB</text>
+<rect x="408" y="55" width="20" height="12" rx="3" class="er-pk"/><text x="418" y="64.5" text-anchor="middle" class="er-bt">PK</text><text x="456" y="65" class="er-c er-c--pk">device_id</text><text x="690" y="65" text-anchor="end" class="er-ty">text</text>
+<rect x="401" y="72" width="298" height="22" class="er-zebra"/>
+<text x="412" y="87" class="er-c">status</text><text x="690" y="87" text-anchor="end" class="er-ty">text</text>
+<text x="412" y="109" class="er-c">src_event_time</text><text x="690" y="109" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="401" y="116" width="298" height="22" class="er-zebra"/>
+<text x="412" y="131" class="er-c">applied_at</text><text x="690" y="131" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--rdb"><rect x="400" y="160" width="300" height="118" rx="8" class="er-box"/><path d="M400,168 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="410" y="180" class="er-tt">scan</text><text x="690" y="180" text-anchor="end" class="er-ts">RDB</text>
+<rect x="408" y="195" width="20" height="12" rx="3" class="er-pk"/><text x="418" y="204.5" text-anchor="middle" class="er-bt">PK</text><text x="456" y="205" class="er-c er-c--pk">scan_id</text><text x="690" y="205" text-anchor="end" class="er-ty">uuid</text>
+<rect x="401" y="212" width="298" height="22" class="er-zebra"/>
+<text x="412" y="227" class="er-c">device_id</text><text x="690" y="227" text-anchor="end" class="er-ty">text</text>
+<text x="412" y="249" class="er-c">last_event_type</text><text x="690" y="249" text-anchor="end" class="er-ty">text</text>
+<rect x="401" y="256" width="298" height="22" class="er-zebra"/>
+<text x="412" y="271" class="er-c">completed_at</text><text x="690" y="271" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--rdb"><rect x="400" y="300" width="300" height="316" rx="8" class="er-box"/><path d="M400,308 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="410" y="320" class="er-tt">actual_result</text><text x="690" y="320" text-anchor="end" class="er-ts">RDB · SAP 로 가는 표</text>
+<text x="412" y="345" class="er-c">module</text><text x="690" y="345" text-anchor="end" class="er-ty">text</text>
+<rect x="401" y="352" width="298" height="22" class="er-zebra"/>
+<rect x="408" y="357" width="20" height="12" rx="3" class="er-pk"/><text x="418" y="366.5" text-anchor="middle" class="er-bt">PK</text><text x="456" y="367" class="er-c er-c--pk">hull_no</text><text x="690" y="367" text-anchor="end" class="er-ty">text</text>
+<rect x="408" y="379" width="20" height="12" rx="3" class="er-pk"/><text x="418" y="388.5" text-anchor="middle" class="er-bt">PK</text><text x="456" y="389" class="er-c er-c--pk">block_id</text><text x="690" y="389" text-anchor="end" class="er-ty">text</text>
+<rect x="401" y="396" width="298" height="22" class="er-zebra"/>
+<rect x="408" y="401" width="20" height="12" rx="3" class="er-pk"/><text x="418" y="410.5" text-anchor="middle" class="er-bt">PK</text><text x="456" y="411" class="er-c er-c--pk">scan_id</text><text x="690" y="411" text-anchor="end" class="er-ty">uuid</text>
+<text x="412" y="433" class="er-c">device_id</text><text x="690" y="433" text-anchor="end" class="er-ty">text</text>
+<rect x="401" y="440" width="298" height="22" class="er-zebra"/>
+<text x="412" y="455" class="er-c">completed_at</text><text x="690" y="455" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="412" y="477" class="er-c">block_progress_rate</text><text x="690" y="477" text-anchor="end" class="er-ty">real</text>
+<rect x="401" y="484" width="298" height="22" class="er-zebra"/>
+<text x="412" y="499" class="er-c">match_confidence</text><text x="690" y="499" text-anchor="end" class="er-ty">real</text>
+<text x="412" y="521" class="er-c">reference_cad_id</text><text x="690" y="521" text-anchor="end" class="er-ty">text</text>
+<rect x="401" y="528" width="298" height="22" class="er-zebra"/>
+<text x="412" y="543" class="er-c">model_version</text><text x="690" y="543" text-anchor="end" class="er-ty">text</text>
+<text x="412" y="565" class="er-c">judged_status</text><text x="690" y="565" text-anchor="end" class="er-ty">PENDING → 판별 로직</text>
+<rect x="401" y="572" width="298" height="22" class="er-zebra"/>
+<text x="412" y="587" class="er-c">src_received_at</text><text x="690" y="587" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="412" y="609" class="er-c">applied_at</text><text x="690" y="609" text-anchor="end" class="er-ty">timestamptz</text>
+</g>
+<g class="er-t er-t--rdb"><rect x="400" y="610" width="300" height="118" rx="8" class="er-box"/><path d="M400,618 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="410" y="630" class="er-tt">artifact</text><text x="690" y="630" text-anchor="end" class="er-ts">RDB</text>
+<rect x="408" y="645" width="20" height="12" rx="3" class="er-pk"/><text x="418" y="654.5" text-anchor="middle" class="er-bt">PK</text><text x="456" y="655" class="er-c er-c--pk">scan_id</text><text x="690" y="655" text-anchor="end" class="er-ty">uuid</text>
+<rect x="401" y="662" width="298" height="22" class="er-zebra"/>
+<rect x="408" y="667" width="20" height="12" rx="3" class="er-pk"/><text x="418" y="676.5" text-anchor="middle" class="er-bt">PK</text><text x="456" y="677" class="er-c er-c--pk">artifact_type</text><text x="690" y="677" text-anchor="end" class="er-ty">text</text>
+<rect x="408" y="689" width="20" height="12" rx="3" class="er-pk"/><text x="418" y="698.5" text-anchor="middle" class="er-bt">PK</text><text x="456" y="699" class="er-c er-c--pk">segment_key</text><text x="690" y="699" text-anchor="end" class="er-ty">text</text>
+<rect x="401" y="706" width="298" height="22" class="er-zebra"/>
+<text x="412" y="721" class="er-c">storage_uri</text><text x="690" y="721" text-anchor="end" class="er-ty">text</text>
+</g>
+<g class="er-t er-t--ops"><rect x="780" y="20" width="300" height="228" rx="8" class="er-box"/><path d="M780,28 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="790" y="40" class="er-tt">ops.rfc_sent</text><text x="1070" y="40" text-anchor="end" class="er-ts">보낸 기록 · 한 번만</text>
+<rect x="788" y="55" width="20" height="12" rx="3" class="er-pk"/><text x="798" y="64.5" text-anchor="middle" class="er-bt">PK</text><text x="836" y="65" class="er-c er-c--pk">zone</text><text x="1070" y="65" text-anchor="end" class="er-ty">text</text>
+<rect x="781" y="72" width="298" height="22" class="er-zebra"/>
+<rect x="788" y="77" width="20" height="12" rx="3" class="er-pk"/><text x="798" y="86.5" text-anchor="middle" class="er-bt">PK</text><text x="836" y="87" class="er-c er-c--pk">hull_no</text><text x="1070" y="87" text-anchor="end" class="er-ty">text</text>
+<rect x="788" y="99" width="20" height="12" rx="3" class="er-pk"/><text x="798" y="108.5" text-anchor="middle" class="er-bt">PK</text><text x="836" y="109" class="er-c er-c--pk">block_id</text><text x="1070" y="109" text-anchor="end" class="er-ty">text</text>
+<rect x="781" y="116" width="298" height="22" class="er-zebra"/>
+<rect x="788" y="121" width="20" height="12" rx="3" class="er-pk"/><text x="798" y="130.5" text-anchor="middle" class="er-bt">PK</text><text x="836" y="131" class="er-c er-c--pk">scan_id</text><text x="1070" y="131" text-anchor="end" class="er-ty">uuid</text>
+<rect x="788" y="143" width="20" height="12" rx="3" class="er-pk"/><text x="798" y="152.5" text-anchor="middle" class="er-bt">PK</text><text x="836" y="153" class="er-c er-c--pk">judged_status</text><text x="1070" y="153" text-anchor="end" class="er-ty">text</text>
+<rect x="781" y="160" width="298" height="22" class="er-zebra"/>
+<text x="792" y="175" class="er-c">src_received_at</text><text x="1070" y="175" text-anchor="end" class="er-ty">timestamptz</text>
+<text x="792" y="197" class="er-c">src_applied_at</text><text x="1070" y="197" text-anchor="end" class="er-ty">timestamptz</text>
+<rect x="781" y="204" width="298" height="22" class="er-zebra"/>
+<text x="792" y="219" class="er-c">src_lsn</text><text x="1070" y="219" text-anchor="end" class="er-ty">bigint</text>
+<text x="792" y="241" class="er-c">sent_at</text><text x="1070" y="241" text-anchor="end" class="er-ty">보낸 시각</text>
+</g>
+<g class="er-t er-t--sap"><rect x="780" y="300" width="300" height="250" rx="8" class="er-box"/><path d="M780,308 a8,8 0 0 1 8,-8 h284 a8,8 0 0 1 8,8 v22 h-300 z" class="er-hd"/><text x="790" y="320" class="er-tt">zhotdb_actual_result</text><text x="1070" y="320" text-anchor="end" class="er-ts">SAP 새 표 (Z)</text>
+<rect x="788" y="335" width="20" height="12" rx="3" class="er-pk"/><text x="798" y="344.5" text-anchor="middle" class="er-bt">PK</text><text x="836" y="345" class="er-c er-c--pk">zone</text><text x="1070" y="345" text-anchor="end" class="er-ty">svc.actual_result.module</text>
+<rect x="781" y="352" width="298" height="22" class="er-zebra"/>
+<rect x="788" y="357" width="20" height="12" rx="3" class="er-pk"/><text x="798" y="366.5" text-anchor="middle" class="er-bt">PK</text><text x="836" y="367" class="er-c er-c--pk">hull_no</text><text x="1070" y="367" text-anchor="end" class="er-ty">text</text>
+<rect x="788" y="379" width="20" height="12" rx="3" class="er-pk"/><text x="798" y="388.5" text-anchor="middle" class="er-bt">PK</text><text x="836" y="389" class="er-c er-c--pk">block_id</text><text x="1070" y="389" text-anchor="end" class="er-ty">text</text>
+<rect x="781" y="396" width="298" height="22" class="er-zebra"/>
+<rect x="788" y="401" width="20" height="12" rx="3" class="er-pk"/><text x="798" y="410.5" text-anchor="middle" class="er-bt">PK</text><text x="836" y="411" class="er-c er-c--pk">scan_id</text><text x="1070" y="411" text-anchor="end" class="er-ty">varchar(36)</text>
+<rect x="788" y="423" width="20" height="12" rx="3" class="er-pk"/><text x="798" y="432.5" text-anchor="middle" class="er-bt">PK</text><text x="836" y="433" class="er-c er-c--pk">judged_status</text><text x="1070" y="433" text-anchor="end" class="er-ty">text</text>
+<rect x="781" y="440" width="298" height="22" class="er-zebra"/>
+<text x="792" y="455" class="er-c">device_id</text><text x="1070" y="455" text-anchor="end" class="er-ty">text</text>
+<text x="792" y="477" class="er-c">completed_at</text><text x="1070" y="477" text-anchor="end" class="er-ty">timestamp</text>
+<rect x="781" y="484" width="298" height="22" class="er-zebra"/>
+<text x="792" y="499" class="er-c">block_progress_rate</text><text x="1070" y="499" text-anchor="end" class="er-ty">float8</text>
+<text x="792" y="521" class="er-c">match_confidence</text><text x="1070" y="521" text-anchor="end" class="er-ty">float8</text>
+<rect x="781" y="528" width="298" height="22" class="er-zebra"/>
+<text x="792" y="543" class="er-c">sent_at</text><text x="1070" y="543" text-anchor="end" class="er-ty">SAP 기록 시각</text>
+</g>
+</svg>
+<figcaption>tsdb → RDB → SAP 로 컬럼이 옮겨 가는 길. 주황 = 판별 모듈의 CDC 라우트, 파랑 = RFC Service 가 SAP Z 표에 쓰는 컬럼. zone 은 원천 행의 module 컬럼에서, sent_at 은 SAP 쪽 시각. 점선 = RFC Service 가 SAP 에 쓰기 전에 ops.rfc_sent 에 먼저 기록하고, 이미 있으면 보내지 않는다. Z 표와 ops.rfc_sent 의 PK(zone · hull_no · block_id · scan_id · judged_status)가 같은 실적을 두 번 쓰지 않게 막는다.</figcaption>
+</figure>
+
+    </section>
+
+    <!-- 05 -->
+    <section class="sec" id="s4">
+      <h2><span class="n">05</span>전체 스키마 지도</h2>
+      <p class="why">칸마다 들어 있는 표입니다. 주황 띠 = 변경 감지(CDC)로 내보내는 칸, 겹친 카드 = 모듈 수만큼, <span class="mono">→</span> = 연결된 부모 표.</p>
+<div class="smap">
+  <div class="smap__hd"><b>Hot DB</b><span>PostgreSQL 17 + TimescaleDB 2.29 · DB hotdb · 스키마 10 · 표 209</span><span class="sp"></span><span>주황 띠 = CDC 원천 · 겹친 카드 = 모듈 수만큼 · → = FK (부모)</span></div>
+  <div class="smap__row smap__row--4"><div class="sbox "><div class="sbox__k">Legacy RDB sap</div><div class="sbox__n">erp<small>114표</small></div><ul><li><span class="t">item</span><span class="d">품목 · 폴링</span></li><li><span class="t">part</span><span class="d">부품 · 폴링</span></li><li><span class="t">order_line</span><span class="d">주문 행 · 폴링 10초</span></li><li><span class="t">…</span><span class="d">111표 더 · 시험용</span></li></ul><div class="sbox__w"><span class="w">RFC Service ① 폴링</span><span class="">계정 rfc_agent</span><span class="">원천 SAP</span></div></div><div class="sbox "><div class="sbox__k">Legacy RDB oracle</div><div class="sbox__n">mes · lgs · geo<small>60 · 3 · 1표</small></div><ul><li><span class="t">work_log</span><span class="d">작업 기록 · 폴링</span></li><li><span class="t">alarm</span><span class="d">설비 경보 · 폴링</span></li><li><span class="t">…</span><span class="d">mes 58표 더 · 시험용</span></li><li><span class="t">shipment</span><span class="d">출하 · 폴링</span></li><li><span class="t">tracking</span><span class="d">위치 추적 · 폴링 10초</span></li><li><span class="t">…</span><span class="d">lgs 1표 더</span></li><li><span class="t">zone_area</span><span class="d">구역 지도</span></li></ul><div class="sbox__w"><span class="w">DB Agent 폴링</span><span class="">계정 db_agent</span><span class="">원천 Oracle</span></div></div><div class="sbox sbox--cdc"><div class="sbox__k">TSDB field data</div><div class="sbox__n">tsdb<small>필드 데이터</small></div><ul><li class=""><span class="t">device</span><span class="d">장비 마스터 · zone · 7열</span></li><li class=""><span class="t">tag_catalog</span><span class="fk">→ device</span><span class="d">tag_key · 10열</span></li><li class=""><span class="t">status_history</span><span class="fk">→ tag</span><span class="d">하이퍼 6h · 1초 · 12열</span></li><li class=""><span class="t">actual_history</span><span class="fk">→ tag</span><span class="d">하이퍼 1d · 1분 · 14열</span></li><li class=""><span class="t">artifact_history</span><span class="fk">→ tag</span><span class="d">하이퍼 1d · 스캔당 12 · 16열</span></li></ul><div class="sbox__w"><span class="w">HotDB Provider (대역: 발행기)</span><span class="">계정 hotdb_provider</span><span class="c">tsdb_cdc_pub</span></div></div><div class="sbox sbox--cdc sbox--multi"><div class="sbox__k">RDB field data</div><div class="sbox__n">svc_&lt;모듈&gt;<small>× 4 — mch · asm · oft · pnt</small></div><ul><li class=""><span class="t">device_status_current</span><span class="fk">→ tsdb.device</span><span class="d">장비당 1행 · 13열</span></li><li class="ind"><span class="t">device_status_change</span><span class="fk">→ current</span><span class="d">바뀔 때만 · 7열</span></li><li class=""><span class="t">scan</span><span class="fk">→ tsdb.device</span><span class="d">스캔 1건 · 16열</span></li><li class="ind"><span class="t">actual_result</span><span class="fk">→ scan</span><span class="d">COMPLETE · 판정 · 13열</span></li><li class="ind"><span class="t">artifact</span><span class="fk">→ scan</span><span class="d">산출물 위치 · 16열</span></li></ul><div class="sbox__w"><span class="w">실적 판별 모듈 (CDC)</span><span class="">계정 svc_&lt;모듈&gt;</span><span class="c">svc_cdc_pub = actual_result</span></div></div></div>
+  <div class="smap__row smap__row--3"><div class="sbox "><div class="sbox__k">운영</div><div class="sbox__n">ops<small>CDC · 폴링 · 모듈 상태</small></div><ul><li class=""><span class="t">module</span><span class="d">모듈 등록부 · provision_module · 4열</span></li><li class=""><span class="t">poll_state</span><span class="d">폴링 워터마크 · 오류</span></li><li class=""><span class="t">rfc_sent</span><span class="d">SAP 로 보낸 실적 · 9열</span></li><li class=""><span class="t">cdc_heartbeat</span><span class="d">슬롯 전진 · 2열</span></li><li class=""><span class="t">cdc_dead_letter</span><span class="d">반영 못 한 이벤트 · 8열</span></li><li class=""><span class="t">flyway_schema_history</span><span class="d">마이그레이션 V1~V8</span></li></ul><div class="sbox__w"><span class="">판별 모듈 · RFC Service · 에이전트 · 관리자</span></div></div><div class="sbox sbox--sys"><div class="sbox__k">TimescaleDB 내부</div><div class="sbox__n">_timescaledb_internal<small>직접 쓰지 않음</small></div><ul><li><span class="t">_hyper_N_M_chunk</span><span class="d">이력의 실제 행 · CDC 로 나감</span></li><li><span class="t">*_compressed</span><span class="d">7일 뒤 압축 · CDC 가 버림</span></li><li><span class="t">bgw_*</span><span class="d">잡 통계</span></li></ul><div class="sbox__w"><span class="c">tsdb_cdc_pub (스키마째)</span></div></div><div class="sbox sbox--sys"><div class="sbox__k">확장</div><div class="sbox__n">public<small></small></div><ul><li><span class="t">timescaledb</span><span class="d">함수 · CREATE 금지</span></li></ul><div class="sbox__w"></div></div></div>
+  <div class="smap__pub">
+    <div><b>tsdb_cdc_pub</b> <span class="ar">→</span> 슬롯 <b>zone_mch · zone_asm · zone_oft · zone_pnt</b> <span class="ar">→</span> 실적 판별 모듈 → svc_&lt;모듈&gt;</div>
+    <div><b>svc_cdc_pub</b> <span class="ar">→</span> 슬롯 <b>rfc_provider</b> <span class="ar">→</span> RFC Service ② → SAP Z 표 (ops.rfc_sent 로 한 번만)</div>
+  </div>
+</div>
+
+      <p class="small">표 · 컬럼 하나하나는 <span class="mono">hotdb-schema-dataflow.html</span>, 만든 방법 · 테스트는 <span class="mono">hotdb-cdc-implementation.html</span>, 발표용은 <span class="mono">hotdb-briefing.html</span>.</p>
+    </section>
+
+    <!-- 05 -->
+    <section class="sec" id="gloss">
+      <h2><span class="n">06</span>용어</h2>
+      <p class="why">이 문서에 나온 말입니다.</p>
+      <div class="tbl-wrap">
+        <table class="tbl gloss">
+          <thead><tr><th style="width:20%">용어</th><th style="width:12%">종류</th><th style="width:34%">뜻</th><th>이 문서에서</th></tr></thead>
+          <tbody>
+            <tr><td>Hot DB</td><td>DB</td><td>현장 · 레거시 데이터를 모아 두는 PostgreSQL 한 대</td><td>네 칸 + 운영 칸</td></tr>
+            <tr><td>TSDB · tsdb</td><td>칸 · 스키마</td><td>Time-Series DB. 시간순 원본</td><td>장비 데이터 그대로</td></tr>
+            <tr><td>RDB · svc_&lt;모듈&gt;</td><td>칸 · 스키마</td><td>Relational DB. 정리된 결과 (svc = service)</td><td>모듈마다 하나 — svc_mch · asm · oft · pnt</td></tr>
+            <tr><td>erp · mes · lgs · geo</td><td>스키마</td><td>레거시 DB 의 시험용 사본 (지어낸 이름)</td><td>erp = SAP, 나머지 = Oracle</td></tr>
+            <tr><td>CDC</td><td>약어</td><td>Change Data Capture. DB 에 바뀐 줄을 바로 알아채기</td><td>TSDB → 판별 모듈, RDB → RFC Service</td></tr>
+            <tr><td>폴링</td><td>방식</td><td>정해진 주기마다 가서 바뀐 것만 읽기</td><td>SAP · Oracle 레거시</td></tr>
+            <tr><td>MQTT Agent</td><td>서비스</td><td>장비 MQTT 메시지를 태그로 바꾸는 곳 (ISL4 Agent)</td><td>현장 데이터 입구</td></tr>
+            <tr><td>HotDB Provider</td><td>서비스</td><td>태그를 TSDB 에 넣는 곳</td><td>이번 범위 밖 — 시험에선 발행기가 대신</td></tr>
+            <tr><td>실적 판별 모듈</td><td>서비스</td><td>가공 · 조립 · 의장 · 도장 실적 판별</td><td>자기 구역 장비만 RDB 로</td></tr>
+            <tr><td>RFC Service · DB Agent</td><td>서비스</td><td>그림의 O-8 · O-6</td><td>SAP 왕복 · Oracle 복사</td></tr>
+            <tr><td>PK · FK</td><td>약어</td><td>Primary Key 기본키 · Foreign Key 외래키</td><td>이 줄을 찾는 열쇠 · 다른 표의 줄을 가리키는 컬럼</td></tr>
+            <tr><td>Z 표 · PENDING</td><td>SAP · 값</td><td>SAP 고객 정의 표 · 판정 전 상태</td><td>실적이 SAP 에 적히는 곳 · 판별 로직 전 기본값</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<button id="bSideOpen" class="side-reopen no-print" type="button" aria-label="목차 사이드바 펼치기">목차</button>
+
+<script>
+/* ============================================================
+   HW Doc Kit - diagram engine (의존성 없음, 단일 파일 내장용)
+   drawio 느낌의 조작: 드래그 이동 / 연결 / 라벨 인라인 편집 /
+   팬·줌 / 톤 변경 / 삭제 / Ctrl+Z / JSON 내보내기(붙여넣기로 영구 반영)
+
+   마크업 (자세한 내용은 references/diagram.md):
+     div.dgm[data-edit=on] 안에
+     script[type=application/json][class=dgm-data] 로 노드·엣지 JSON 을 넣습니다.
+   ============================================================ */
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var GRID = 10;
+  var TONES = ['neutral', 'primary', 'accent', 'muted', 'ok', 'warn', 'risk', 'info'];
+
+  function s(n, a) {
+    var e = document.createElementNS(NS, n);
+    for (var k in (a || {})) e.setAttribute(k, a[k]);
+    return e;
+  }
+  function h(t, c, txt) {
+    var e = document.createElement(t);
+    if (c) e.className = c;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+  function btn(label, title) {
+    var b = h('button', 'dgm__btn', label);
+    b.type = 'button';
+    if (title) b.title = title;
+    return b;
+  }
+  function snap(v) { return Math.round(v / GRID) * GRID; }
+
+  function boxShape(n) {
+    var sh = n.shape || 'rect', w = n.w, ht = n.h;
+    if (sh === 'diamond')
+      return s('path', { 'class': 'box', d: 'M' + w / 2 + ',0 L' + w + ',' + ht / 2 + ' L' + w / 2 + ',' + ht + ' L0,' + ht / 2 + ' Z' });
+    if (sh === 'store') {
+      var r = Math.min(14, ht / 4);
+      var d = 'M0,' + r +
+        ' C0,' + (r * .45) + ' ' + (w * .22) + ',0 ' + (w / 2) + ',0' +
+        ' C' + (w * .78) + ',0 ' + w + ',' + (r * .45) + ' ' + w + ',' + r +
+        ' L' + w + ',' + (ht - r) +
+        ' C' + w + ',' + (ht - r * .45) + ' ' + (w * .78) + ',' + ht + ' ' + (w / 2) + ',' + ht +
+        ' C' + (w * .22) + ',' + ht + ' 0,' + (ht - r * .45) + ' 0,' + (ht - r) + ' Z';
+      return s('path', { 'class': 'box', d: d });
+    }
+    if (sh === 'note') {
+      var f = 14;
+      return s('path', { 'class': 'box', d: 'M0,0 L' + (w - f) + ',0 L' + w + ',' + f + ' L' + w + ',' + ht + ' L0,' + ht + ' Z' });
+    }
+    var rx = sh === 'pill' ? Math.min(ht / 2, 26) : (sh === 'round' ? 16 : 9);
+    return s('rect', { 'class': 'box', x: 0, y: 0, width: w, height: ht, rx: rx });
+  }
+
+  /* ---------- 선 그리기 ----------
+     직교(엘보) 경로다. 모서리는 둥글게 깎고, 가운데 줄기(lane)는 다른 박스를 뚫지 않는
+     자리로 옮긴다 — 자동 레이아웃이 없는 대신 선이 박스를 가로지르지 않게 한다. */
+  var OBS_PAD = 8;      /* 박스 둘레 여유 */
+  var CORNER = 12;      /* 모서리 반지름 */
+
+  function obstaclesOf(nodes, a, b) {
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n === a || n === b) continue;
+      out.push({ x0: n.x - OBS_PAD, y0: n.y - OBS_PAD, x1: n.x + n.w + OBS_PAD, y1: n.y + n.h + OBS_PAD });
+    }
+    return out;
+  }
+  function blockedV(obs, x, ya, yb) {
+    var y0 = Math.min(ya, yb), y1 = Math.max(ya, yb);
+    for (var i = 0; i < obs.length; i++) {
+      var o = obs[i];
+      if (x > o.x0 && x < o.x1 && y1 > o.y0 && y0 < o.y1) return true;
+    }
+    return false;
+  }
+  function blockedH(obs, y, xa, xb) {
+    var x0 = Math.min(xa, xb), x1 = Math.max(xa, xb);
+    for (var i = 0; i < obs.length; i++) {
+      var o = obs[i];
+      if (y > o.y0 && y < o.y1 && x1 > o.x0 && x0 < o.x1) return true;
+    }
+    return false;
+  }
+  /* 가운데 줄기를 놓을 자리. 한가운데가 막히면 좌우(위아래)로 10px 씩 벌려 본다. */
+  function pickLane(mid, ok) {
+    if (ok(mid)) return mid;
+    for (var d = 10; d <= 400; d += 10) {
+      if (ok(mid + d)) return mid + d;
+      if (ok(mid - d)) return mid - d;
+    }
+    return mid;
+  }
+  function dist(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
+  function toward(c, t, r) {
+    var dx = t.x - c.x, dy = t.y - c.y, L = Math.sqrt(dx * dx + dy * dy) || 1;
+    return { x: c.x + dx / L * r, y: c.y + dy / L * r };
+  }
+  /* 꺾이는 점마다 2차 베지어로 모서리를 깎은 폴리라인 */
+  function polyline(pts) {
+    var p = [pts[0]];
+    for (var i = 1; i < pts.length; i++) {
+      var q = p[p.length - 1];
+      if (Math.abs(pts[i].x - q.x) > 0.5 || Math.abs(pts[i].y - q.y) > 0.5) p.push(pts[i]);
+    }
+    if (p.length < 3) return 'M' + p[0].x + ',' + p[0].y + ' L' + p[p.length - 1].x + ',' + p[p.length - 1].y;
+    var d = 'M' + p[0].x + ',' + p[0].y;
+    for (var j = 1; j < p.length - 1; j++) {
+      var a = p[j - 1], c = p[j], b = p[j + 1];
+      var r = Math.min(CORNER, dist(a, c) / 2, dist(c, b) / 2);
+      var s1 = toward(c, a, r), s2 = toward(c, b, r);
+      d += ' L' + s1.x.toFixed(1) + ',' + s1.y.toFixed(1) +
+           ' Q' + c.x + ',' + c.y + ' ' + s2.x.toFixed(1) + ',' + s2.y.toFixed(1);
+    }
+    d += ' L' + p[p.length - 1].x + ',' + p[p.length - 1].y;
+    return d;
+  }
+
+  function route(a, b, obs) {
+    obs = obs || [];
+    var ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    var dx = bc.x - ac.x, dy = bc.y - ac.y, pts, mid;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      var p1 = { x: dx > 0 ? a.x + a.w : a.x, y: ac.y };
+      var p2 = { x: dx > 0 ? b.x : b.x + b.w, y: bc.y };
+      var lane = pickLane((p1.x + p2.x) / 2, function (v) {
+        return !blockedV(obs, v, p1.y, p2.y) &&
+               !blockedH(obs, p1.y, p1.x, v) && !blockedH(obs, p2.y, v, p2.x);
+      });
+      pts = [p1, { x: lane, y: p1.y }, { x: lane, y: p2.y }, p2];
+      mid = { x: lane, y: (p1.y + p2.y) / 2 };
+    } else {
+      var q1 = { x: ac.x, y: dy > 0 ? a.y + a.h : a.y };
+      var q2 = { x: bc.x, y: dy > 0 ? b.y : b.y + b.h };
+      var laneY = pickLane((q1.y + q2.y) / 2, function (v) {
+        return !blockedH(obs, v, q1.x, q2.x) &&
+               !blockedV(obs, q1.x, q1.y, v) && !blockedV(obs, q2.x, v, q2.y);
+      });
+      pts = [q1, { x: q1.x, y: laneY }, { x: q2.x, y: laneY }, q2];
+      mid = { x: (q1.x + q2.x) / 2, y: laneY };
+    }
+    return { d: polyline(pts), mid: mid };
+  }
+
+  /* 원본 JSON 이 바뀌었는지 보는 값. 문서를 고쳐 다시 배포하면 해시가 달라져
+     예전 편집본을 버린다 — 안 그러면 저자가 고친 그림이 영원히 안 보인다. */
+  function srcHash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) + h + s.charCodeAt(i)) | 0; }
+    return String(h);
+  }
+
+  function Diagram(root) {
+    this.root = root;
+    this.editable = root.getAttribute('data-edit') !== 'off';
+
+    /* 저장 키 — data-key 가 있으면 그것을, 없으면 문서 안에서의 순번을 쓴다.
+       순번은 그림을 추가·삭제하면 밀리지만, 그때는 해시도 함께 달라져 저장본이 버려진다. */
+    var all = document.querySelectorAll('.dgm');
+    this.key = 'hwdgm:' + (location.pathname.split('/').pop() || 'doc') + ':'
+      + (root.getAttribute('data-key') || Array.prototype.indexOf.call(all, root));
+
+    var tag = root.querySelector('script.dgm-data');
+    this.srcHash = srcHash(tag ? tag.textContent : '');
+
+    this.data = this.read();
+    var saved = this.loadSaved();
+    if (saved) this.data = saved;
+    this.view = { tx: 0, ty: 0, k: 1 };
+    this.sel = null;          /* {type:'node'|'edge'|'group', id} */
+    this.linkMode = false;
+    this.linkFrom = null;
+    this.undo = [];
+    this.build();
+    this.render();
+    this.autoHeight();
+    this.fit();
+    this.ready = true;
+    this.markSaved(!!this._restored);
+  }
+
+  Diagram.prototype.read = function () {
+    var tag = this.root.querySelector('script.dgm-data');
+    var d = { nodes: [], edges: [], groups: [] };
+    if (tag) { try { d = JSON.parse(tag.textContent); } catch (e) { console.warn('[dgm] JSON 파싱 실패', e); } }
+    d.nodes = d.nodes || []; d.edges = d.edges || []; d.groups = d.groups || [];
+    d.nodes.forEach(function (n) {
+      n.w = n.w || 170; n.h = n.h || 62;
+      n.shape = n.shape || 'rect'; n.tone = n.tone || 'neutral';
+      n.x = n.x || 0; n.y = n.y || 0;
+    });
+    return d;
+  };
+
+  Diagram.prototype.build = function () {
+    var self = this;
+    var bar = h('div', 'dgm__bar no-print');
+    var mk = function (label, title, fn) { var b = btn(label, title); b.addEventListener('click', fn); bar.appendChild(b); return b; };
+
+    mk('박스', '새 박스 추가', function () { self.addNode(); });
+    this.bLink = mk('연결', '두 박스를 차례로 클릭해 화살표 연결', function () { self.toggleLink(); });
+    mk('색', '선택 항목의 톤 변경', function () { self.cycleTone(); });
+    mk('모양', '선택 박스의 모양 변경', function () { self.cycleShape(); });
+    mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
+    bar.appendChild(h('span', 'dgm__sep'));
+    mk('−', '축소', function () { self.zoom(1 / 1.2); });
+    mk('+', '확대', function () { self.zoom(1.2); });
+    mk('맞춤', '화면에 맞추기', function () { self.autoHeight(); self.fit(); });
+    this.bMax = mk('넓게', '화면 가득 펼치기 (Esc 로 닫기)', function () { self.toggleMax(); });
+    bar.appendChild(h('span', 'dgm__sep'));
+    mk('JSON', '수정 결과를 JSON으로 복사해 원본 파일에 붙여넣기', function () { self.openJson(); });
+    this.bReset = mk('원래대로', '이 브라우저에 저장된 편집 내용을 지운다', function () { self.resetSaved(); });
+    bar.appendChild(h('span', 'sp'));
+    bar.appendChild(h('span', 'dgm__hint', '드래그로 이동 · 더블클릭으로 라벨 수정 · 휠로 확대'));
+
+    var svg = s('svg', { 'class': 'dgm__svg' });
+    var defs = s('defs');
+    [['ar-default', 'var(--ink3)'], ['ar-primary', 'var(--hw)'], ['ar-risk', 'var(--risk)'], ['ar-ok', 'var(--ok)']]
+      .forEach(function (m) {
+        var mk2 = s('marker', {
+          id: m[0] + '-' + Math.random().toString(36).slice(2, 7),
+          viewBox: '0 0 10 10', refX: 9, refY: 5,
+          markerWidth: 8, markerHeight: 8, orient: 'auto-start-reverse'
+        });
+        var p = s('path', { d: 'M0,0.5 L10,5 L0,9.5 L2.9,5 z' });
+        p.setAttribute('style', 'fill:' + m[1]);
+        mk2.appendChild(p); defs.appendChild(mk2);
+        self['mk_' + m[0].slice(3)] = mk2.getAttribute('id');
+      });
+    svg.appendChild(defs);
+
+    this.gRoot = s('g');
+    this.gGroups = s('g'); this.gEdges = s('g'); this.gNodes = s('g');
+    this.gRoot.appendChild(this.gGroups);
+    this.gRoot.appendChild(this.gEdges);
+    this.gRoot.appendChild(this.gNodes);
+    svg.appendChild(this.gRoot);
+
+    this.svg = svg;
+    this.root.insertBefore(svg, this.root.firstChild);
+    if (this.editable) this.root.insertBefore(bar, svg);
+
+    /* JSON 모달 */
+    var modal = h('div', 'dgm__modal no-print');
+    var pane = h('div', 'pane');
+    var head = h('div', 'head'); head.appendChild(h('b', null, '다이어그램 JSON'));
+    head.appendChild(h('span', 'sp'));
+    var closeB = btn('닫기'); head.appendChild(closeB);
+    var ta = h('textarea'); ta.spellcheck = false;
+    var foot = h('div', 'foot');
+    var copyB = btn('전체 복사'); var applyB = btn('붙여넣은 JSON 적용');
+    foot.appendChild(h('span', 'dgm__hint', '원본 HTML의 dgm-data 블록에 붙여넣으면 수정이 영구 반영됩니다'));
+    foot.appendChild(h('span', 'sp')); foot.appendChild(applyB); foot.appendChild(copyB);
+    pane.appendChild(head); pane.appendChild(ta); pane.appendChild(foot);
+    modal.appendChild(pane); this.root.appendChild(modal);
+    this.modal = modal; this.ta = ta;
+    closeB.addEventListener('click', function () { modal.classList.remove('is-open'); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('is-open'); });
+    copyB.addEventListener('click', function () {
+      ta.select(); ta.setSelectionRange(0, ta.value.length);
+      try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); }
+      copyB.textContent = '복사됨'; setTimeout(function () { copyB.textContent = '전체 복사'; }, 1200);
+    });
+    applyB.addEventListener('click', function () {
+      try {
+        var d = JSON.parse(ta.value);
+        self.push(); self.data = d; self.data.nodes = d.nodes || []; self.data.edges = d.edges || []; self.data.groups = d.groups || [];
+        self.render(); self.autoHeight(); self.fit(); modal.classList.remove('is-open');
+      } catch (e) { alert('JSON 형식이 올바르지 않습니다: ' + e.message); }
+    });
+
+    this.bind();
+  };
+
+  /* ---------- 렌더 ---------- */
+  Diagram.prototype.render = function () {
+    var self = this;
+    this.gGroups.textContent = ''; this.gEdges.textContent = ''; this.gNodes.textContent = '';
+    this.index = {};
+    this.data.nodes.forEach(function (n) { self.index[n.id] = n; });
+
+    this.data.groups.forEach(function (g) {
+      var el = s('g', { 'class': 'dgm-grp', 'data-id': g.id, transform: 'translate(' + g.x + ',' + g.y + ')' });
+      el.appendChild(s('rect', { 'class': 'box', x: 0, y: 0, width: g.w, height: g.h, rx: 10 }));
+      var t = s('text', { 'class': 'gl', x: 12, y: 20 }); t.textContent = g.label || '';
+      el.appendChild(t);
+      self.gGroups.appendChild(el);
+    });
+
+    this.data.edges.forEach(function (e, i) {
+      var a = self.index[e.from], b = self.index[e.to];
+      if (!a || !b) return;
+      var r = route(a, b, obstaclesOf(self.data.nodes, a, b));
+      var g = s('g', { 'class': 'dgm-edge', 'data-i': i });
+      if (e.tone) g.setAttribute('data-tone', e.tone);
+      if (e.style) g.setAttribute('data-style', e.style);
+      var wire = s('path', { 'class': 'wire', d: r.d });
+      var mid = e.tone === 'primary' ? self.mk_primary : e.tone === 'risk' ? self.mk_risk : e.tone === 'ok' ? self.mk_ok : self.mk_default;
+      if (e.arrow !== false) wire.setAttribute('marker-end', 'url(#' + mid + ')');
+      g.appendChild(s('path', { 'class': 'hit', d: r.d }));
+      g.appendChild(wire);
+      if (e.label) {
+        var txt = String(e.label), wpx = 0;
+        for (var ci = 0; ci < txt.length; ci++) wpx += txt.charCodeAt(ci) > 0x2E80 ? 12.5 : 7;
+        var w = Math.max(34, Math.ceil(wpx) + 22);
+        var fo = s('foreignObject', { x: r.mid.x - w / 2, y: r.mid.y - 11, width: w, height: 22 });
+        var div = h('div', 'elbl'); div.appendChild(h('span', null, e.label));
+        fo.appendChild(div); g.appendChild(fo);
+      }
+      self.gEdges.appendChild(g);
+    });
+
+    this.data.nodes.forEach(function (n) {
+      var g = s('g', { 'class': 'dgm-node', 'data-id': n.id, 'data-tone': n.tone, transform: 'translate(' + n.x + ',' + n.y + ')' });
+      g.appendChild(boxShape(n));
+      var pad = n.shape === 'diamond' ? Math.round(n.w * .18) : 0;
+      var fo = s('foreignObject', { x: pad, y: 0, width: n.w - pad * 2, height: n.h });
+      var lbl = h('div', 'lbl');
+      lbl.appendChild(h('span', 't', n.label || ''));
+      if (n.sub) lbl.appendChild(h('span', 'sub', n.sub));
+      fo.appendChild(lbl); g.appendChild(fo);
+      self.gNodes.appendChild(g);
+    });
+
+    this.paint();
+  };
+
+  /* render 는 모든 변경 뒤에 불린다 — 여기 한 곳만 잡으면 끌기·라벨 편집·추가·삭제가
+     모두 저장된다. 첫 그리기와 되돌리기 때는 건너뛴다. */
+  (function (orig) {
+    Diagram.prototype.render = function () {
+      orig.call(this);
+      if (this.ready && !this._skipSave) this.save();
+    };
+  })(Diagram.prototype.render);
+
+  Diagram.prototype.paint = function () {
+    var self = this;
+    this.gRoot.setAttribute('transform', 'translate(' + this.view.tx + ',' + this.view.ty + ') scale(' + this.view.k + ')');
+    Array.prototype.forEach.call(this.root.querySelectorAll('.is-sel'), function (e) { e.classList.remove('is-sel'); });
+    if (!this.sel) return;
+    var q = this.sel.type === 'edge' ? '.dgm-edge[data-i="' + this.sel.id + '"]'
+      : this.sel.type === 'group' ? '.dgm-grp[data-id="' + this.sel.id + '"]'
+        : '.dgm-node[data-id="' + this.sel.id + '"]';
+    var el = this.root.querySelector(q);
+    if (el) el.classList.add('is-sel');
+  };
+
+  /* ---------- 좌표 ---------- */
+  Diagram.prototype.world = function (ev) {
+    var r = this.svg.getBoundingClientRect();
+    return { x: (ev.clientX - r.left - this.view.tx) / this.view.k, y: (ev.clientY - r.top - this.view.ty) / this.view.k };
+  };
+
+  /* 화면 가득 펼치기. 다른 다이어그램이 펼쳐져 있으면 먼저 닫는다. */
+  Diagram.prototype.toggleMax = function (force) {
+    var self = this;
+    var on = (force == null) ? !this.root.classList.contains('is-max') : !!force;
+    if (on) {
+      var cur = document.querySelector('.dgm.is-max');
+      if (cur && cur !== this.root && cur.__dgm) cur.__dgm.toggleMax(false);
+    }
+    this.root.classList.toggle('is-max', on);
+    document.documentElement.classList.toggle('dgm-locked', on);
+    if (this.bMax) {
+      this.bMax.classList.toggle('is-on', on);
+      this.bMax.textContent = on ? '닫기' : '넓게';
+      this.bMax.title = on ? '원래 크기로 (Esc)' : '화면 가득 펼치기 (Esc 로 닫기)';
+    }
+    (window.requestAnimationFrame || setTimeout)(function () {
+      if (!on) self.autoHeight();
+      self.fit();
+    });
+  };
+
+  /* 캔버스 높이를 내용 비율에 맞춘다.
+     고정 높이를 쓰면 넓고 납작한 그림은 축소되어 글씨가 안 보이고, 좁은 그림은 빈 띠가 남는다.
+     슬라이드처럼 남는 공간을 채우는 자리(flex:1)와 data-autoheight="off" 는 건드리지 않는다. */
+  Diagram.prototype.autoHeight = function () {
+    if (this.root.classList.contains('is-max')) return;
+    if (this.root.getAttribute('data-autoheight') === 'off') return;
+    var cs = window.getComputedStyle(this.root);
+    if (cs.flexGrow !== '0') return;
+    var items = this.data.nodes.concat(this.data.groups);
+    if (!items.length) return;
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    items.forEach(function (n) {
+      x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+      x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h);
+    });
+    var W = this.svg.clientWidth || this.root.clientWidth || 900;
+    var pad = 28, bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
+    var k = Math.min(W / bw, 1);
+    var bar = this.root.querySelector('.dgm__bar');
+    var want = Math.round(bh * k) + (bar ? bar.offsetHeight : 0) + 2;
+    this.root.style.height = Math.max(220, Math.min(want, 720)) + 'px';
+  };
+
+  Diagram.prototype.fit = function () {
+    var items = this.data.nodes.concat(this.data.groups);
+    var r = this.svg.getBoundingClientRect();
+    // CSS transform:scale() 이 걸린 무대(발표용 .stage) 안에서는 getBoundingClientRect 가
+    // "화면에 보이는" 크기를 돌려준다. 그 값으로 배율을 잡으면 큰 화면에서 상한(1.6배)까지
+    // 확대돼 그림이 잘리고, 작은 화면에서는 필요 이상 줄어든다.
+    // clientWidth/Height 는 변환 전 레이아웃 크기라 무대 배율과 무관하다.
+    var W = this.svg.clientWidth || r.width || 800;
+    var H = this.svg.clientHeight || r.height || 420;
+    if (!items.length) { this.view = { tx: 20, ty: 20, k: 1 }; return this.paint(); }
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    items.forEach(function (n) {
+      x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
+      x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h);
+    });
+    var pad = 24, bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
+    var k = Math.min(W / bw, H / bh, 1);
+    this.view.k = k;
+    this.view.tx = (W - bw * k) / 2 - (x0 - pad) * k;
+    this.view.ty = (H - bh * k) / 2 - (y0 - pad) * k;
+    this.paint();
+  };
+
+  Diagram.prototype.zoom = function (f, cx, cy) {
+    var r = this.svg.getBoundingClientRect();
+    cx = cx == null ? r.width / 2 : cx; cy = cy == null ? r.height / 2 : cy;
+    var k0 = this.view.k, k1 = Math.max(.25, Math.min(3, k0 * f));
+    this.view.tx = cx - (cx - this.view.tx) * (k1 / k0);
+    this.view.ty = cy - (cy - this.view.ty) * (k1 / k0);
+    this.view.k = k1; this.paint();
+  };
+
+  /* ---------- 편집 내용 보관 (브라우저 안에만) ----------
+     끌어 옮기고 라벨을 고친 결과가 새로고침에도 남는다. 저장 위치는 이 브라우저의
+     localStorage 라 다른 사람에게는 전달되지 않는다 — 문서 자체에 반영하려면
+     JSON 버튼으로 내보내 원본 파일에 붙여넣어야 한다. */
+  Diagram.prototype.save = function () {
+    if (!this.editable || !this.key) return;
+    var self = this;
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(function () {
+      try {
+        localStorage.setItem(self.key, JSON.stringify({ v: self.srcHash, d: self.data }));
+        self.markSaved(true);
+      } catch (e) { /* 사생활 보호 모드 등 — 저장만 안 될 뿐 편집은 된다 */ }
+    }, 250);
+  };
+
+  Diagram.prototype.loadSaved = function () {
+    try {
+      var raw = localStorage.getItem(this.key);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || o.v !== this.srcHash || !o.d) { localStorage.removeItem(this.key); return null; }
+      this._restored = true;
+      return o.d;
+    } catch (e) { return null; }
+  };
+
+  Diagram.prototype.resetSaved = function () {
+    try { localStorage.removeItem(this.key); } catch (e) { }
+    this.data = this.read();
+    this.sel = null;
+    this._skipSave = true;
+    this.render();
+    this._skipSave = false;
+    this.fit();
+    this.markSaved(false);
+  };
+
+  /* 저장됨 표시. 버튼 라벨만 잠깐 바꾼다 — 별도 알림창은 발표 중에 방해가 된다. */
+  Diagram.prototype.markSaved = function (on) {
+    if (!this.bReset) return;
+    this.bReset.classList.toggle('is-on', !!on);
+    this.bReset.title = on ? '이 브라우저에 저장된 편집 내용을 지우고 원래대로' : '원래대로 (저장된 편집 없음)';
+  };
+
+  /* ---------- 편집 ---------- */
+  Diagram.prototype.push = function () {
+    this.undo.push(JSON.stringify(this.data));
+    if (this.undo.length > 40) this.undo.shift();
+  };
+  Diagram.prototype.popUndo = function () {
+    if (!this.undo.length) return;
+    this.data = JSON.parse(this.undo.pop());
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.addNode = function () {
+    this.push();
+    var id = 'n' + Date.now().toString(36).slice(-5);
+    var r = this.svg.getBoundingClientRect();
+    var wx = snap((r.width / 2 - this.view.tx) / this.view.k - 85);
+    var wy = snap((r.height / 2 - this.view.ty) / this.view.k - 31);
+    this.data.nodes.push({ id: id, label: '새 단계', x: wx, y: wy, w: 170, h: 62, shape: 'rect', tone: 'neutral' });
+    this.sel = { type: 'node', id: id };
+    this.render();
+  };
+  Diagram.prototype.toggleLink = function () {
+    this.linkMode = !this.linkMode; this.linkFrom = null;
+    this.bLink.classList.toggle('is-on', this.linkMode);
+  };
+  Diagram.prototype.cycleTone = function () {
+    if (!this.sel) return;
+    this.push();
+    if (this.sel.type === 'node') {
+      var n = this.index[this.sel.id];
+      n.tone = TONES[(TONES.indexOf(n.tone) + 1) % TONES.length];
+    } else if (this.sel.type === 'edge') {
+      var order = [undefined, 'primary', 'ok', 'risk'];
+      var e = this.data.edges[this.sel.id];
+      e.tone = order[(order.indexOf(e.tone) + 1) % order.length];
+    }
+    this.render();
+  };
+  Diagram.prototype.cycleShape = function () {
+    if (!this.sel || this.sel.type !== 'node') return;
+    var SH = ['rect', 'round', 'pill', 'diamond', 'store', 'note'];
+    this.push();
+    var n = this.index[this.sel.id];
+    n.shape = SH[(SH.indexOf(n.shape) + 1) % SH.length];
+    this.render();
+  };
+  Diagram.prototype.remove = function () {
+    if (!this.sel) return;
+    this.push();
+    var self = this;
+    if (this.sel.type === 'node') {
+      this.data.nodes = this.data.nodes.filter(function (n) { return n.id !== self.sel.id; });
+      this.data.edges = this.data.edges.filter(function (e) { return e.from !== self.sel.id && e.to !== self.sel.id; });
+    } else if (this.sel.type === 'edge') {
+      this.data.edges.splice(this.sel.id, 1);
+    } else {
+      this.data.groups = this.data.groups.filter(function (g) { return g.id !== self.sel.id; });
+    }
+    this.sel = null; this.render();
+  };
+  Diagram.prototype.openJson = function () {
+    this.ta.value = JSON.stringify(this.data, null, 2);
+    this.modal.classList.add('is-open');
+  };
+
+  /* ---------- 이벤트 ---------- */
+  Diagram.prototype.bind = function () {
+    var self = this, drag = null, pan = null;
+
+    this.svg.addEventListener('pointerdown', function (ev) {
+      if (ev.target.closest('[contenteditable="true"]')) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      var edgeEl = ev.target.closest('.dgm-edge');
+      var grpEl = ev.target.closest('.dgm-grp');
+
+      if (self.linkMode && nodeEl) {
+        var id = nodeEl.getAttribute('data-id');
+        if (!self.linkFrom) { self.linkFrom = id; self.sel = { type: 'node', id: id }; self.paint(); }
+        else if (self.linkFrom !== id) {
+          self.push();
+          self.data.edges.push({ from: self.linkFrom, to: id, label: '' });
+          self.linkFrom = null; self.toggleLink(); self.render();
+        }
+        return;
+      }
+      if (nodeEl && self.editable) {
+        self.sel = { type: 'node', id: nodeEl.getAttribute('data-id') };
+        var n = self.index[self.sel.id];
+        var w = self.world(ev);
+        drag = { kind: 'node', obj: n, dx: w.x - n.x, dy: w.y - n.y, moved: false };
+        self.push();
+      } else if (grpEl && self.editable) {
+        self.sel = { type: 'group', id: grpEl.getAttribute('data-id') };
+        var g = self.data.groups.filter(function (q) { return q.id === self.sel.id; })[0];
+        var w2 = self.world(ev);
+        drag = { kind: 'group', obj: g, dx: w2.x - g.x, dy: w2.y - g.y, moved: false };
+        self.push();
+      } else if (edgeEl) {
+        self.sel = { type: 'edge', id: +edgeEl.getAttribute('data-i') };
+      } else {
+        self.sel = null;
+        pan = { x: ev.clientX, y: ev.clientY, tx: self.view.tx, ty: self.view.ty };
+        self.svg.classList.add('is-panning');
+      }
+      self.svg.setPointerCapture(ev.pointerId);
+      self.paint();
+    });
+
+    this.svg.addEventListener('pointermove', function (ev) {
+      if (drag) {
+        var w = self.world(ev);
+        drag.obj.x = snap(w.x - drag.dx); drag.obj.y = snap(w.y - drag.dy);
+        drag.moved = true;
+        self.render();
+      } else if (pan) {
+        self.view.tx = pan.tx + (ev.clientX - pan.x);
+        self.view.ty = pan.ty + (ev.clientY - pan.y);
+        self.paint();
+      }
+    });
+
+    var end = function (ev) {
+      if (drag && !drag.moved) self.undo.pop();
+      drag = null; pan = null;
+      self.svg.classList.remove('is-panning');
+      try { self.svg.releasePointerCapture(ev.pointerId); } catch (e) { }
+    };
+    this.svg.addEventListener('pointerup', end);
+    this.svg.addEventListener('pointercancel', end);
+
+    this.svg.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      var r = self.svg.getBoundingClientRect();
+      self.zoom(ev.deltaY < 0 ? 1.12 : 1 / 1.12, ev.clientX - r.left, ev.clientY - r.top);
+    }, { passive: false });
+
+    this.svg.addEventListener('dblclick', function (ev) {
+      if (!self.editable) return;
+      var nodeEl = ev.target.closest('.dgm-node');
+      if (nodeEl) return self.edit(nodeEl.querySelector('.lbl .t'), function (v) {
+        self.index[nodeEl.getAttribute('data-id')].label = v;
+      });
+      var edgeEl = ev.target.closest('.dgm-edge');
+      if (edgeEl) {
+        var i = +edgeEl.getAttribute('data-i');
+        var v = prompt('연결 라벨', self.data.edges[i].label || '');
+        if (v !== null) { self.push(); self.data.edges[i].label = v; self.render(); }
+      }
+    });
+
+    this.root.addEventListener('keydown', function (ev) {
+      if (ev.target.getAttribute && ev.target.getAttribute('contenteditable') === 'true') return;
+      if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); self.remove(); }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); self.popUndo(); }
+    });
+    this.root.tabIndex = 0;
+
+    // 폭이 바뀌면 다시 그리는 것만으로는 부족하다 — 좁아진 칸에 옛 배율로 그리면 넘쳐서 잘린다.
+    // fit() 으로 배율까지 다시 잡아야 항상 전체가 보인다.
+    var ro = window.ResizeObserver ? new ResizeObserver(function () { self.fit(); }) : null;
+    if (ro) ro.observe(this.svg);
+  };
+
+  Diagram.prototype.edit = function (el, done) {
+    if (!el) return;
+    var self = this;
+    this.push();
+    el.parentNode.setAttribute('contenteditable', 'true');
+    el.parentNode.focus();
+    var save = function () {
+      el.parentNode.removeAttribute('contenteditable');
+      done(el.textContent.trim());
+      self.render();
+    };
+    el.parentNode.addEventListener('blur', save, { once: true });
+    el.parentNode.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); el.parentNode.blur(); }
+      if (ev.key === 'Escape') { el.parentNode.removeAttribute('contenteditable'); self.popUndo(); }
+      ev.stopPropagation();
+    });
+    var rg = document.createRange(); rg.selectNodeContents(el);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+  };
+
+  function initAll(scope) {
+    var list = (scope || document).querySelectorAll('.dgm');
+    Array.prototype.forEach.call(list, function (el) {
+      if (el.__dgm) return;
+      el.__dgm = new Diagram(el);
+    });
+  }
+  /* Esc 는 펼쳐 놓은 다이어그램을 닫는다. 라벨 편집 중의 Esc 는
+     edit() 안에서 stopPropagation 되므로 여기까지 오지 않는다. */
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var el = document.querySelector('.dgm.is-max');
+    if (el && el.__dgm) { ev.preventDefault(); el.__dgm.toggleMax(false); }
+  });
+
+  /* 창 폭이 바뀌면 높이와 배율을 다시 잡는다. 펼쳐 둔 그림은 건드리지 않는다. */
+  var rsT = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(rsT);
+    rsT = setTimeout(function () {
+      Array.prototype.forEach.call(document.querySelectorAll('.dgm'), function (el) {
+        if (!el.__dgm || el.classList.contains('is-max')) return;
+        el.__dgm.autoHeight(); el.__dgm.fit();
+      });
+    }, 160);
+  });
+
+  window.HWDiagram = { initAll: initAll, Diagram: Diagram };
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', function () { initAll(); });
+  else initAll();
+})();
+
+/* ============================================================
+   HW Doc Kit - flow engine (웹 스타일 워크플로우 그림, 의존성 없음)
+   카드(그리드 배치) 위치를 읽어 곡선 연결선 · 라벨 · 흐르는 점을 그리고,
+   `편집` 을 켜면 문서 안에서 바로 고칠 수 있다.
+
+   마크업 (자세한 내용은 references/flow.md):
+     div.flow > div.flow__head + div.flow__in(grid) > .fnode[data-id] ...
+              + script.flow-links (JSON 배열)
+     연결: {"from","to","kind":"flow|ok|risk|muted|plain","label","lane","port":"r>l"}
+
+   편집: 끌어 이동(10px 스냅) · 더블클릭 글자 수정 · 연결 · 색 · 아이콘 · 선 종류 · 방향 ·
+         삭제(Delete) · 되돌리기(Ctrl+Z) · 이 브라우저에 자동 저장 · 내보내기(HTML 붙여넣기로 영구 반영)
+   ============================================================ */
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var GRID = 10;
+  var ICONS = {
+    broker: '<circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49M7.76 16.24a6 6 0 0 1 0-8.49M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"/>',
+    chip: '<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M19 9h3M19 15h3M2 9h3M2 15h3"/>',
+    server: '<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01"/>',
+    layers: '<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
+    stream: '<path d="M3 6h13M3 12h18M3 18h9"/><circle cx="19" cy="6" r="1.6"/><circle cx="15" cy="18" r="1.6"/>',
+    code: '<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>',
+    db: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/>',
+    filter: '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>',
+    split: '<path d="M16 3h5v5M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.17-2.83L3 3M15 9l6-6"/>',
+    send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>',
+    inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+    tag: '<path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><path d="M7 7h.01"/>',
+    check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>',
+    alert: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/>',
+    retry: '<path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+    archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>',
+    trash: '<path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/>',
+    chart: '<path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-5"/>',
+    gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+    terminal: '<path d="m4 17 6-6-6-6M12 19h8"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/>',
+    lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+    cloud: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>'
+  };
+  var ICON_KEYS = Object.keys(ICONS);
+  var ROLES = ['', 'isl', 'new', 'src', 'store', 'ok', 'warn', 'risk', 'dim', 'decide'];
+  var ROLE_NAMES = { '': '기본', isl: '기존', 'new': '신규', src: '입력', store: '저장소', ok: '완료', warn: '주의', risk: '위험', dim: '버림', decide: '판정' };
+  var KINDS = ['flow', 'ok', 'risk', 'muted', 'plain'];
+  var KIND_NAMES = { flow: '데이터 흐름', ok: '저장 · 확정', risk: '실패', muted: '버림 · 보류', plain: '기본' };
+  var PORTS = ['', 'r>l', 'b>t', 't>b', 'l>r', 'r>t', 'b>l', 'r>b', 'b>r', 't>l', 'l>t'];
+  var DIR = { r: [1, 0], l: [-1, 0], b: [0, 1], t: [0, -1] };
+  var TEXT_SEL = '.fnode__t, .fnode__s, .fnode__tag, .fnode__badge, .fnode__no, .flane__n, .flane__k, .flane__m span, .fbypass__t, .flow__title, .flow__hint';
+
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function btn(label, title) { var b = el('button', 'dgm__btn', label); b.type = 'button'; if (title) b.title = title; return b; }
+  function snap(v) { return Math.round(v / GRID) * GRID; }
+  function hash(s) { var h = 5381; for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h); }
+
+  function paintIcons(root) {
+    root.querySelectorAll('[data-ic]').forEach(function (e) {
+      var name = e.getAttribute('data-ic');
+      e.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || ICONS.code) + '</svg>';
+    });
+  }
+
+  function portOf(r, side) {
+    if (side === 'r') return [r.right, r.top + r.height / 2];
+    if (side === 'l') return [r.left, r.top + r.height / 2];
+    if (side === 'b') return [r.left + r.width / 2, r.bottom];
+    return [r.left + r.width / 2, r.top];
+  }
+  function autoPort(a, b) {
+    if (b.left >= a.right - 6) return 'r>l';
+    if (b.right <= a.left + 6) return 'l>r';
+    if (b.top >= a.bottom - 6) return 'b>t';
+    return 't>b';
+  }
+  function rel(e, base, sc) {
+    /* sc: 조상에 transform:scale 이 걸려 있을 때(발표 덱의 --k) 화면 좌표를 레이아웃 좌표로 되돌리는 배율.
+       getBoundingClientRect 는 화면(확대 후) 값이고 선은 레이아웃(확대 전) 단위로 그리므로 나눠 준다. */
+    sc = sc || 1;
+    var r = e.getBoundingClientRect();
+    return { left: (r.left - base.left) / sc, right: (r.right - base.left) / sc, top: (r.top - base.top) / sc, bottom: (r.bottom - base.top) / sc, width: r.width / sc, height: r.height / sc };
+  }
+  function translateOf(e) {
+    var t = (e.style.translate || '').trim().split(/\s+/);
+    return [parseFloat(t[0]) || 0, parseFloat(t[1]) || 0];
+  }
+
+  /* ─────────────────────────────────────────────────────────── */
+  function Flow(root, index) {
+    this.root = root;
+    this.fid = index;
+    this.inner = root.querySelector('.flow__in');
+    this.spec = root.querySelector('script.flow-links');
+    if (!this.inner) return;
+    if (!this.spec) { this.spec = el('script', 'flow-links'); this.spec.type = 'application/json'; this.spec.textContent = '[]'; root.appendChild(this.spec); }
+    this.links = JSON.parse(this.spec.textContent || '[]');
+    this.editable = root.getAttribute('data-edit') !== 'off';
+    this.key = 'hwflow:' + (location.pathname.split('/').pop() || 'doc') + ':' + (root.getAttribute('data-key') || index);
+    this.orig = this.snapshot();
+    this.origHash = hash(this.orig.html + JSON.stringify(this.orig.links) + this.orig.head);
+    this.undo = [];
+    this.sel = null;            /* {type:'node', id} | {type:'link', idx} */
+    this.linkMode = false;
+    this.linkFrom = null;
+    this.restore();
+    paintIcons(this.root);
+    if (this.editable) this.buildUi();
+    this.bind();
+    this.draw();
+    var self = this;
+    if (window.ResizeObserver) new ResizeObserver(function () { self.draw(); }).observe(this.inner);
+  }
+
+  /* 편집 흔적을 뺀 깨끗한 상태 — 저장 · 되돌리기 · 내보내기가 모두 이것을 쓴다 */
+  Flow.prototype.snapshot = function () {
+    var clone = this.inner.cloneNode(true);
+    clone.querySelectorAll('.flow__links, .flow__lbls').forEach(function (e) { e.remove(); });
+    clone.querySelectorAll('[data-ic]').forEach(function (e) { e.innerHTML = ''; });
+    clone.querySelectorAll('.is-sel, .is-from').forEach(function (e) { e.classList.remove('is-sel', 'is-from'); });
+    clone.querySelectorAll('[contenteditable]').forEach(function (e) { e.removeAttribute('contenteditable'); });
+    var head = this.root.querySelector('.flow__head');
+    var hclone = head ? head.cloneNode(true) : null;
+    if (hclone) hclone.querySelectorAll('.flow__edit').forEach(function (e) { e.remove(); });
+    return { html: clone.innerHTML.trim(), links: JSON.parse(JSON.stringify(this.links)), head: hclone ? hclone.innerHTML.trim() : '' };
+  };
+  Flow.prototype.apply = function (snap) {
+    this.inner.innerHTML = snap.html;
+    this.links = JSON.parse(JSON.stringify(snap.links));
+    var head = this.root.querySelector('.flow__head');
+    if (head && snap.head != null) {
+      var tools = head.querySelector('.flow__edit');
+      head.innerHTML = snap.head;
+      if (tools) head.appendChild(tools);
+      this.bindSeg();
+    }
+    paintIcons(this.inner);
+    this.sel = null;
+    this.draw();
+  };
+  Flow.prototype.push = function () {
+    this.undo.push(this.snapshot());
+    if (this.undo.length > 40) this.undo.shift();
+  };
+  Flow.prototype.doUndo = function () {
+    var s = this.undo.pop();
+    if (s) { this.apply(s); this.save(); }
+  };
+  Flow.prototype.save = function () {
+    this.spec.textContent = JSON.stringify(this.links);
+    if (!this.editable) return;
+    try {
+      var s = this.snapshot();
+      localStorage.setItem(this.key, JSON.stringify({ hash: this.origHash, snap: s }));
+      this.markSaved(true);
+    } catch (e) { /* 저장 불가 환경 — 무시 */ }
+  };
+  Flow.prototype.restore = function () {
+    try {
+      var raw = localStorage.getItem(this.key);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (d.hash !== this.origHash) { localStorage.removeItem(this.key); return; }
+      this.apply(d.snap);
+      this._restored = true;
+    } catch (e) { /* 무시 */ }
+  };
+  Flow.prototype.resetSaved = function () {
+    try { localStorage.removeItem(this.key); } catch (e) { /* 무시 */ }
+    this.push();
+    this.apply(this.orig);
+    this.markSaved(false);
+  };
+  Flow.prototype.markSaved = function (on) {
+    if (this.bReset) this.bReset.style.display = on ? '' : 'none';
+  };
+
+  /* ── UI ─────────────────────────────────────────────────── */
+  Flow.prototype.buildUi = function () {
+    var self = this;
+    var head = this.root.querySelector('.flow__head');
+    if (!head) { head = el('div', 'flow__head'); this.root.insertBefore(head, this.root.firstChild); }
+    var wrap = el('span', 'flow__edit no-print');
+    this.bEdit = btn('편집', '카드 · 연결 · 글자를 이 자리에서 고친다');
+    this.bEdit.addEventListener('click', function () { self.toggleEdit(); });
+    wrap.appendChild(this.bEdit);
+    head.appendChild(wrap);
+
+    var bar = el('div', 'dgm__bar flow__bar no-print');
+    var mk = function (label, title, fn) { var b = btn(label, title); b.addEventListener('click', fn); bar.appendChild(b); return b; };
+    mk('카드', '새 카드 추가', function () { self.addNode(); });
+    this.bLink = mk('연결', '시작 카드 → 도착 카드를 차례로 클릭', function () { self.toggleLink(); });
+    mk('색', '카드 역할 · 선 종류를 바꾼다', function () { self.cycleTone(); });
+    mk('아이콘', '선택 카드의 아이콘을 바꾼다', function () { self.cycleIcon(); });
+    mk('방향', '선택 선이 붙는 면을 바꾼다 (자동 → 오른쪽>왼쪽 → …)', function () { self.cyclePort(); });
+    mk('삭제', '선택 항목 삭제 (Delete)', function () { self.remove(); });
+    bar.appendChild(el('span', 'dgm__sep'));
+    this.bMax = mk('넓게', '화면 가득 펼치기 (Esc 로 닫기)', function () { self.toggleMax(); });
+    bar.appendChild(el('span', 'dgm__sep'));
+    mk('되돌리기', 'Ctrl+Z', function () { self.doUndo(); });
+    this.bReset = mk('원래대로', '이 브라우저에 저장된 편집을 지우고 문서 원본으로', function () { self.resetSaved(); });
+    bar.appendChild(el('span', 'sp'));
+    this.hint = el('span', 'dgm__hint flow__status', '끌어 이동 · 더블클릭 글자 수정 · 선 더블클릭 라벨 수정');
+    bar.appendChild(this.hint);
+    mk('내보내기', '수정한 그림 HTML 을 복사해 원본 파일에 붙여넣기', function () { self.openExport(); });
+    head.parentNode.insertBefore(bar, head.nextSibling);
+    this.bar = bar;
+    this.markSaved(!!this._restored);
+
+    var modal = el('div', 'dgm__modal no-print');
+    var pane = el('div', 'pane');
+    var mh = el('div', 'head'); mh.appendChild(el('b', null, '그림 HTML 내보내기')); mh.appendChild(el('span', 'sp'));
+    var closeB = btn('닫기'); mh.appendChild(closeB);
+    var ta = el('textarea'); ta.spellcheck = false;
+    var foot = el('div', 'foot');
+    var applyB = btn('붙여넣은 HTML 적용'); var copyB = btn('전체 복사');
+    foot.appendChild(el('span', 'dgm__hint', '원본 파일에서 이 그림의 <div class="flow"> 블록 전체를 이 내용으로 바꾸면 영구 반영됩니다'));
+    foot.appendChild(el('span', 'sp')); foot.appendChild(applyB); foot.appendChild(copyB);
+    pane.appendChild(mh); pane.appendChild(ta); pane.appendChild(foot); modal.appendChild(pane);
+    this.root.appendChild(modal);
+    this.modal = modal; this.ta = ta;
+    closeB.addEventListener('click', function () { modal.classList.remove('is-open'); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('is-open'); });
+    copyB.addEventListener('click', function () {
+      ta.select();
+      try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); }
+      copyB.textContent = '복사됨'; setTimeout(function () { copyB.textContent = '전체 복사'; }, 1200);
+    });
+    applyB.addEventListener('click', function () {
+      var tmp = el('div'); tmp.innerHTML = ta.value;
+      var f = tmp.querySelector('.flow');
+      var inn = f && f.querySelector('.flow__in');
+      if (!inn) { alert('<div class="flow"> 블록을 찾지 못했습니다.'); return; }
+      var sp = f.querySelector('script.flow-links');
+      var hd = f.querySelector('.flow__head');
+      try {
+        self.push();
+        self.apply({ html: inn.innerHTML, links: sp ? JSON.parse(sp.textContent) : [], head: hd ? hd.innerHTML : null });
+        var style = inn.getAttribute('style'); if (style) self.inner.setAttribute('style', style);
+        self.save(); modal.classList.remove('is-open');
+      } catch (e) { alert('연결 JSON 이 올바르지 않습니다: ' + e.message); }
+    });
+  };
+
+  Flow.prototype.toggleEdit = function (force) {
+    var on = force != null ? force : !this.root.classList.contains('is-edit');
+    this.root.classList.toggle('is-edit', on);
+    this.bEdit.classList.toggle('is-on', on);
+    this.bEdit.textContent = on ? '편집 끝' : '편집';
+    if (!on) { this.select(null); this.setLinkMode(false); }
+    this.draw();
+  };
+  Flow.prototype.editing = function () { return this.root.classList.contains('is-edit'); };
+  Flow.prototype.status = function (t) { if (this.hint) this.hint.textContent = t; };
+
+  /* 화면 가득 펼치기. 다른 그림이 펼쳐져 있으면 먼저 닫는다(.dgm.toggleMax 와 같은 규칙). */
+  Flow.prototype.toggleMax = function (force) {
+    var self = this;
+    var on = (force == null) ? !this.root.classList.contains('is-max') : !!force;
+    if (on) {
+      var cur = document.querySelector('.flow.is-max');
+      if (cur && cur !== this.root && cur.__flow) cur.__flow.toggleMax(false);
+    }
+    this.root.classList.toggle('is-max', on);
+    document.documentElement.classList.toggle('flow-locked', on);
+    if (this.bMax) {
+      this.bMax.classList.toggle('is-on', on);
+      this.bMax.textContent = on ? '닫기' : '넓게';
+      this.bMax.title = on ? '원래 크기로 (Esc)' : '화면 가득 펼치기 (Esc 로 닫기)';
+    }
+    (window.requestAnimationFrame || setTimeout)(function () { self.draw(); });
+  };
+
+  Flow.prototype.select = function (s) {
+    this.sel = s;
+    this.root.querySelectorAll('.is-sel').forEach(function (e) { e.classList.remove('is-sel'); });
+    if (!s) { this.status('끌어 이동 · 더블클릭 글자 수정 · 선 더블클릭 라벨 수정'); return; }
+    if (s.type === 'node') {
+      var n = this.inner.querySelector('[data-id="' + s.id + '"]');
+      if (n) n.classList.add('is-sel');
+      var role = this.roleOf(n);
+      this.status('카드 ' + s.id + ' · 역할 ' + ROLE_NAMES[role] + ' · 아이콘 ' + ((n && n.querySelector('.fnode__ic')) ? n.querySelector('.fnode__ic').getAttribute('data-ic') : '-'));
+    } else {
+      this.root.querySelectorAll('[data-li="' + s.idx + '"]').forEach(function (e) { e.classList.add('is-sel'); });
+      var ln = this.links[s.idx];
+      if (ln) this.status('선 ' + ln.from + ' → ' + ln.to + ' · ' + KIND_NAMES[ln.kind || 'plain'] + ' · 방향 ' + (ln.port || '자동'));
+    }
+  };
+  Flow.prototype.roleOf = function (n) {
+    if (!n) return '';
+    for (var i = 1; i < ROLES.length; i++) if (n.classList.contains('fnode--' + ROLES[i])) return ROLES[i];
+    return '';
+  };
+
+  Flow.prototype.setLinkMode = function (on) {
+    this.linkMode = on; this.linkFrom = null;
+    if (this.bLink) this.bLink.classList.toggle('is-on', on);
+    this.root.querySelectorAll('.is-from').forEach(function (e) { e.classList.remove('is-from'); });
+    this.status(on ? '연결: 시작 카드를 클릭하세요 (Esc 취소)' : '끌어 이동 · 더블클릭 글자 수정 · 선 더블클릭 라벨 수정');
+  };
+  Flow.prototype.toggleLink = function () { if (!this.editing()) this.toggleEdit(true); this.setLinkMode(!this.linkMode); };
+
+  Flow.prototype.addNode = function () {
+    if (!this.editing()) this.toggleEdit(true);
+    this.push();
+    var id = 'n' + Date.now().toString(36);
+    var n = el('div', 'fnode fnode--new');
+    n.setAttribute('data-id', id);
+    n.setAttribute('style', 'position:absolute;left:24px;top:24px;width:210px');
+    n.innerHTML = '<span class="fnode__ic" data-ic="code"></span><div class="fnode__body"><div class="fnode__t">새 단계</div><div class="fnode__s">설명을 더블클릭해 고치세요</div><span class="fnode__tag">tag</span></div>';
+    this.inner.appendChild(n);
+    paintIcons(n);
+    this.select({ type: 'node', id: id });
+    this.save(); this.draw();
+  };
+  Flow.prototype.cycleTone = function () {
+    if (!this.sel) return;
+    this.push();
+    if (this.sel.type === 'node') {
+      var n = this.inner.querySelector('[data-id="' + this.sel.id + '"]');
+      if (!n || !n.classList.contains('fnode')) return;
+      var cur = this.roleOf(n), next = ROLES[(ROLES.indexOf(cur) + 1) % ROLES.length];
+      if (cur) n.classList.remove('fnode--' + cur);
+      if (next) n.classList.add('fnode--' + next);
+    } else {
+      var ln = this.links[this.sel.idx];
+      ln.kind = KINDS[(KINDS.indexOf(ln.kind || 'plain') + 1) % KINDS.length];
+    }
+    this.save(); this.draw(); this.select(this.sel);
+  };
+  Flow.prototype.cycleIcon = function () {
+    if (!this.sel || this.sel.type !== 'node') return;
+    var n = this.inner.querySelector('[data-id="' + this.sel.id + '"]');
+    var ic = n && n.querySelector('.fnode__ic');
+    if (!ic) return;
+    this.push();
+    var next = ICON_KEYS[(ICON_KEYS.indexOf(ic.getAttribute('data-ic')) + 1) % ICON_KEYS.length];
+    ic.setAttribute('data-ic', next); paintIcons(n);
+    this.save(); this.select(this.sel);
+  };
+  Flow.prototype.cyclePort = function () {
+    if (!this.sel || this.sel.type !== 'link') return;
+    this.push();
+    var ln = this.links[this.sel.idx];
+    var next = PORTS[(PORTS.indexOf(ln.port || '') + 1) % PORTS.length];
+    if (next) ln.port = next; else delete ln.port;
+    this.save(); this.draw(); this.select(this.sel);
+  };
+  Flow.prototype.remove = function () {
+    if (!this.sel) return;
+    this.push();
+    if (this.sel.type === 'node') {
+      var id = this.sel.id;
+      var n = this.inner.querySelector('[data-id="' + id + '"]');
+      if (n) n.remove();
+      this.links = this.links.filter(function (l) { return l.from !== id && l.to !== id; });
+    } else {
+      this.links.splice(this.sel.idx, 1);
+    }
+    this.select(null); this.save(); this.draw();
+  };
+
+  /* 글자 인라인 수정 */
+  Flow.prototype.editText = function (target, onCommit) {
+    var self = this, before = target.textContent;
+    var undoSnap = this.snapshot();
+    target.setAttribute('contenteditable', 'true');
+    target.focus();
+    var range = document.createRange(); range.selectNodeContents(target);
+    var selx = window.getSelection(); selx.removeAllRanges(); selx.addRange(range);
+    var done = false;
+    var finish = function (commit) {
+      if (done) return; done = true;
+      target.removeAttribute('contenteditable');
+      target.removeEventListener('keydown', onKey);
+      if (!commit) { target.textContent = before; return; }
+      var after = target.textContent.replace(/\s+/g, ' ').trim();
+      target.textContent = after;
+      if (after !== before) {
+        self.undo.push(undoSnap);
+        if (onCommit) onCommit(after);
+        self.save(); self.draw();
+      }
+    };
+    var onKey = function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); target.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); target.blur(); }
+      e.stopPropagation();
+    };
+    target.addEventListener('keydown', onKey);
+    target.addEventListener('blur', function () { finish(true); }, { once: true });
+  };
+
+  /* ── 이벤트 ─────────────────────────────────────────────── */
+  Flow.prototype.bindSeg = function () {
+    var root = this.root;
+    root.querySelectorAll('.flow__seg button').forEach(function (b) {
+      if (b.__bound) return; b.__bound = true;
+      b.addEventListener('click', function () {
+        root.querySelectorAll('.flow__seg button').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        root.setAttribute('data-focus', b.getAttribute('data-focus'));
+      });
+    });
+  };
+
+  Flow.prototype.bind = function () {
+    var self = this, root = this.root, inner = this.inner;
+    this.bindSeg();
+
+    /* 호버: 연결된 선만 남긴다 (편집 중에는 끈다) */
+    inner.addEventListener('mouseover', function (e) {
+      if (self.editing()) return;
+      var n = e.target.closest('[data-id]'); if (!n || !inner.contains(n)) return;
+      var id = n.getAttribute('data-id');
+      root.classList.add('is-hover');
+      root.querySelectorAll('[data-li]').forEach(function (x) {
+        var l = self.links[+x.getAttribute('data-li')];
+        x.classList.toggle('hot', !!l && (l.from === id || l.to === id));
+      });
+    });
+    inner.addEventListener('mouseout', function (e) {
+      var n = e.target.closest('[data-id]'); if (!n) return;
+      if (e.relatedTarget && n.contains(e.relatedTarget)) return;
+      root.classList.remove('is-hover');
+    });
+
+    /* 선택 · 연결 · 끌기 */
+    inner.addEventListener('pointerdown', function (e) {
+      if (!self.editing()) return;
+      if (e.target.closest('[contenteditable="true"]')) return;
+      var hit = e.target.closest('[data-li]');
+      if (hit) { self.select({ type: 'link', idx: +hit.getAttribute('data-li') }); e.preventDefault(); return; }
+      var n = e.target.closest('[data-id]');
+      if (!n || !inner.contains(n)) { self.select(null); return; }
+      var id = n.getAttribute('data-id');
+      if (self.linkMode) {
+        if (!self.linkFrom) { self.linkFrom = id; n.classList.add('is-from'); self.status('연결: 도착 카드를 클릭하세요'); }
+        else if (self.linkFrom !== id) {
+          self.push();
+          self.links.push({ from: self.linkFrom, to: id, kind: 'flow' });
+          self.save(); self.setLinkMode(false); self.draw();
+          self.select({ type: 'link', idx: self.links.length - 1 });
+        }
+        e.preventDefault(); return;
+      }
+      self.select({ type: 'node', id: id });
+      var start = [e.clientX, e.clientY], t0 = translateOf(n), moved = false, snap0 = null, raf = 0;
+      var move = function (ev) {
+        var dx = snap(ev.clientX - start[0]), dy = snap(ev.clientY - start[1]);
+        if (!moved && Math.abs(dx) + Math.abs(dy) < GRID) return;
+        if (!moved) { moved = true; snap0 = self.snapshot(); n.classList.add('is-drag'); }
+        n.style.translate = (t0[0] + dx) + 'px ' + (t0[1] + dy) + 'px';
+        if (!raf) raf = requestAnimationFrame(function () { raf = 0; self.draw(); });
+      };
+      var up = function () {
+        window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+        n.classList.remove('is-drag');
+        if (moved) { self.undo.push(snap0); self.save(); self.draw(); }
+      };
+      /* 캡처 대신 window 에서 받는다 — 카드 밖으로 빨리 끌어도 놓치지 않는다 */
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+      e.preventDefault();
+    });
+
+    /* 더블클릭: 글자 · 선 라벨 수정 */
+    root.addEventListener('dblclick', function (e) {
+      if (!self.editing()) return;
+      var li = e.target.closest('[data-li]');
+      if (li) {
+        var idx = +li.getAttribute('data-li');
+        var lbl = root.querySelector('.flbl[data-li="' + idx + '"]');
+        if (!lbl) {
+          self.push(); self.links[idx].label = '라벨'; self.draw();
+          lbl = root.querySelector('.flbl[data-li="' + idx + '"]');
+          self.undo.pop();
+        }
+        self.editText(lbl, function (v) { if (v) self.links[idx].label = v; else delete self.links[idx].label; });
+        e.preventDefault(); return;
+      }
+      var t = e.target.closest(TEXT_SEL);
+      if (t && root.contains(t)) { self.editText(t); e.preventDefault(); }
+    });
+  };
+
+  document.addEventListener('keydown', function (e) {
+    var f = Flow.active;
+    if (!f || !f.editing()) return;
+    if (document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('contenteditable') === 'true') return;
+    if (/^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '')) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); f.doUndo(); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { if (f.sel) { e.preventDefault(); f.remove(); } }
+    else if (e.key === 'Escape') { f.setLinkMode(false); f.select(null); }
+  });
+  document.addEventListener('pointerdown', function (e) {
+    var r = e.target.closest && e.target.closest('.flow');
+    if (r && r.__flow) Flow.active = r.__flow;
+  }, true);
+  /* Esc 는 펼쳐 놓은 그림을 닫는다(.dgm 과 같은 규칙). */
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var m = document.querySelector('.flow.is-max');
+    if (m && m.__flow) { ev.preventDefault(); m.__flow.toggleMax(false); }
+  });
+  window.addEventListener('resize', function () {
+    var m = document.querySelector('.flow.is-max');
+    if (m && m.__flow) m.__flow.draw();
+  });
+
+  /* ── 그리기 ─────────────────────────────────────────────── */
+  Flow.prototype.draw = function () {
+    var self = this, inner = this.inner, root = this.root;
+    if (!inner) return;
+    var svg = inner.querySelector('svg.flow__links');
+    var lbls = inner.querySelector('.flow__lbls');
+    if (!svg) { svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'flow__links'); inner.insertBefore(svg, inner.firstChild); }
+    if (!lbls) { lbls = el('div', 'flow__lbls'); inner.appendChild(lbls); }
+    svg.innerHTML = ''; lbls.innerHTML = '';
+    var base = inner.getBoundingClientRect();
+    var sc = (inner.offsetWidth && base.width) ? base.width / inner.offsetWidth : 1;
+    svg.setAttribute('width', inner.scrollWidth); svg.setAttribute('height', inner.scrollHeight);
+    var editing = this.editing();
+
+    var defs = document.createElementNS(NS, 'defs');
+    [['flow', 'var(--hw)'], ['ok', 'var(--ok)'], ['risk', 'var(--risk)'], ['muted', 'var(--ink3)']].forEach(function (m) {
+      var mk = document.createElementNS(NS, 'marker');
+      mk.setAttribute('id', 'fa-' + m[0] + '-' + self.fid);
+      mk.setAttribute('viewBox', '0 0 10 10'); mk.setAttribute('refX', '8.5'); mk.setAttribute('refY', '5');
+      mk.setAttribute('markerWidth', '7'); mk.setAttribute('markerHeight', '7'); mk.setAttribute('orient', 'auto-start-reverse');
+      var p = document.createElementNS(NS, 'path'); p.setAttribute('d', 'M0 1 L9 5 L0 9 z'); p.setAttribute('style', 'fill:' + m[1]);
+      mk.appendChild(p); defs.appendChild(mk);
+    });
+    svg.appendChild(defs);
+
+    this.links.forEach(function (ln, idx) {
+      var a = inner.querySelector('[data-id="' + ln.from + '"]');
+      var b = inner.querySelector('[data-id="' + ln.to + '"]');
+      if (!a || !b) return;
+      var ra = rel(a, base, sc), rb = rel(b, base, sc);
+      var port = (ln.port || autoPort(ra, rb)).split('>');
+      var p1 = portOf(ra, port[0]), p2 = portOf(rb, port[1]);
+      var d1 = DIR[port[0]], d2 = DIR[port[1]];
+      var dist = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+      var k = Math.max(28, Math.min(dist * 0.45, 140));
+      var s = [p1[0] + d1[0] * 5, p1[1] + d1[1] * 5];
+      var e = [p2[0] + d2[0] * 7, p2[1] + d2[1] * 7];
+      var dPath = 'M' + s[0] + ' ' + s[1] + ' C' + (s[0] + d1[0] * k) + ' ' + (s[1] + d1[1] * k) + ' ' + (e[0] + d2[0] * k) + ' ' + (e[1] + d2[1] * k) + ' ' + e[0] + ' ' + e[1];
+      var kind = ln.kind || 'plain';
+      var path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', dPath);
+      path.setAttribute('class', 'ln' + (kind !== 'plain' ? ' ln--' + kind : ''));
+      path.setAttribute('marker-end', 'url(#fa-' + (kind === 'plain' ? 'muted' : kind) + '-' + self.fid + ')');
+      path.setAttribute('data-li', idx);
+      if (ln.lane) path.setAttribute('data-lane', ln.lane);
+      svg.appendChild(path);
+      if (editing) {
+        var hit = document.createElementNS(NS, 'path');
+        hit.setAttribute('d', dPath); hit.setAttribute('class', 'ln-hit'); hit.setAttribute('data-li', idx);
+        svg.appendChild(hit);
+      }
+      var len = path.getTotalLength();
+      if ((kind === 'flow' || kind === 'ok') && !editing) {
+        var n = len > 220 ? 3 : 2, dur = Math.max(1.6, len / 85);
+        for (var i = 0; i < n; i++) {
+          var c = document.createElementNS(NS, 'circle');
+          c.setAttribute('r', '3.4'); c.setAttribute('class', 'dot' + (kind === 'ok' ? ' dot--ok' : ''));
+          c.setAttribute('data-li', idx);
+          if (ln.lane) c.setAttribute('data-lane', ln.lane);
+          var am = document.createElementNS(NS, 'animateMotion');
+          am.setAttribute('dur', dur.toFixed(2) + 's'); am.setAttribute('repeatCount', 'indefinite');
+          am.setAttribute('begin', (-(dur / n) * i).toFixed(2) + 's'); am.setAttribute('path', dPath);
+          c.appendChild(am); svg.appendChild(c);
+        }
+      }
+      if (ln.label) {
+        var mid = path.getPointAtLength(len / 2);
+        var t = el('span', 'flbl' + (kind !== 'plain' && kind !== 'muted' ? ' flbl--' + kind : ''), ln.label);
+        t.style.left = mid.x + 'px'; t.style.top = mid.y + 'px';
+        t.setAttribute('data-li', idx);
+        if (ln.lane) t.setAttribute('data-lane', ln.lane);
+        lbls.appendChild(t);
+      }
+    });
+    if (this.sel && this.sel.type === 'link') this.root.querySelectorAll('[data-li="' + this.sel.idx + '"]').forEach(function (x) { x.classList.add('is-sel'); });
+    this.spec.textContent = JSON.stringify(this.links);
+  };
+
+  Flow.prototype.openExport = function () {
+    var s = this.snapshot();
+    var style = this.inner.getAttribute('style') || '';
+    var attrs = '';
+    ['data-key', 'data-edit'].forEach(function (a) { if (this.root.hasAttribute(a)) attrs += ' ' + a + '="' + this.root.getAttribute(a) + '"'; }, this);
+    var legend = this.root.querySelector('.flow__legend');
+    var html = '<div class="flow"' + attrs + '>\n'
+      + '  <div class="flow__head">' + s.head + '</div>\n'
+      + '  <div class="flow__in" style="' + style + '">\n' + s.html + '\n  </div>\n'
+      + (legend ? '  ' + legend.outerHTML + '\n' : '')
+      + '  <' + 'script type="application/json" class="flow-links">' + JSON.stringify(s.links, null, 1).replace(/<\//g, '<\\/') + '<' + '/script>\n'
+      + '</div>';
+    this.ta.value = html;
+    this.modal.classList.add('is-open');
+  };
+
+  function init() {
+    var flows = [];
+    document.querySelectorAll('.flow').forEach(function (root, i) {
+      if (root.__flow) return;
+      root.__flow = new Flow(root, i);
+      flows.push(root.__flow);
+    });
+    window.addEventListener('beforeprint', function () { flows.forEach(function (f) { f.draw(); }); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { flows.forEach(function (f) { f.draw(); }); });
+  }
+  window.HWFlow = { init: init, icons: ICON_KEYS };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+/* ============================================================
+   HW Doc Kit - 탭(.tabs) · JSON 한 줄 설명(.jx2) 엔진 (의존성 없음)
+   마크업은 style-guide.md "탭과 JSON 한 줄 설명" 절 참고.
+   ============================================================ */
+(function () {
+  // 탭: data-sync 가 같은 묶음은 같은 탭으로 함께 넘어간다
+  function show(box, key) {
+    box.querySelectorAll(':scope > .tabs__bar .tabs__b').forEach(function (b) { b.classList.toggle('on', b.dataset.t === key); });
+    box.querySelectorAll(':scope > .tabs__p').forEach(function (p) { p.classList.toggle('on', p.dataset.p === key); });
+  }
+  var boxes = document.querySelectorAll('.tabs');
+  boxes.forEach(function (box) {
+    var first = box.querySelector('.tabs__b.on') || box.querySelector('.tabs__b');
+    if (first) show(box, first.dataset.t);
+    box.querySelectorAll(':scope > .tabs__bar .tabs__b').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var sync = box.dataset.sync;
+        boxes.forEach(function (o) { if (o === box || (sync && o.dataset.sync === sync)) show(o, b.dataset.t); });
+      });
+    });
+  });
+
+  // JSON 한 줄 호버 → 몇 번째 줄인지와 설명을 발치 칸에
+  document.querySelectorAll('.jx2').forEach(function (box) {
+    var pos = box.querySelector('.jx2__pos'), fd = box.querySelector('.jx2__fd');
+    if (!pos || !fd) return;
+    var idle = fd.innerHTML;
+    box.querySelectorAll('.jx2__r--k').forEach(function (r) {
+      r.addEventListener('mouseenter', function () {
+        box.classList.add('act');
+        pos.textContent = r.querySelector('.jx2__ln').textContent + '행';
+        fd.innerHTML = '<b></b><code></code><span></span>';
+        fd.children[0].textContent = r.dataset.n;
+        fd.children[1].textContent = r.dataset.k;
+        fd.children[2].textContent = r.dataset.d;
+      });
+      r.addEventListener('mouseleave', function () { box.classList.remove('act'); pos.textContent = '-'; fd.innerHTML = idle; });
+    });
+  });
+})();
+
+/* ============================================================
+   HW Doc Kit - 개발용 문서 런타임 (TOC 스크롤스파이 / 체크 상태 / 복사)
+   ============================================================ */
+(function () {
+  'use strict';
+  var KEY = 'hwdoc:' + (document.title || location.pathname);
+
+  /* --- TOC 자동 생성 (비어 있을 때만) --- */
+  var toc = document.querySelector('.toc');
+  if (toc && !toc.children.length) {
+    document.querySelectorAll('.sec').forEach(function (sec) {
+      if (!sec.id) return;
+      var h = sec.querySelector('h2');
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + sec.id;
+      a.textContent = h
+        ? Array.prototype.map.call(h.childNodes, function (x) { return x.textContent.trim(); })
+          .filter(Boolean).join(' ')
+        : sec.id;
+      li.appendChild(a); toc.appendChild(li);
+    });
+  }
+
+  /* --- 스크롤스파이 --- */
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var secs = links.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  if (window.IntersectionObserver && secs.length) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (a) { a.classList.toggle('is-cur', a.getAttribute('href') === '#' + e.target.id); });
+      });
+    }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
+    secs.forEach(function (s) { io.observe(s); });
+  }
+  /* 마지막 섹션은 짧으면 위 10~25% 관찰 밴드까지 올라오지 못해 끝까지 안 켜질 수 있다 —
+     스크롤이 문서 끝에 닿으면 무조건 마지막 링크를 켠다. */
+  if (links.length) {
+    var lastLink = links[links.length - 1];
+    var atBottom = function () {
+      return window.innerHeight + Math.round(window.scrollY) >= document.documentElement.scrollHeight - 4;
+    };
+    var checkBottom = function () {
+      if (atBottom()) { links.forEach(function (a) { a.classList.toggle('is-cur', a === lastLink); }); }
+    };
+    window.addEventListener('scroll', checkBottom, { passive: true });
+    window.addEventListener('resize', checkBottom);
+    checkBottom();
+  }
+
+  /* --- 목차 사이드바 접기/펼치기 (좁게: 목차 목록만 / 완전히: 사이드바 전체) --- */
+  (function () {
+    var bToc = document.getElementById('bToc'), tocList = document.querySelector('.toc');
+    var doc = document.querySelector('.doc'), bOpen = document.getElementById('bSideOpen');
+    if (!bToc || !tocList || !doc) return;
+    var TKEY = 'hwdoc:side-collapsed';
+    var collapsed = false;
+    try { collapsed = localStorage.getItem(TKEY) === '1'; } catch (e) { /* 저장 불가 환경 */ }
+    function apply(c) {
+      doc.classList.toggle('side-collapsed', c);
+      tocList.classList.toggle('is-collapsed', c);
+      bToc.textContent = c ? '펼치기' : '접기';
+      bToc.setAttribute('aria-expanded', String(!c));
+      if (bOpen) bOpen.classList.toggle('is-shown', c);
+    }
+    apply(collapsed);
+    bToc.addEventListener('click', function () {
+      collapsed = !collapsed;
+      try { localStorage.setItem(TKEY, collapsed ? '1' : '0'); } catch (e) { /* 무시 */ }
+      apply(collapsed);
+    });
+    if (bOpen) bOpen.addEventListener('click', function () {
+      collapsed = false;
+      try { localStorage.setItem(TKEY, '0'); } catch (e) { /* 무시 */ }
+      apply(collapsed);
+    });
+  })();
+
+  /* --- 체크리스트 상태 저장 --- */
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { }
+  document.querySelectorAll('.chk input[type="checkbox"]').forEach(function (cb, i) {
+    var id = cb.id || ('chk' + i); cb.id = id;
+    if (saved[id]) cb.checked = true;
+    var sync = function () {
+      cb.closest('li').classList.toggle('is-done', cb.checked);
+      saved[id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) { }
+      count();
+    };
+    cb.addEventListener('change', sync);
+    cb.closest('li').classList.toggle('is-done', cb.checked);
+  });
+  function count() {
+    document.querySelectorAll('.chk').forEach(function (ul) {
+      var all = ul.querySelectorAll('input[type="checkbox"]');
+      var done = ul.querySelectorAll('input[type="checkbox"]:checked');
+      var badge = ul.previousElementSibling && ul.previousElementSibling.querySelector('.chk-count');
+      if (badge) badge.textContent = done.length + ' / ' + all.length;
+    });
+  }
+  count();
+
+  /* --- 코드 복사 --- */
+  document.querySelectorAll('.code__copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var pre = b.closest('.code').querySelector('pre');
+      try { navigator.clipboard.writeText(pre.innerText); } catch (e) { }
+      var t = b.textContent; b.textContent = '복사됨';
+      setTimeout(function () { b.textContent = t; }, 1200);
+    });
+  });
+
+  /* --- 사이드 버튼 --- */
+  function bind(id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); }
+  bind('bTheme', function () {
+    var r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  bind('bPrint', function () { window.print(); });
+  bind('bReset', function () {
+    if (!confirm('체크 상태를 모두 초기화할까요?')) return;
+    try { localStorage.removeItem(KEY); } catch (e) { }
+    location.reload();
+  });
+})();
+</script>
+</body>
+</html>

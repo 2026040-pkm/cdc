@@ -1,0 +1,4 @@
+# 조립 권역 — tsdb.device.zone 값이 ASSEMBLY 인 장비만 받는다
+hotdb:
+  zone:
+    code: ASSEMBLY

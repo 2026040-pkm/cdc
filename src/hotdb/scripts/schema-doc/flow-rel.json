@@ -1,0 +1,30 @@
+{
+  "key": "schema-rel-v2",
+  "title": "표 사이 관계 (FK)",
+  "hint": "회색 선 = FK (자식 → 부모) · 주황 = CDC · 모듈 안 FK 는 커밋 때 검사(DEFERRABLE)",
+  "cols": "repeat(5, 1fr)",
+  "cells": [
+    {"type": "node", "id": "dev", "col": 1, "row": 2, "title": "tsdb.device", "sub": "PK (site, device_id) · zone — 장비 마스터", "ic": "server", "role": "store"},
+    {"type": "node", "id": "tag", "col": 2, "row": 2, "title": "tsdb.tag_catalog", "sub": "PK tag_key", "ic": "tag", "role": "store"},
+    {"type": "node", "id": "sh", "col": 3, "row": 1, "title": "status_history", "sub": "FK tag_key", "ic": "stream", "role": "store"},
+    {"type": "node", "id": "ah", "col": 3, "row": 2, "title": "actual_history", "sub": "FK tag_key", "ic": "stream", "role": "store"},
+    {"type": "node", "id": "rh", "col": 3, "row": 3, "title": "artifact_history", "sub": "FK tag_key", "ic": "stream", "role": "store"},
+    {"type": "node", "id": "cur", "col": 4, "row": 1, "title": "device_status_current", "sub": "FK (site, device_id) → tsdb.device", "ic": "db", "role": "store new"},
+    {"type": "node", "id": "chg", "col": 5, "row": 1, "title": "device_status_change", "sub": "FK device_id → current", "ic": "db", "role": "store new"},
+    {"type": "node", "id": "scan", "col": 4, "row": 2, "title": "scan", "sub": "FK (site, device_id) → tsdb.device", "ic": "db", "role": "store new"},
+    {"type": "node", "id": "res", "col": 5, "row": 2, "title": "actual_result", "sub": "FK scan_id → scan", "ic": "db", "role": "store new"},
+    {"type": "node", "id": "art", "col": 5, "row": 3, "title": "artifact", "sub": "FK scan_id → scan", "ic": "db", "role": "store new"}
+  ],
+  "links": [
+    {"from": "tag", "to": "dev", "kind": "plain"},
+    {"from": "sh", "to": "tag", "kind": "plain"},
+    {"from": "ah", "to": "tag", "kind": "plain"},
+    {"from": "rh", "to": "tag", "kind": "plain"},
+    {"from": "sh", "to": "cur", "kind": "flow"},
+    {"from": "ah", "to": "scan", "kind": "flow"},
+    {"from": "rh", "to": "art", "kind": "flow", "label": "CDC"},
+    {"from": "chg", "to": "cur", "kind": "plain"},
+    {"from": "res", "to": "scan", "kind": "plain"},
+    {"from": "art", "to": "scan", "kind": "plain"}
+  ]
+}

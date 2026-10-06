@@ -1,0 +1,4 @@
+# 도장 권역 — tsdb.device.zone 값이 PAINTING 인 장비만 받는다
+hotdb:
+  zone:
+    code: PAINTING

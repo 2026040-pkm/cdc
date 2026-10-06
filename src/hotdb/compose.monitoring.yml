@@ -1,0 +1,80 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 모니터링 — Prometheus · Grafana + 서버마다 붙는 수집기(podman-exporter · node-exporter)
+#
+#   Grafana    http://localhost:59400  (admin/admin, 익명 Viewer) → HotDB / HotDB CDC
+#   Prometheus http://localhost:59490
+#
+# 서버 to 서버: 수집기 두 개는 서버마다 띄우고
+#   podman compose -f compose.monitoring.yml up -d podman-exporter node-exporter
+# Prometheus 쪽 monitoring/prometheus/targets/*.json 에 각 서버 IP:포트를 적는다.
+# ─────────────────────────────────────────────────────────────────────────────
+name: hotdb
+
+services:
+  prometheus:
+    image: docker.io/prom/prometheus:v2.54.1
+    container_name: hotdb-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus:ro
+      - hotdb-prometheus-data:/prometheus
+    ports: ["${PROMETHEUS_PORT:-59490}:9090"]
+
+  grafana:
+    image: docker.io/grafana/grafana:11.2.0
+    container_name: hotdb-grafana
+    restart: unless-stopped
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/hotdb-health.json
+      # Grafana 가 DB 를 직접 읽는 데이터소스 주소 (권역 RDB · dead letter 원문 조회)
+      HOTDB_ADDR: ${HOTDB_ADDR:-hotdb-pg:5432}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - hotdb-grafana-data:/var/lib/grafana
+    ports: ["${GRAFANA_PORT:-59400}:3000"]
+
+  # 컨테이너별 CPU · 메모리. rootless podman 에서는 cAdvisor 가 컨테이너를 못 잡아 소켓을 직접 읽는다
+  podman-exporter:
+    image: quay.io/navidys/prometheus-podman-exporter:v1.21.2
+    container_name: hotdb-podman-exporter
+    restart: unless-stopped
+    user: root
+    security_opt: ["label=disable"]
+    environment:
+      CONTAINER_HOST: unix:///run/podman/podman.sock
+    command: [--collector.enhance-metrics]
+    volumes:
+      - ${PODMAN_SOCK:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:ro
+    ports: ["${PODMAN_EXPORTER_PORT:-59488}:9882"]
+
+  # 호스트 CPU · 메모리 · 디스크 · 네트워크 (로컬에서는 podman VM 을 본다)
+  node-exporter:
+    image: docker.io/prom/node-exporter:v1.8.2
+    container_name: hotdb-node-exporter
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+      - --collector.disable-defaults
+      - --collector.cpu
+      - --collector.meminfo
+      - --collector.filesystem
+      - --collector.netdev
+      - --collector.loadavg
+      - --collector.diskstats
+    volumes:
+      - /:/host:ro
+    ports: ["${NODE_EXPORTER_PORT:-59489}:9100"]
+
+volumes:
+  hotdb-prometheus-data:
+  hotdb-grafana-data:

@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# RFC Service (O-8) — ① SAP 폴링 → 레거시 DB erp  ② 판별 모듈 실적 CDC → SAP (2단 CDC)
+#   (모듈 · 컨테이너 이름은 rfc-provider 그대로 — 슬롯 · 계정 · 지표 이름을 바꾸지 않으려고)
+#
+#   한 대에 전부:   scripts/up.ps1
+#   RFC AGENT 서버: .env 에 HOTDB_HOST=<HotDB 서버 IP>, HOTDB_PORT=59433 을 적고
+#                   podman compose -f compose.rfc.yml up -d
+#
+# 슬롯 rfc_provider 하나로 판별 모듈 전부를 받는다. SAP 송신: RFC_SENDER=jdbc(Z 테이블) · dry-run
+# ─────────────────────────────────────────────────────────────────────────────
+name: hotdb
+
+services:
+  rfc-provider:
+    build:
+      context: ./app
+      args: { MODULE: rfc-provider }
+    image: localhost/hotdb/rfc-provider:local
+    container_name: hotdb-rfc-provider
+    restart: on-failure
+    environment:
+      HOTDB_HOST: ${HOTDB_HOST:-hotdb-pg}
+      HOTDB_PORT: ${HOTDB_PORT:-5432}
+      CDC_OFFSET_DIR: /app/data
+      LEGACY_HOST: ${LEGACY_HOST:-legacy-db}     # SAP 폴링 결과(erp)를 쓰는 레거시 DB
+      LEGACY_PORT: ${LEGACY_PORT:-5432}
+      # SAP — 운영: jdbc:sap://<host>:<port>/?currentschema=<스키마> · SAP_SCHEMA=<스키마>. 기본은 로컬 대역 sap-sim
+      RFC_SENDER: ${RFC_SENDER:-dry-run}     # 로컬(compose.local.yml)은 jdbc — sap-sim 의 Z 표에 쓴다
+      SAP_URL: ${SAP_URL:-jdbc:postgresql://sap-sim:5432/sapsim}
+      SAP_USER: ${SAP_USER:-sapsim}
+      SAP_PASSWORD: ${SAP_PASSWORD:-sapsim}
+      SAP_SCHEMA: ${SAP_SCHEMA:-erpsrc}
+      SAP_RESULT_TABLE: ${SAP_RESULT_TABLE:-erpsrc.zhotdb_actual_result}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-60000}
+      POLL_FAST_INTERVAL_MS: ${POLL_FAST_INTERVAL_MS:-10000}
+      JAVA_TOOL_OPTIONS: ${RFC_JAVA_OPTS:--Xms64m -Xmx192m}
+    ports: ["${RFC_PROVIDER_PORT:-59485}:8080"]
+    volumes: [rfc-provider-data:/app/data]
+
+# Debezium 오프셋 파일. 지우면 슬롯의 confirmed_flush 위치부터 다시 받는다 — 유실은 없다
+volumes:
+  rfc-provider-data:

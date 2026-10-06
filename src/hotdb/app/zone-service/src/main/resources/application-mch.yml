@@ -1,0 +1,4 @@
+# 가공 권역 — tsdb.device.zone 값이 MACHINING 인 장비만 받는다
+hotdb:
+  zone:
+    code: MACHINING

@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 레거시 DB — SAP · Oracle 사본만 두는 별도 PostgreSQL (Hot DB = 필드 DB 와 분리, 2026-10-06)
+#
+#   erp (SAP 사본)       ← RFC Service 폴링 (계정 rfc_agent)
+#   mes · lgs · geo      ← DB Agent 폴링    (계정 db_agent)
+#   ops.poll_state       폴링 작업 상태
+#
+#   단독(서버 to 서버):  podman compose -f compose.legacy.yml up -d
+#   한 대에 전부:        scripts/up.ps1
+#
+# 표는 db/legacy-db/V2 — scripts/gen-sample-legacy.py 가 만든 시험용 표 178개. 이름 · 값은 지어냈고 규모만 실제와 비슷하다.
+# ─────────────────────────────────────────────────────────────────────────────
+name: hotdb
+
+services:
+  legacy-db:
+    image: docker.io/timescale/timescaledb:2.29.2-pg17   # 받아 둔 이미지를 평범한 PostgreSQL 로 쓴다 (확장 안 씀)
+    container_name: hotdb-legacy-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: legacy
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LEGACY_ADMIN_PASSWORD:-postgres}
+      TZ: Asia/Seoul
+    command: ["postgres", "-c", "shared_buffers=${LEGACY_SHARED_BUFFERS:-128MB}"]
+    ports: ["${LEGACY_PUBLIC_PORT:-59435}:5432"]
+    volumes: [hotdb-legacy-pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d legacy"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  legacy-migrate:   # hotdb-migrate 와 같은 이미지 — 대상 DB 와 마이그레이션 위치만 다르다
+    build:
+      context: ./app
+      args: { MODULE: hotdb-migrate }
+    image: localhost/hotdb/hotdb-migrate:local
+    container_name: hotdb-legacy-migrate
+    restart: "no"
+    depends_on:
+      legacy-db: { condition: service_healthy }
+    environment:
+      HOTDB_HOST: legacy-db
+      HOTDB_PORT: 5432
+      HOTDB_DB: legacy
+      HOTDB_ADMIN_PASSWORD: ${LEGACY_ADMIN_PASSWORD:-postgres}
+      HOTDB_MIGRATION_LOCATIONS: filesystem:/hotdb-db/legacy-db
+      JAVA_TOOL_OPTIONS: -Xmx128m
+    volumes:
+      - ./db:/hotdb-db:ro
+
+  legacy-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+    container_name: hotdb-legacy-exporter
+    restart: unless-stopped
+    depends_on:
+      legacy-db: { condition: service_healthy }
+    environment:
+      DATA_SOURCE_NAME: "postgresql://hotdb_monitor:hotdb_monitor@legacy-db:5432/legacy?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/pgexporter/queries-legacy.yaml
+    command: [--no-collector.stat_bgwriter]
+    volumes:
+      - ./monitoring/exporter:/etc/pgexporter:ro
+    ports: ["${LEGACY_EXPORTER_PORT:-59491}:9187"]
+
+volumes:
+  hotdb-legacy-pgdata:

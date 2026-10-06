@@ -1,0 +1,28 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: hotdb-prom
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 5s
+
+  # 권역 RDB · dead letter 원문을 화면에서 보려고 DB 를 직접 읽는다 (읽기 전용 계정)
+  - name: HotDB
+    uid: hotdb-pg
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: ${HOTDB_ADDR}
+    database: hotdb
+    user: hotdb_monitor
+    editable: false
+    secureJsonData:
+      password: hotdb_monitor
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1700
+      timescaledb: true

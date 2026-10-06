@@ -1,0 +1,100 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# RFC Service (O-8) — 두 방향
+#   ① SAP 폴링 → 레거시 DB erp           (poll-core, 계정 rfc_agent)
+#   ② svc.actual_result(CDC) → SAP (2단 CDC, 계정 rfc_provider)
+#
+#   1단: tsdb ─(slot zone_<모듈>, tsdb_cdc_pub)─▶ 판별 모듈 ─▶ svc (module 컬럼)
+#   2단: svc ─(slot rfc_provider, svc_cdc_pub)─▶ 이 서비스 ─▶ SAP
+#
+# 판별 모듈 전부를 슬롯 하나로 받는다. svc_cdc_pub 에는 실적 표만 실려 있다 (V6).
+# SAP 송신은 아직 dry-run — 보낸 기록(ops.rfc_sent)과 지표는 실제와 똑같이 쌓인다.
+# ─────────────────────────────────────────────────────────────────────────────
+spring:
+  application:
+    name: rfc-provider
+  datasource:
+    url: jdbc:postgresql://${HOTDB_HOST:localhost}:${HOTDB_PORT:59433}/${HOTDB_DB:hotdb}?ApplicationName=rfc-provider
+    username: ${HOTDB_USER:rfc_provider}
+    password: ${HOTDB_PASSWORD:rfc_provider}
+    hikari:
+      maximum-pool-size: 2
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus, metrics, info
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      pipeline: rfc-provider
+
+hotdb:
+  cdc:
+    pipeline: rfc-provider
+    source:
+      host: ${HOTDB_HOST:localhost}
+      port: ${HOTDB_PORT:59433}
+      database: ${HOTDB_DB:hotdb}
+      user: ${HOTDB_USER:rfc_provider}
+      password: ${HOTDB_PASSWORD:rfc_provider}
+    slot: rfc_provider
+    publication: svc_cdc_pub
+    include-tables:
+      - ops\.cdc_heartbeat
+      - svc\.actual_result      # 판별 모듈 전부 한 표 (module 컬럼) — 모듈이 늘어도 그대로
+    # svc 는 작다. 처음 붙을 때 이미 있는 실적도 보낸다 — 이미 보낸 것은 ops.rfc_sent 가 거른다
+    snapshot-mode: initial
+    offset-file: ${CDC_OFFSET_DIR:./data}/offsets-rfc-provider.dat
+    max-batch-size: 512
+
+  rfc:
+    max-retries: 5
+    backoff-ms: 500
+    # dry-run: 로그만 · jdbc: SAP Z 테이블에 INSERT (운영 HANA / 로컬 SAP 대역). JCo 가 생기면 jco
+    sender: ${RFC_SENDER:dry-run}
+    sap:
+      url: ${SAP_URL:jdbc:postgresql://localhost:59434/sapsim}
+      user: ${SAP_USER:sapsim}
+      password: ${SAP_PASSWORD:sapsim}
+      table: ${SAP_RESULT_TABLE:erpsrc.zhotdb_actual_result}
+
+  # ── ① SAP → erp 폴링 ────────────────────────────────────────────────────
+  # 운영 HANA: SAP_URL=jdbc:sap://<host>:<port>/?currentschema=<스키마> , SAP_SCHEMA=<스키마>
+  # 워터마크 upd_date || upd_time = 원천 표의 최종 수정 일자 · 시각 (DATS · TIMS 문자열)
+  poll:
+    agent: rfc-service
+    default-interval-ms: ${POLL_INTERVAL_MS:60000}
+    target:   # 레거시 DB 의 erp — rfc_agent 만 쓴다 (Hot DB 와 분리된 별도 DB)
+      url: jdbc:postgresql://${LEGACY_HOST:localhost}:${LEGACY_PORT:59435}/${LEGACY_DB:legacy}?ApplicationName=rfc-service-poll&reWriteBatchedInserts=true
+      user: ${HOTDB_POLL_USER:rfc_agent}
+      password: ${HOTDB_POLL_PASSWORD:rfc_agent}
+    sources:
+      sap:
+        url: ${SAP_URL:jdbc:postgresql://localhost:59434/sapsim}
+        user: ${SAP_USER:sapsim}
+        password: ${SAP_PASSWORD:sapsim}
+    jobs:
+      - target: erp.item                 # 품목 마스터
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.item
+        watermark: upd_date || upd_time
+      - target: erp.part                 # 부품 마스터
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.part
+        watermark: upd_date || upd_time
+      - target: erp.order_line           # 주문 행 (자주 바뀐다)
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.order_line
+        watermark: upd_date || upd_time
+        interval-ms: ${POLL_FAST_INTERVAL_MS:10000}
+
+logging:
+  level:
+    dev.hotdb: info
+    io.debezium: info

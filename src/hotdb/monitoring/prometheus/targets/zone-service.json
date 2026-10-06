@@ -1,0 +1,6 @@
+[
+  { "targets": ["zone-mch:8080"], "labels": { "zone": "mch", "server": "local" } },
+  { "targets": ["zone-asm:8080"], "labels": { "zone": "asm", "server": "local" } },
+  { "targets": ["zone-oft:8080"], "labels": { "zone": "oft", "server": "local" } },
+  { "targets": ["zone-pnt:8080"], "labels": { "zone": "pnt", "server": "local" } }
+]

@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 실적 판별 모듈 — 같은 이미지를 ZONE 만 바꿔 띄운다 (가공 · 조립 · 의장 · 도장, 늘 수 있다)
+#
+#   한 대에 전부: scripts/up.ps1
+#   OT 서버에서:  .env 에 HOTDB_HOST=<HotDB 서버 IP>, HOTDB_PORT=59433 을 적고
+#                 podman compose -f compose.zone.yml up -d zone-asm
+#
+# 모듈 추가: V 파일에 SELECT ops.provision_module('<zone>', '<ZONE_CODE>', '<이름>'); + 아래 블록 하나 (ZONE_CODE 환경변수로 권역 코드)
+# 도장 · 가공은 필드 정의서가 없어 발행기 장비가 0 이다 — 모듈은 떠 있고 받을 데이터만 없다 (up.ps1 -AllZones 면 대역 장비 생성)
+# DB 가 아직 준비 안 됐거나 라우트가 스키마와 안 맞으면 기동이 실패하고 재시작한다(on-failure).
+# ─────────────────────────────────────────────────────────────────────────────
+name: hotdb
+
+x-zone: &zone
+  build:
+    context: ./app
+    args: { MODULE: zone-service }
+  image: localhost/hotdb/zone-service:local
+  restart: on-failure
+
+x-zone-env: &zone-env
+  HOTDB_HOST: ${HOTDB_HOST:-hotdb-pg}
+  HOTDB_PORT: ${HOTDB_PORT:-5432}
+  CDC_OFFSET_DIR: /app/data
+  JAVA_TOOL_OPTIONS: ${ZONE_JAVA_OPTS:--Xms64m -Xmx256m}
+
+services:
+  zone-asm:
+    <<: *zone
+    container_name: hotdb-zone-asm
+    environment: { <<: *zone-env, ZONE: asm }
+    ports: ["${ZONE_ASM_PORT:-59481}:8080"]
+    volumes: [zone-asm-data:/app/data]
+
+  zone-oft:
+    <<: *zone
+    container_name: hotdb-zone-oft
+    environment: { <<: *zone-env, ZONE: oft }
+    ports: ["${ZONE_OFT_PORT:-59482}:8080"]
+    volumes: [zone-oft-data:/app/data]
+
+  zone-pnt:
+    <<: *zone
+    container_name: hotdb-zone-pnt
+    environment: { <<: *zone-env, ZONE: pnt }
+    ports: ["${ZONE_PNT_PORT:-59483}:8080"]
+    volumes: [zone-pnt-data:/app/data]
+
+  zone-mch:
+    <<: *zone
+    container_name: hotdb-zone-mch
+    environment: { <<: *zone-env, ZONE: mch }
+    ports: ["${ZONE_MCH_PORT:-59484}:8080"]
+    volumes: [zone-mch-data:/app/data]
+
+# Debezium 오프셋 파일. 지우면 슬롯의 confirmed_flush 위치부터 다시 받는다 — 유실은 없다
+volumes:
+  zone-asm-data:
+  zone-oft-data:
+  zone-pnt-data:
+  zone-mch-data:

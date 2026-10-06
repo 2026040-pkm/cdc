@@ -1,0 +1,3 @@
+[
+  { "targets": ["db-agent:8080"], "labels": { "server": "local" } }
+]

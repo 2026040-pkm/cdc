@@ -1,0 +1,2323 @@
+{
+  "uid": "hotdb-cdc",
+  "title": "HotDB CDC",
+  "tags": [
+    "hotdb",
+    "cdc"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "한눈에",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "권역 반영 지연 p99 (DB 시계)",
+      "description": "tsdb 수신(received_at) → 권역 RDB 반영(applied_at). 둘 다 DB 시계라 서버 간 시계 편차가 없다. 합격 기준 ≤ 2초",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max by (zone) (hotdb_zone_apply_lag_p99_seconds)",
+          "legendFormat": "{{zone}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "tsdb 적재 행/초",
+      "description": "HotDB Provider(현재는 시뮬레이터)가 넣는 속도. 기준 ≈ 426",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(rate(hotdb_hypertable_inserted_rows[1m]))",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "CDC 반영 행/초",
+      "description": "모든 권역 서비스 · 라우트의 합",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(rate(hotdb_cdc_route_applied_total[1m]))",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "슬롯 최대 보존 WAL",
+      "description": "1GB 경고 · 10GB 에서 슬롯 무효화",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb_slot_retained_bytes)",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "dead letter",
+      "description": "0 이 아니면 ops.cdc_dead_letter 의 error 를 본다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(hotdb_dead_letter_total) or vector(0)",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "권역 서비스 UP",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(up{job=\"zone-service\"})",
+          "legendFormat": "UP"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "count(up{job=\"zone-service\"})",
+          "legendFormat": "전체"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "CDC 처리량 · 지연",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "tsdb 적재 행/초 (하이퍼테이블별)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "rate(hotdb_hypertable_inserted_rows[1m])",
+          "legendFormat": "{{hypertable}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "CDC 수신 이벤트/초 (서비스별)",
+      "description": "서비스마다 tsdb 전체 WAL 을 받는다 — 권역 필터는 서비스 안에서 한다. 서비스 수만큼 배로 는다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (rate(hotdb_cdc_events_total[1m]))",
+          "legendFormat": "{{pipeline}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "라우트 반영 행/초",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline, route) (rate(hotdb_cdc_route_applied_total[1m]))",
+          "legendFormat": "{{pipeline}} · {{route}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "반영 지연 (DB 시계)",
+      "description": "device_status_current 의 applied_at - src_received_at",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_zone_apply_lag_p50_seconds",
+          "legendFormat": "{{zone}} p50"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_zone_apply_lag_p99_seconds",
+          "legendFormat": "{{zone}} p99"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_zone_apply_lag_max_seconds",
+          "legendFormat": "{{zone}} max"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "원천 커밋 → 반영 p99 (앱 시계)",
+      "description": "Debezium source.ts_ms 기준. 서버가 다르면 시계 편차가 섞인다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, pipeline) (rate(hotdb_cdc_lag_commit_seconds_bucket[1m])))",
+          "legendFormat": "{{pipeline}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "배치 처리 시간 p99 · 평균 배치 크기",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, pipeline) (rate(hotdb_cdc_batch_seconds_bucket[1m])))",
+          "legendFormat": "{{pipeline}} p99"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (rate(hotdb_cdc_batch_size_sum[1m])) / sum by (pipeline) (rate(hotdb_cdc_batch_size_count[1m]))",
+          "legendFormat": "{{pipeline}} 크기(건)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "버린 · 거른 이벤트/초",
+      "description": "no_route = 라우트 없는 표(heartbeat 등) · unknown_chunk = 압축 뭉치 등",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline, reason) (rate(hotdb_cdc_events_ignored_total[1m]))",
+          "legendFormat": "{{pipeline}} 버림 {{reason}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (rate(hotdb_cdc_route_filtered_total[1m]))",
+          "legendFormat": "{{pipeline}} 다른 권역"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "재시도 · lookup 다시 읽기",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (rate(hotdb_cdc_apply_retry_total[1m]))",
+          "legendFormat": "{{pipeline}} 재시도"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline, reason) (rate(hotdb_cdc_lookup_reload_total[1m]))",
+          "legendFormat": "{{pipeline}} reload {{reason}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "row",
+      "title": "HotDB · WAL · 슬롯",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "슬롯별 WAL",
+      "description": "소비자가 멈추면 계속 오른다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_slot_retained_bytes",
+          "legendFormat": "{{slot_name}} 보존"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_slot_confirmed_lag_bytes",
+          "legendFormat": "{{slot_name}} 미확인"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "WAL 생성률",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 39,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "rate(hotdb_wal_written_bytes[1m])",
+          "legendFormat": "WAL"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "walsender 미전송",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 47,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_walsender_sent_lag_bytes",
+          "legendFormat": "{{slot_name}} ({{state}})"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "heartbeat 경과",
+      "description": "60초 넘으면 경보",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 47,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_heartbeat_age_seconds",
+          "legendFormat": "{{pipeline}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "하이퍼테이블 크기",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 55,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_hypertable_bytes",
+          "legendFormat": "{{hypertable}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "청크 수 (압축)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 55,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_hypertable_chunks",
+          "legendFormat": "{{hypertable}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_hypertable_compressed_chunks",
+          "legendFormat": "{{hypertable}} 압축"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "DB 접속",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 63,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (state, usename) (pg_stat_activity_count{datname=\"hotdb\"})",
+          "legendFormat": "{{usename}} {{state}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "DB 트랜잭션/초",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 63,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "rate(pg_stat_database_xact_commit{datname=\"hotdb\"}[1m])",
+          "legendFormat": "commit"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "rate(pg_stat_database_xact_rollback{datname=\"hotdb\"}[1m])",
+          "legendFormat": "rollback"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "row",
+      "title": "리소스 (CPU · 메모리)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 71,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 27,
+      "type": "timeseries",
+      "title": "컨테이너 CPU (코어)",
+      "description": "1 = 코어 하나를 다 쓴 것",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:container_cpu_cores{name=~\"hotdb-.*\"}",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "timeseries",
+      "title": "컨테이너 메모리",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:container_mem_bytes{name=~\"hotdb-.*\"}",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 29,
+      "type": "timeseries",
+      "title": "호스트 CPU 사용률",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "1 - avg by (server) (rate(node_cpu_seconds_total{mode=\"idle\"}[1m]))",
+          "legendFormat": "{{server}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "호스트 메모리 사용",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+          "legendFormat": "{{server}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "JVM 힙 사용",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 88,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (jvm_memory_used_bytes{area=\"heap\"})",
+          "legendFormat": "{{pipeline}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "프로세스 CPU (JVM)",
+      "description": "JVM 이 보는 자기 프로세스 CPU (호스트 전체 대비)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 88,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "process_cpu_usage",
+          "legendFormat": "{{pipeline}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 33,
+      "type": "timeseries",
+      "title": "네트워크 (서버 간)",
+      "description": "서버 to 서버 시험에서 WAL 스트림이 서버 수만큼 나간다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 96,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (server) (rate(node_network_receive_bytes_total{device!~\"lo|veth.*|cni.*|podman.*\"}[1m]))",
+          "legendFormat": "{{server}} 수신"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (server) (rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|cni.*|podman.*\"}[1m]))",
+          "legendFormat": "{{server}} 송신"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 34,
+      "type": "timeseries",
+      "title": "GC 일시정지/초",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 96,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (rate(jvm_gc_pause_seconds_sum[1m]))",
+          "legendFormat": "{{pipeline}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 35,
+      "type": "row",
+      "title": "2단 CDC — 권역 RDB → RFC Provider → SAP",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 104,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 36,
+      "type": "stat",
+      "title": "전 구간 지연 p99 (DB 시계)",
+      "description": "Provider 수신(received_at) → SAP 송신(sent_at). CDC 를 두 번 거친다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 105,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max by (zone) (hotdb_rfc_lag_e2e_p99_seconds)",
+          "legendFormat": "{{zone}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 37,
+      "type": "stat",
+      "title": "2단 지연 p99 (DB 시계)",
+      "description": "권역 RDB 반영(applied_at) → SAP 송신",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 105,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max by (zone) (hotdb_rfc_lag_hop2_p99_seconds)",
+          "legendFormat": "{{zone}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 38,
+      "type": "stat",
+      "title": "SAP 송신/초",
+      "description": "dry-run 이어도 같이 센다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 105,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(rate(hotdb_rfc_sent_total[1m])) or vector(0)",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 39,
+      "type": "stat",
+      "title": "RFC Provider UP",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 105,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(up{job=\"rfc-provider\"})",
+          "legendFormat": "UP"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "송신 · 중복 건/초 (권역별)",
+      "description": "중복 = 권역 서비스의 재전송 UPSERT 가 낸 UPDATE. ops.rfc_sent 가 걸러 SAP 로는 한 번만 간다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 109,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (zone) (rate(hotdb_rfc_sent_total[1m]))",
+          "legendFormat": "{{zone}} 송신"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (zone) (rate(hotdb_rfc_duplicate_total[1m]))",
+          "legendFormat": "{{zone}} 중복(이미 보냄)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "지연 (DB 시계)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 109,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_rfc_lag_hop2_p99_seconds",
+          "legendFormat": "{{zone}} 2단 p99"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_rfc_lag_e2e_p99_seconds",
+          "legendFormat": "{{zone}} 전 구간 p99"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_rfc_lag_e2e_max_seconds",
+          "legendFormat": "{{zone}} 전 구간 max"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 42,
+      "type": "row",
+      "title": "레거시 폴링 (RFC Service · DB Agent)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 117,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 43,
+      "type": "stat",
+      "title": "폴링 작업 실패",
+      "description": "ops.poll_state.last_error",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 118,
+        "w": 12,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(hotdb_poll_failing) or vector(0)",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 44,
+      "type": "stat",
+      "title": "가장 오래된 성공",
+      "description": "주기 60초 · 5분 넘으면 경보",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 118,
+        "w": 12,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb_poll_ok_age_seconds)",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 45,
+      "type": "timeseries",
+      "title": "옮긴 행/분",
+      "description": "원천 → 레거시 DB",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 122,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (job) (rate(hotdb_poll_rows_total[5m])) * 60",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 46,
+      "type": "timeseries",
+      "title": "작업별 마지막 성공 이후",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 122,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_poll_ok_age_seconds",
+          "legendFormat": "{{agent}} · {{job}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 47,
+      "type": "timeseries",
+      "title": "한 주기 시간 p99",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 130,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, job) (rate(hotdb_poll_run_seconds_bucket[5m])))",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 48,
+      "type": "timeseries",
+      "title": "폴링 오류/분",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 130,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (job) (rate(hotdb_poll_errors_total[5m])) * 60",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 49,
+      "type": "row",
+      "title": "시뮬레이터",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 138,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 50,
+      "type": "stat",
+      "title": "배속",
+      "description": "POST /sim/speed?value=N",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 139,
+        "w": 24,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_sim_speed",
+          "legendFormat": "x"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 51,
+      "type": "timeseries",
+      "title": "발행 행/초 (채널별)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 143,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (channel) (rate(hotdb_sim_rows_total[1m]))",
+          "legendFormat": "{{channel}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 52,
+      "type": "timeseries",
+      "title": "적재 한 주기 p99",
+      "description": "주기(1초)보다 길어지면 발행기가 밀린다 — 그 배속은 HotDB 적재 한계다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 143,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, channel) (rate(hotdb_sim_tick_seconds_bucket[1m])))",
+          "legendFormat": "{{channel}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 53,
+      "type": "timeseries",
+      "title": "적재 실패",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 151,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (channel) (rate(hotdb_sim_errors_total[1m]))",
+          "legendFormat": "{{channel}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ]
+}
