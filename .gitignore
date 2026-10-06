@@ -200,6 +200,9 @@ graphify-out/
 # 손 뗀 스택(embedded-cdc · embedded-cdc-go · cdc-custom)의 로컬 보관본.
 # 원본은 저장소 이력에 그대로 남아 있다 — 필요하면 그쪽에서 꺼낸다
 src/backup/
+# 손 뗀 문서(docs · latest)와 보조 도구(util)의 로컬 보관본. 원본은 이력에 있다
+docs/backup/
+util/backup/
 
 ### 위 규칙에 잘못 걸리는 소스 경로 되살리기
 # out/ (IntelliJ 빌드 출력) 이 헥사고날 아웃바운드 포트 패키지를 먹는다
