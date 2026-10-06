@@ -5,8 +5,9 @@
 #   Prometheus http://localhost:59490
 #
 # 서버 to 서버: 수집기 두 개는 서버마다 띄우고
-#   podman compose -f compose.monitoring.yml up -d podman-exporter node-exporter
-# Prometheus 쪽 monitoring/prometheus/targets/*.json 에 각 서버 IP:포트를 적는다.
+#   podman 호스트: podman compose -f compose.monitoring.yml up -d podman-exporter node-exporter
+#   docker 호스트: docker compose -f compose.monitoring.yml up -d cadvisor node-exporter   (컨테이너 지표는 cAdvisor 로)
+# Prometheus 쪽 monitoring/prometheus/targets/*.json 에 각 서버 IP:포트를 적는다 (둘 다 job=podman, rules 가 같은 이름으로 묶는다).
 # ─────────────────────────────────────────────────────────────────────────────
 name: hotdb
 
@@ -56,6 +57,23 @@ services:
     volumes:
       - ${PODMAN_SOCK:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:ro
     ports: ["${PODMAN_EXPORTER_PORT:-59488}:9882"]
+
+  # 컨테이너별 CPU · 메모리 — docker 호스트용 (podman-exporter 대신). rules 의 hotdb:container_* 가 둘 다 받는다
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: hotdb-cadvisor
+    restart: unless-stopped
+    privileged: true
+    command: [--docker_only=true, --housekeeping_interval=5s, --store_container_labels=false]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      # Docker Desktop(macOS) 은 VM 안의 소켓이 /var/run/docker.sock 이 아니다
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock:ro
+    ports: ["${CADVISOR_PORT:-59492}:8080"]
 
   # 호스트 CPU · 메모리 · 디스크 · 네트워크 (로컬에서는 podman VM 을 본다)
   node-exporter:

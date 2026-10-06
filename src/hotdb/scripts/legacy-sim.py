@@ -12,8 +12,10 @@
                 표 전부(64). DB Agent 는 읽기 계정 LEGACY_READER 로 읽는다 (SELECT 권한만).
                 FREEPDB1 에는 이 소유자 셋과 읽기 계정만 둔다 (기본 사용자 PDBADMIN · 예전 HOTDB_SIM 은 지움)
 """
+import os
 import random
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timedelta
@@ -77,8 +79,12 @@ def lit(v):
     return "NULL" if v is None else "'" + v.replace("'", "''") + "'"
 
 
+# 컨테이너 CLI — podman 이 있으면 podman, 없으면 docker. CONTAINER_CLI 환경변수로 고른다
+CLI = (os.environ.get("CONTAINER_CLI") or ("podman" if shutil.which("podman") else "docker")).split()
+
+
 def run(container, cmd, sql):
-    r = subprocess.run(["podman", "exec", "-i", container, *cmd], input=sql.encode("utf-8"), capture_output=True)
+    r = subprocess.run([*CLI, "exec", "-i", container, *cmd], input=sql.encode("utf-8"), capture_output=True)
     out = r.stdout.decode("utf-8", "replace") + r.stderr.decode("utf-8", "replace")
     if r.returncode != 0 or re.search(r"(ERROR|ORA-\d+)", out):
         sys.exit(f"[{container}] 실패\n{out[-2000:]}")
@@ -166,7 +172,7 @@ def reset_copies():
     이르면 증분 폴링이 다시 읽지 않고, 원천에서 사라진 행은 사본에 남기 때문이다. 다음 주기에 처음부터 다시 받는다."""
     qs = SAP_TABLES + ORACLE_TABLES
     sql = f"TRUNCATE {', '.join(qs)};\nDELETE FROM ops.poll_state;"
-    r = subprocess.run(["podman", "exec", "-i", "hotdb-legacy-db", "psql", "-U", "postgres", "-d", "legacy", "-v", "ON_ERROR_STOP=1", "-q"],
+    r = subprocess.run([*CLI, "exec", "-i", "hotdb-legacy-db", "psql", "-U", "postgres", "-d", "legacy", "-v", "ON_ERROR_STOP=1", "-q"],
                        input=sql.encode("utf-8"), capture_output=True)
     if r.returncode != 0:
         print("레거시 DB 사본은 그대로 (hotdb-legacy-db 가 없거나 표가 아직 없음) — "

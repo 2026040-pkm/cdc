@@ -1,1 +1,1 @@
-[ { "targets": ["hotdb-exporter:9187"], "labels": { "server": "local" } } ]
+[ { "targets": ["hotdb-exporter:9187"], "labels": { "server": "hotdb" } } ]
