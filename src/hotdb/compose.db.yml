@@ -45,9 +45,9 @@ services:
       - max_wal_senders=16
       - -c
       - max_replication_slots=16
-      # 멈춘 슬롯이 디스크를 채우지 않게 상한. 넘으면 슬롯 무효화 → 재동기화 (디스크 고갈보다 낫다)
+      # 멈춘 슬롯이 디스크를 채우지 않게 상한. 넘으면 슬롯 무효화 → 재동기화 (디스크 고갈보다 낫다). 2026-10-06 ×10 부하에 10GB 가 넘어 20GB 로
       - -c
-      - max_slot_wal_keep_size=10GB
+      - max_slot_wal_keep_size=${HOTDB_SLOT_WAL_KEEP:-20GB}
       # 소비자가 적재에 밀려 응답이 늦어도 바로 끊지 않는다 (embedded-cdc 실측)
       - -c
       - wal_sender_timeout=5min

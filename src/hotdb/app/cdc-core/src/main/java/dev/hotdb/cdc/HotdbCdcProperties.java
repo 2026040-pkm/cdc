@@ -21,6 +21,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                      캡처 갭)는 끝내지 않는다 — 재시작해도 같은 이유로 멈추므로, 살아서 health DOWN 과 지표를 보인다
  * @param failOnCaptureGap 기동 때 되받을 수 없는 구간을 찾으면 엔진을 띄우지 않는다 (조용히 어긋난 채 도는 것보다 멈춘다)
  * @param deadLetter    격리된 이벤트 재처리
+ * @param dbWait        기동 때 Hot DB 가 응답할 때까지 기다리는 간격 · 상한 ({@link DbReadyGate})
  * @param debezium      그 밖의 Debezium 속성을 그대로 넘긴다 (코드 수정 없이 튜닝)
  */
 @ConfigurationProperties("hotdb.cdc")
@@ -42,6 +43,7 @@ public record HotdbCdcProperties(
         @DefaultValue("true") boolean exitOnFailure,
         @DefaultValue("true") boolean failOnCaptureGap,
         @DefaultValue DeadLetter deadLetter,
+        @DefaultValue DbWait dbWait,
         Map<String, String> debezium) {
 
     public record Source(String host, @DefaultValue("5432") int port, String database, String user, String password) {}
@@ -63,6 +65,9 @@ public record HotdbCdcProperties(
     public record DeadLetter(@DefaultValue("true") boolean reprocessEnabled,
                              @DefaultValue("30000") long reprocessIntervalMs,
                              @DefaultValue("50") int reprocessBatchSize) {}
+
+    /** @param intervalMs 시도 간격 · @param timeoutMs 이 시간 안에 응답이 없으면 기동 실패 (0 = 무한히 기다린다) */
+    public record DbWait(@DefaultValue("5000") long intervalMs, @DefaultValue("0") long timeoutMs) {}
 
     @Override
     public Map<String, String> debezium() {

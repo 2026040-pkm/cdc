@@ -52,13 +52,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Import(DebeziumAdapterConfiguration.class)
 public class HotdbCdcAutoConfiguration {
 
+    /** DB 를 읽는 빈들은 전부 이 빈을 받는다 — DB 가 응답할 때까지 기동을 멈춰 두고, 죽지는 않는다. */
     @Bean
-    HypertableResolver hypertableResolver(JdbcTemplate jdbc, MeterRegistry meters) {
+    DbReadyGate dbReadyGate(HotdbCdcProperties props, JdbcTemplate jdbc) {
+        return new DbReadyGate(props.pipeline(), jdbc, props.dbWait());
+    }
+
+    @Bean
+    HypertableResolver hypertableResolver(JdbcTemplate jdbc, MeterRegistry meters, DbReadyGate gate) {
         return new HypertableResolver(jdbc, meters);
     }
 
     @Bean
-    Map<String, LookupCache> hotdbLookups(RoutingProperties routing, JdbcTemplate jdbc, MeterRegistry meters) {
+    Map<String, LookupCache> hotdbLookups(RoutingProperties routing, JdbcTemplate jdbc, MeterRegistry meters, DbReadyGate gate) {
         Map<String, LookupCache> out = new LinkedHashMap<>();
         routing.lookups().forEach((name, spec) -> {
             LookupCache c = new LookupCache(name, spec, jdbc, meters);
@@ -70,7 +76,7 @@ public class HotdbCdcAutoConfiguration {
 
     @Bean
     List<CompiledRoute> hotdbRoutes(RoutingProperties routing, HotdbCdcProperties props, JdbcTemplate jdbc,
-                                    Map<String, LookupCache> hotdbLookups) {
+                                    Map<String, LookupCache> hotdbLookups, DbReadyGate gate) {
         Catalog catalog = Catalog.jdbc(jdbc);
         Map<String, Set<String>> lookupCols = new LinkedHashMap<>();
         hotdbLookups.forEach((n, c) -> lookupCols.put(n, catalog.columnsOfQuery(c.spec().sql())));
@@ -78,18 +84,18 @@ public class HotdbCdcAutoConfiguration {
     }
 
     @Bean
-    DeadLetters deadLetters(HotdbCdcProperties props, JdbcTemplate jdbc) {
+    DeadLetters deadLetters(HotdbCdcProperties props, JdbcTemplate jdbc, DbReadyGate gate) {
         return new DeadLetters(props.pipeline(), jdbc);
     }
 
     /** 처리 위치 기록 · 캡처 갭 검사 — 어느 어댑터든 PostgreSQL 슬롯을 읽으므로 여기 둔다. */
     @Bean
-    CdcCheckpoints cdcCheckpoints(HotdbCdcProperties props, JdbcTemplate jdbc) {
+    CdcCheckpoints cdcCheckpoints(HotdbCdcProperties props, JdbcTemplate jdbc, DbReadyGate gate) {
         return new CdcCheckpoints(props.pipeline(), props.slot(), jdbc);
     }
 
     @Bean
-    SlotContinuityGuard slotContinuityGuard(HotdbCdcProperties props, JdbcTemplate jdbc) {
+    SlotContinuityGuard slotContinuityGuard(HotdbCdcProperties props, JdbcTemplate jdbc, DbReadyGate gate) {
         return new SlotContinuityGuard(props.pipeline(), props.slot(), jdbc);
     }
 

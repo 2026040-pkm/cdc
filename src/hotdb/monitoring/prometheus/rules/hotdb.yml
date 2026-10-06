@@ -35,7 +35,7 @@ groups:
         labels: { severity: warning }
         annotations:
           summary: "슬롯 {{ $labels.slot_name }} 이 WAL {{ $value | humanize1024 }}B 를 붙잡고 있음"
-          description: "10GB(max_slot_wal_keep_size)를 넘으면 슬롯이 무효화되고 재동기화가 필요하다."
+          description: "20GB(max_slot_wal_keep_size)를 넘으면 슬롯이 무효화되고 재동기화가 필요하다."
 
       - alert: CdcSlotNearInvalidation
         expr: hotdb_slot_safe_wal_size_bytes >= 0 and hotdb_slot_safe_wal_size_bytes < 2e9
