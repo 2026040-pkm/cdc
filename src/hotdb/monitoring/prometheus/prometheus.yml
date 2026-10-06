@@ -25,6 +25,11 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     file_sd_configs: [{ files: [/etc/prometheus/targets/field-simulator.json], refresh_interval: 30s }]
 
+  # 레거시 발행기 (SAP · Oracle 대역 원천 표를 바꾼다) — 레거시 서버에 떠 있다
+  - job_name: legacy-simulator
+    metrics_path: /actuator/prometheus
+    file_sd_configs: [{ files: [/etc/prometheus/targets/legacy-simulator.json], refresh_interval: 30s }]
+
   - job_name: hotdb
     file_sd_configs: [{ files: [/etc/prometheus/targets/hotdb.json], refresh_interval: 30s }]
 

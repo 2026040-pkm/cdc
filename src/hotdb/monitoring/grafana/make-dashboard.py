@@ -21,7 +21,7 @@ ROWS = [
         ("CDC 반영 행/초", "stat", "short",
          [("sum(rate(hotdb_cdc_route_applied_total[1m]))", "")], "모든 권역 서비스 · 라우트의 합"),
         ("슬롯 최대 보존 WAL", "stat", "bytes",
-         [("max(hotdb_slot_retained_bytes)", "")], "1GB 경고 · 10GB 에서 슬롯 무효화"),
+         [("max(hotdb_slot_retained_bytes)", "")], "1GB 경고 · 20GB(max_slot_wal_keep_size) 에서 슬롯 무효화"),
         ("dead letter", "stat", "short",
          [("sum(hotdb_dead_letter_total) or vector(0)", "")], "0 이 아니면 ops.cdc_dead_letter 의 error 를 본다"),
         ("권역 서비스 UP", "stat", "short",
@@ -126,6 +126,17 @@ ROWS = [
          "주기(1초)보다 길어지면 발행기가 밀린다 — 그 배속은 HotDB 적재 한계다"),
         ("적재 실패", "timeseries", "short",
          [("sum by (channel) (rate(hotdb_sim_errors_total[1m]))", "{{channel}}")], ""),
+    ]),
+    ("레거시 발행기 (SAP · Oracle 대역 원천 표)", [
+        ("원천 변경 행/분 (대역 · 종류별)", "timeseries", "short",
+         [("sum by (source, op) (rate(hotdb_lsim_rows_total[1m])) * 60", "{{source}} {{op}}")],
+         "주기마다 표마다 UPDATE(워터마크 = 지금) · INSERT. 이 값이 '레거시 폴링 > 옮긴 행/분' 으로 따라와야 한다"),
+        ("배속 · 표 수", "stat", "short", [("hotdb_lsim_speed", "배속"), ("hotdb_lsim_tables", "표")], "POST /sim/speed?value=N"),
+        ("한 주기 시간 p99", "timeseries", "s",
+         [("histogram_quantile(0.99, sum by (le) (rate(hotdb_lsim_tick_seconds_bucket[1m])))", "p99")],
+         "주기(10초)보다 길어지면 대역 DB 가 못 따라가는 것"),
+        ("실패/분 (대역별)", "timeseries", "short",
+         [("sum by (source) (rate(hotdb_lsim_errors_total[1m])) * 60", "{{source}}")], "대역이 내려가 있으면 표마다 하나씩"),
     ]),
 ]
 

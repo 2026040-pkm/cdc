@@ -157,7 +157,7 @@
       "id": 5,
       "type": "stat",
       "title": "슬롯 최대 보존 WAL",
-      "description": "1GB 경고 · 10GB 에서 슬롯 무효화",
+      "description": "1GB 경고 · 20GB(max_slot_wal_keep_size) 에서 슬롯 무효화",
       "datasource": {
         "type": "prometheus",
         "uid": "hotdb-prom"
@@ -2307,6 +2307,211 @@
           },
           "expr": "sum by (channel) (rate(hotdb_sim_errors_total[1m]))",
           "legendFormat": "{{channel}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 54,
+      "type": "row",
+      "title": "레거시 발행기 (SAP · Oracle 대역 원천 표)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 159,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 55,
+      "type": "stat",
+      "title": "배속 · 표 수",
+      "description": "POST /sim/speed?value=N",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 160,
+        "w": 24,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_lsim_speed",
+          "legendFormat": "배속"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_lsim_tables",
+          "legendFormat": "표"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 56,
+      "type": "timeseries",
+      "title": "원천 변경 행/분 (대역 · 종류별)",
+      "description": "주기마다 표마다 UPDATE(워터마크 = 지금) · INSERT. 이 값이 '레거시 폴링 > 옮긴 행/분' 으로 따라와야 한다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 164,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (source, op) (rate(hotdb_lsim_rows_total[1m])) * 60",
+          "legendFormat": "{{source}} {{op}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 57,
+      "type": "timeseries",
+      "title": "한 주기 시간 p99",
+      "description": "주기(10초)보다 길어지면 대역 DB 가 못 따라가는 것",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 164,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(hotdb_lsim_tick_seconds_bucket[1m])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 58,
+      "type": "timeseries",
+      "title": "실패/분 (대역별)",
+      "description": "대역이 내려가 있으면 표마다 하나씩",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 172,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (source) (rate(hotdb_lsim_errors_total[1m])) * 60",
+          "legendFormat": "{{source}}"
         }
       ],
       "options": {
