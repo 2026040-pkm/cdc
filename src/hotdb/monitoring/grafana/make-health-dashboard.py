@@ -191,6 +191,26 @@ stat("미확인 WAL", [(f"hotdb_slot_confirmed_lag_bytes{{{ZSLOT}}}", "{{slot_na
 stat("마지막 배치 이후", [(f"hotdb_cdc_last_batch_age_seconds{{{ZONE}}}", "{{zone}}")], 18, y, 6, 4, unit="s",
      thr=AGE, decimals=0, text="value_and_name", desc="마지막으로 배치를 반영한 지 몇 초. heartbeat 가 10초마다 오므로 평소 0~15초")
 y += 4
+CORES = {"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "yellow", "value": 1},
+                                       {"color": "red", "value": 2}]}
+stat("Hot DB CPU (코어)", [('sum(hotdb:container_cpu_cores{name="hotdb-pg"})', "")], 0, y, 4, 4, decimals=2, thr=CORES,
+     desc="hotdb-pg 컨테이너가 쓰는 코어 수. 슬롯 5개의 WAL 디코딩 + 쓰기. 1코어 주의 · 2코어 이슈 (서버 코어 수에 맞춰 조정)")
+stat("Hot DB 메모리", [('sum(hotdb:container_mem_bytes{name="hotdb-pg"})', "")], 4, y, 4, 4, unit="bytes",
+     desc="hotdb-pg 컨테이너 메모리 (shared_buffers + 페이지 캐시 포함). 계속 오르기만 하는지가 중요")
+stat("모듈 CPU (코어)", [('hotdb:container_cpu_cores{name=~"hotdb-zone-.*"}', "{{name}}")], 8, y, 8, 4, decimals=2,
+     thr=CORES, text="value_and_name", desc="모듈 하나가 1코어를 넘게 쓰면 밀린 것을 따라잡는 중이거나 그 권역 양이 많은 것")
+stat("모듈 메모리", [('hotdb:container_mem_bytes{name=~"hotdb-zone-.*"}', "{{name}}")], 16, y, 8, 4, unit="bytes",
+     text="value_and_name", desc="JVM 힙 상한 256MB + 메타스페이스 · 스레드. 600MB 를 넘어 계속 오르면 누수 의심")
+y += 4
+series("CPU — Hot DB 와 모듈 각각 (코어)", [
+    ('sum(hotdb:container_cpu_cores{name="hotdb-pg"})', "Hot DB"),
+    ('hotdb:container_cpu_cores{name=~"hotdb-zone-.*"}', "{{name}}")], 0, y, 12, 8, thr=CORES,
+    desc="Hot DB 만 오르면 디코딩 · 쓰기 부하, 모듈 하나만 오르면 그 모듈이 따라잡는 중")
+series("메모리 — Hot DB 와 모듈 각각", [
+    ('sum(hotdb:container_mem_bytes{name="hotdb-pg"})', "Hot DB"),
+    ('hotdb:container_mem_bytes{name=~"hotdb-zone-.*"}', "{{name}}")], 12, y, 12, 8, unit="bytes",
+    desc="Hot DB 는 캐시까지 잡혀 높다. 모듈은 평평해야 정상")
+y += 8
 timeline("모듈 상태 이력 — 언제 멈췄나", [
     (f"(hotdb_cdc_state{{{ZONE}}} == bool 1) + 2 * ((hotdb_cdc_state{{{ZONE}}} != bool 2) * (hotdb_cdc_state{{{ZONE}}} != bool 1))",
      "{{zone}}")], 0, y, 12, 6, desc="초록 RUNNING · 노랑 STARTING · 빨강 STOPPED / FAILED / HALTED (또는 지표 없음 = 서비스 down)")
