@@ -15,9 +15,14 @@ field-simulator ─INSERT─▶ [tsdb] ─WAL─┬─▶ zone-mch ─┐       
  SAP (HANA · 로컬은 sap-sim) ◀── Z 표 INSERT ── rfc-provider = RFC Service (실적 CDC → SAP, ops.rfc_sent 로 한 번만)
                              ──JDBC 폴링──▶ rfc-provider ─▶ 레거시 DB [erp]
  Oracle (로컬은 oracle-sim)  ──JDBC 폴링──▶ db-agent = DB Agent ─▶ 레거시 DB [mes · lgs · geo]
+      ▲ legacy-simulator (레거시 발행기, 시험용) — sap-sim · oracle-sim 원천 표를 10초마다 UPDATE · INSERT 해 폴링이 가져갈 변경분을 만든다
 
  Hot DB(필드 DB, 59433) = tsdb · svc · ops      레거시 DB(59435) = erp · mes · lgs · geo · ops.poll_state
 ```
+
+**서버 to 서버 배치 (2026-10-06 ~)** — Hot DB · 판별 모듈 4 · RFC Service · DB Agent · 발행기 둘 · Prometheus · Grafana 는 **서비스 PC(docker)**,
+레거시 DB 사본 · SAP 대역 · Oracle 대역 · 수집기는 **레거시 서버(wssh 172.30.1.88)**. 폴링 둘과 레거시 발행기만 네트워크를 탄다.
+올리는 법은 [서버 to 서버](#서버-to-서버).
 
 ## 바로 써 보기
 
@@ -43,6 +48,7 @@ python scripts\legacy-sim.py mutate   # 레거시 대역 원천 몇 행을 고�
 | SAP 대역 | `localhost:59434` db `sapsim` (sapsim/sapsim) — 원천 `erpsrc.*` · 송신 대상 `erpsrc.zhotdb_actual_result` |
 | Oracle 대역 | `localhost:59521/FREEPDB1` — 원천 표 소유자 MES · LGS · GEO (64표), 읽기 계정 legacy_reader/legacy_reader, 관리자 system/hotdb_sim_sys |
 | 발행기 | http://localhost:59480/sim · 배속 `POST /sim/speed?value=5` · `POST /sim/pause` |
+| 레거시 발행기 | http://localhost:59493/sim — SAP · Oracle 대역 원천 표를 10초마다 바꿔(UPDATE 3 · INSERT 1) 폴링이 가져갈 변경분을 만든다. 배속 · pause 같음 |
 
 필요한 것: podman (+ docker-compose), JDK 21 (`~/.jdks` 에 있으면 자동), Python 3.
 레거시 표(erp 114 · mes 60 · lgs 3 · geo 1 = 178표)는 `scripts/gen-sample-legacy.py` 가 만든 시험용 표다 — 이름 · 컬럼 · 값은 지어냈고, 표 수 · PK · 컬럼 수만 실제 레거시와 비슷하게 맞췄다.
@@ -58,8 +64,9 @@ python scripts\legacy-sim.py mutate   # 레거시 대역 원천 몇 행을 고�
 | `app/zone-service` | 실적 판별 모듈. **코드 없이 설정(`application.yml` 의 `hotdb.routes`)만 있다**. `ZONE` 으로 모듈 선택 |
 | `app/rfc-provider` | RFC Service (O-8) — ① SAP 폴링 → erp (poll-core) ② `svc.actual_result` CDC → SAP. SAP 송신은 `RfcSender` — `jdbc`(Z 표) · `dry-run` |
 | `app/db-agent` | DB Agent (O-6) — Oracle 폴링 → mes · lgs · geo 64표 전부 (poll-core). 작업 목록 `poll-jobs.yml` 은 `scripts/gen-sample-legacy.py` 가 만든다 |
-| `compose.legacy-sim.yml` · `scripts/legacy-sim.py` | 로컬 검증용 SAP 대역(PostgreSQL) · Oracle 대역(oracle-free 23) · 원천 표 시드 |
+| `compose.legacy-sim.yml` · `scripts/legacy-sim.py` | 로컬 검증용 SAP 대역(PostgreSQL) · Oracle 대역(oracle-free 23) · 원천 표 시드 · 레거시 발행기 |
 | `app/field-simulator` | 카탈로그 기준 3채널 · 350대 발행기 (×1 ≈ 426 행/초) |
+| `app/legacy-simulator` | 레거시 발행기 — 대역 원천 표를 JDBC 메타데이터로 읽어 주기마다 UPDATE(워터마크 = 지금) · INSERT. 운영에서는 안 띄운다 |
 | `app/hotdb-migrate` | Flyway 실행기 |
 | `compose.*.yml` | 서버 역할별로 나눈 compose — 서버 to 서버 배치 그대로 |
 | `monitoring/` | Prometheus · Grafana · postgres_exporter 쿼리 · 경보 |
@@ -123,6 +130,29 @@ SELECT ops.provision_module('cut', 'CUTTING', '절단 실적 판별');
 
 ## 서버 to 서버
 
+### docker 호스트 (Mac · Linux) — 지금 쓰는 배치
+
+```bash
+cp .env.example .env            # HOTDB_HOST=hotdb-pg(이 PC 에 Hot DB 도) · LEGACY_HOST=<레거시 서버 IP> · SAP_URL · ORACLE_URL · LSIM_LOCAL
+scripts/up-services.sh          # jar 빌드 → 이미지 빌드 → Hot DB + 마이그레이션 → 판별 모듈 4 · RFC Service · DB Agent · 발행기 · 모니터링
+scripts/up-services.sh --skip-build | --no-legacy | down [-v] | ps | logs [svc]
+```
+
+| 스크립트 | 하는 일 |
+|---|---|
+| `scripts/up-services.sh` | 서비스 PC 쪽 전부. `.env` 의 HOTDB_HOST 가 `hotdb-pg` 면 Hot DB 도 같이 띄우고 마이그레이션이 끝난 뒤 서비스를 올린다. Prometheus `targets/*.json` 을 `.env` 의 서버 주소로 다시 쓴다. `LSIM_LOCAL=1` 이면 레거시 발행기도 이 PC 에서 |
+| `scripts/make-legacy-bundle.sh` | 레거시 서버용 묶음 `dist/legacy-bundle/` (+ `.tar.gz`) — compose 셋 · 마이그레이션 SQL · 시드 · hotdb-migrate · legacy-simulator 이미지(amd64 · arm64) · `up.sh`/`up.ps1` · README. 저쪽은 docker(또는 podman) + python3 만 있으면 `./up.sh` 한 번 |
+| `scripts/deploy-hotdb.sh` | Hot DB 를 다른 서버에 둘 때 — SSH 로 compose.db.yml · db · monitoring · jar 를 보내고 거기서 build · up |
+| `scripts/legacy-sim.py` | 대역 원천 표 시드 · 한 번 고치기. podman 없으면 docker 를 쓴다 (`CONTAINER_CLI`) |
+
+docker 에서는 podman-exporter 대신 `cadvisor`(59492) 를 띄운다 — rules 의 `hotdb:container_*` 가 둘을 같은 이름으로 묶어 대시보드는 그대로다.
+호스트 지표(node-exporter)는 macOS 에서는 Docker Desktop VM 을 본다 (RAM 이 VM 할당량으로 나온다).
+
+레거시 서버의 포트(59434 · 59435 · 59521 · 59489 · 59491 · 59492 · 59493)가 서비스 PC 에서 열려 있어야 한다. 레거시 발행기 · 필드 발행기는
+`GET /sim` · `POST /sim/speed?value=N` · `/sim/pause` · `/sim/resume` 으로 조절한다 (레거시 발행기는 `/sim/tick` 도).
+
+### podman 호스트 (서버마다 compose 하나) — 원안
+
 | 서버 | 띄우는 것 |
 |---|---|
 | HotDB 서버 | `podman compose -f compose.db.yml up -d` + `-f compose.monitoring.yml up -d podman-exporter node-exporter` |
@@ -134,6 +164,12 @@ SELECT ops.provision_module('cut', 'CUTTING', '절단 실적 판별');
 
 이미지는 한 곳에서 `podman compose ... build` 후 `podman save` / `load` 로 옮긴다.
 지연은 DB 시계만으로 잰 값(`hotdb_zone_apply_lag_*`)을 기준으로 본다 — 서버 간 시계 편차가 섞이지 않는다.
+
+### 운영 안전장치 (2026-10-06 서버 to 서버에서 겪고 넣은 것)
+
+- **서비스는 Hot DB 없이 죽지 않는다** — 기동 때 `DbReadyGate` 가 `SELECT 1` 이 될 때까지 5초마다 기다린다(`hotdb.cdc.db-wait`). 전에는 DB 가 내려가 있으면 컨텍스트가 실패해 컨테이너가 재시작을 반복했다
+- **슬롯 WAL 상한 20GB** (`max_slot_wal_keep_size`, `HOTDB_SLOT_WAL_KEEP`). 발행기 ×10 을 20분 돌리자 rfc_provider 슬롯이 12GB 뒤처져 10GB 상한에 무효화됐다(`wal_status=lost`). 무효화되면 슬롯 · `ops.cdc_checkpoint` · 오프셋을 지우고 다시 붙여야 하고, RFC Service 는 `svc.actual_result` 를 처음부터 스냅샷해 안 보낸 것만 보낸다(`ops.rfc_sent` 가 거른다)
+- 한 대(Mac)에서는 **×3~×5 까지**가 안전하다. 올릴 때 Grafana "슬롯 최대 보존 WAL" 과 경보 `CdcSlotRetainingWal` 을 본다
 
 ## 처음 잰 값 (2026-10-06, 로컬 podman VM 2GiB · 권역 서비스 2개)
 
@@ -159,6 +195,7 @@ SELECT ops.provision_module('cut', 'CUTTING', '절단 실적 판별');
 ## 알아 둘 것
 
 - 발행기는 HotDB Provider 대역이다. Provider(MQTT Agent → tsdb)는 파란 영역 밖이라 만들지 않는다
+- 서비스는 Hot DB 가 없으면 **죽지 않고 기다린다** — 기동 때 `SELECT 1` 이 될 때까지 5초마다 시도(`hotdb.cdc.db-wait`), 30초마다 로그. DB 가 오면 그때 라우트 대조 · 슬롯 검사 · 엔진 기동. 라우트가 스키마와 안 맞는 것은 그대로 기동 거부다
 - 레거시 폴링은 워터마크(`upd_date || upd_time`) 이상만 다시 읽는다 — 같은 값의 행은 매번 다시 읽히지만 UPSERT 라 결과가 같다.
   작업 상태는 `ops.poll_state`, 멈추면 경보 `LegacyPollStale`
 - SAP 송신을 JCo(RFC 함수)로 바꿀 때는 `RfcSender` 구현 하나만 더한다 — CDC · 중복 차단(`ops.rfc_sent`) · 재시도는 그대로

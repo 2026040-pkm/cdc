@@ -1299,9 +1299,12 @@ tsdb.device (site, device_id) ◀── scan (scan_id) ◀── actual_result  
         </dl></div>
       </div>
       <div class="slice">
-        <div class="slice__h"><span class="no">S9</span><b>서버 to 서버 부하 측정 (R1-b)</b><span class="sp"></span><span class="chip chip--warn">남음</span></div>
+        <div class="slice__h"><span class="no">S9</span><b>서버 to 서버 부하 측정 (R1-b)</b><span class="sp"></span><span class="chip chip--info">배치 완료 · 측정 남음</span></div>
         <div class="slice__b"><dl>
           <dt>산출물</dt><dd>HotDB 서버 · OT 서버 2대 · RFC · DB AGENT 서버 배치, ×1 · ×5 측정</dd>
+          <dt>2026-10-06 배치</dt><dd>서버 두 대로 나눴습니다 — 서비스 PC(docker: Hot DB · 판별 모듈 4 · RFC Service · DB Agent · 발행기 둘 · 모니터링)와 레거시 서버(wssh: 레거시 DB 사본 · SAP 대역 · Oracle 대역 · 수집기).
+            올리는 법 · 스크립트는 <span class="mono">src/hotdb/README.md</span> "서버 to 서버". 겪은 것: ×10 에서 rfc_provider 슬롯이 10GB 상한에 무효화 → 상한 20GB, 서비스는 Hot DB 없이도 기다리게(<span class="mono">DbReadyGate</span>).
+            폴링이 가져갈 변경분을 만드는 레거시 발행기(<span class="mono">legacy-simulator</span>)를 더했습니다. ×1 · ×5 측정값은 아직 적지 않았습니다.</dd>
           <dt>완료 조건</dt><dd>×1 반영 p99 ≤ 2초 · HotDB CPU ≤ 30% · 정지 5분 후 10분 안 회복</dd>
           <dt>검증 방법</dt><dd>§08 서버별 compose + <span class="mono">targets/*.json</span> → Grafana · <span class="mono">outage-test.ps1 -Seconds 300</span></dd>
           <dt>의존</dt><dd>두 번째 서버 (BRD Q4)</dd>
