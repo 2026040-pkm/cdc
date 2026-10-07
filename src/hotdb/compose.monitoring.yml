@@ -59,7 +59,9 @@ services:
     ports: ["${PODMAN_EXPORTER_PORT:-59488}:9882"]
 
   # 컨테이너별 CPU · 메모리 — docker 호스트용 (podman-exporter 대신). rules 의 hotdb:container_* 가 둘 다 받는다
+  #   로컬 podman(up.ps1)은 /var/lib/docker 가 없어 못 뜬다 → profile 로 빼 둔다. 이름을 찍어 올리면(deploy-hotdb.sh 등) 뜬다
   cadvisor:
+    profiles: [docker]
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: hotdb-cadvisor
     restart: unless-stopped

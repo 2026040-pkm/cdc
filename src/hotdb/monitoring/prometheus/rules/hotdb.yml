@@ -11,11 +11,45 @@ groups:
       - record: hotdb:container_mem_bytes
         expr: sum by (name, instance, server) (container_memory_working_set_bytes{name!=""})
 
+  # 엔진 자원 대시보드(hotdb-engine) — ① 엔진 몫 ② 본연의 일과의 상호 영향 ③ 원천 DB 부하 ④ 적체 · backpressure
+  - name: hotdb-engine
+    rules:
+      # ① · ② 프로세스 CPU 를 몫별로 (코어). 나머지 = GC · JIT · HTTP 같은 JVM 몫
+      - record: hotdb:proc_cpu_cores
+        expr: sum by (pipeline, part) (rate(hotdb_cdc_engine_cpu_seconds_total[1m]))
+      - record: hotdb:proc_cpu_cores
+        expr: label_replace(sum by (pipeline, part) (rate(hotdb_work_cpu_seconds_total[1m])), "part", "work:$1", "part", "(.*)")
+      - record: hotdb:engine_cpu_share
+        expr: >-
+          sum by (pipeline) (rate(hotdb_cdc_engine_cpu_seconds_total{part="engine"}[1m]))
+          / sum by (pipeline) (rate(hotdb_cdc_engine_cpu_seconds_total{part="process"}[1m]))
+
+      # ③ 원천 DB — 지금 WAL 속도로 소비자가 멈춰 있으면 언제 한계에 닿나
+      - record: hotdb:wal_rate_bytes
+        expr: sum(rate(hotdb_wal_written_bytes[15m]))
+      # 슬롯 무효화(max_slot_wal_keep_size)까지 — 이 시간을 넘게 내려가 있으면 재동기화
+      - record: hotdb:slot_downtime_budget_seconds
+        expr: max by (slot_name) (hotdb_slot_safe_wal_size_bytes >= 0) / scalar(hotdb:wal_rate_bytes > 0)
+      # 디스크가 차기까지 — 슬롯 상한보다 먼저 오면 DB 가 멈춘다 (슬롯 상한보다 디스크 여유가 커야 한다)
+      # node-exporter 가 9p 마운트를 읽느라 수집을 가끔 놓친다 — 5분 안의 마지막 값으로 본다
+      - record: hotdb:disk_downtime_budget_seconds
+        expr: min(max_over_time(node_filesystem_avail_bytes{hotdb_db="1", mountpoint="/"}[5m])) / scalar(hotdb:wal_rate_bytes > 0)
+
+      # ④ 큐 사용률 — 1 에 붙어 있으면 엔진이 슬롯 읽기를 멈춘 상태(backpressure). 밀린 것은 원천 WAL 에 남는다
+      - record: hotdb:engine_queue_fill
+        expr: >-
+          max by (pipeline) (hotdb_cdc_engine_queue{state="used"})
+          / max by (pipeline) (hotdb_cdc_engine_queue{state="capacity"} > 0)
+      - record: hotdb:engine_queue_bytes_fill
+        expr: >-
+          max by (pipeline) (hotdb_cdc_engine_queue_bytes{state="used"})
+          / max by (pipeline) (hotdb_cdc_engine_queue_bytes{state="capacity"} > 0)
+
   # 임계값은 BRD §07 합격 기준 초안에서 왔다. 실측 후 조정한다.
   - name: hotdb-cdc-alerts
     rules:
       - alert: CdcConsumerDown
-        expr: up{job=~"zone-service|rfc-provider|db-agent"} == 0
+        expr: up{job=~"zone-service|rfc-service|db-agent"} == 0
         for: 1m
         labels: { severity: critical }
         annotations:
@@ -42,6 +76,29 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: "슬롯 {{ $labels.slot_name }} 무효화까지 {{ $value | humanize1024 }}B"
+
+      - alert: CdcDowntimeBudgetLow
+        expr: min(hotdb:slot_downtime_budget_seconds) < 3600 or hotdb:disk_downtime_budget_seconds < 3600
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "지금 WAL 속도면 소비자가 {{ $value | humanizeDuration }} 넘게 멈출 때 슬롯 무효화 또는 디스크 가득"
+
+      - alert: HotdbDiskBelowSlotCap
+        expr: min(max_over_time(node_filesystem_avail_bytes{hotdb_db="1", mountpoint="/"}[5m])) < scalar(max(pg_settings_max_slot_wal_keep_size_bytes{job="hotdb"}))
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Hot DB 디스크 여유 {{ $value | humanize1024 }}B 가 슬롯 WAL 상한보다 작다"
+          description: "소비자가 오래 멈추면 슬롯이 무효화되기 전에 디스크가 먼저 찬다 — DB 가 멈춘다."
+
+      - alert: CdcEngineBackpressure
+        expr: hotdb:engine_queue_fill > 0.9 or hotdb:engine_queue_bytes_fill > 0.9
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.pipeline }} 엔진 큐가 5분째 가득 — 슬롯 읽기를 멈추고 원천에 쌓는 중"
+          description: "반영(handler)이 못 따라간다. 배치 처리 시간 · 슬롯 미확인 WAL 을 같이 본다."
 
       - alert: CdcApplyLagHigh
         expr: hotdb_zone_apply_lag_p99_seconds > 5
@@ -127,7 +184,7 @@ groups:
         expr: ((1 - min(pg_up{job="hotdb"})) * 2) or vector(2)
       - record: hotdb:check
         labels: { check: "02 서비스 응답 (모듈 · RFC · DB Agent)" }
-        expr: (max(1 - up{job=~"zone-service|rfc-provider|db-agent"}) * 2) or vector(0)
+        expr: (max(1 - up{job=~"zone-service|rfc-service|db-agent"}) * 2) or vector(0)
       - record: hotdb:check
         labels: { check: "03 CDC 소비자 붙음 (슬롯)" }
         expr: ((min(hotdb_slot_active) == bool 0) * 2) or vector(0)

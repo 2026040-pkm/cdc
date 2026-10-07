@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +55,7 @@ public class DebeziumCdcSource implements CdcSource, SmartLifecycle {
     private final Timer batchTimer;
     private final DistributionSummary batchSize;
     private final Timer commitLag;
+    private final EngineResources resources;
     private final AtomicReference<State> state = new AtomicReference<>(State.STOPPED);
     private volatile Instant lastBatchAt;
     private volatile Instant lastEventCommitAt;
@@ -78,6 +80,7 @@ public class DebeziumCdcSource implements CdcSource, SmartLifecycle {
         this.commitLag = Timer.builder("hotdb.cdc.lag.commit")
                 .description("반영 끝 - 원천 커밋 시각(source.ts_ms). 서버 시계 편차가 섞인다")
                 .publishPercentileHistogram().register(meters);
+        this.resources = new EngineResources(props.pipeline(), meters);
         meters.gauge("hotdb.cdc.state", this, e -> e.state.get().ordinal());
         // 기동 때 판정이라 카운터로 두면 첫 수집 전에 1 이 되어 increase() 경보가 영영 안 걸린다 — 게이지로 둔다
         meters.gauge("hotdb.cdc.capture.gap", this, e -> e.captureGap ? 1 : 0);
@@ -87,6 +90,10 @@ public class DebeziumCdcSource implements CdcSource, SmartLifecycle {
 
     @Override
     public void start() {
+        if (!props.engineEnabled()) {
+            log.warn("hotdb.cdc.engine-enabled=false — 엔진 없이 띄운다 (자원 측정 기준선용). 슬롯을 읽지 않는다");
+            return;
+        }
         // 되받을 수 없는 구간이 생겼는데 모르고 돌면 그 뒤로 계속 어긋난 채로 돈다. 재동기화는 사람이 판단할 일이다.
         // 예외로 컨텍스트를 죽이면 Prometheus 가 한 번도 못 긁으므로, 엔진만 띄우지 않고 앱은 살려 신호를 낸다.
         Optional<String> gap = continuity.detectGap();
@@ -102,7 +109,22 @@ public class DebeziumCdcSource implements CdcSource, SmartLifecycle {
         }
 
         state.set(State.STARTING);
-        engine = DebeziumEngine.create(Json.class)
+        // 엔진을 그룹 스레드 위에서 만든다 — Debezium 이 생성자에서 만드는 스레드 풀도 그룹을 물려받게
+        executor = Executors.newSingleThreadExecutor(r -> new Thread(resources.group(), r, "cdc-" + props.pipeline()));
+        try {
+            engine = executor.submit(this::buildEngine).get();
+        } catch (ExecutionException e) {
+            throw new IllegalStateException("CDC 엔진을 만들지 못했다", e.getCause());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("CDC 엔진 생성 중 인터럽트", e);
+        }
+        executor.execute(engine);
+        log.info("CDC 엔진 시작: pipeline={} slot={} publication={}", props.pipeline(), props.slot(), props.publication());
+    }
+
+    private DebeziumEngine<ChangeEvent<String, String>> buildEngine() {
+        return DebeziumEngine.create(Json.class)
                 .using(debeziumProperties())
                 .using((success, message, error) -> {
                     if (success) {
@@ -128,13 +150,20 @@ public class DebeziumCdcSource implements CdcSource, SmartLifecycle {
                 })
                 .notifying(this::handleBatch)
                 .build();
-        executor = Executors.newSingleThreadExecutor(r -> new Thread(r, "cdc-" + props.pipeline()));
-        executor.execute(engine);
-        log.info("CDC 엔진 시작: pipeline={} slot={} publication={}", props.pipeline(), props.slot(), props.publication());
     }
 
     private void handleBatch(List<ChangeEvent<String, String>> records,
                              DebeziumEngine.RecordCommitter<ChangeEvent<String, String>> committer) throws InterruptedException {
+        long[] usage = resources.startHandler();
+        try {
+            applyBatch(records, committer);
+        } finally {
+            resources.endHandler(usage);
+        }
+    }
+
+    private void applyBatch(List<ChangeEvent<String, String>> records,
+                            DebeziumEngine.RecordCommitter<ChangeEvent<String, String>> committer) throws InterruptedException {
         state.compareAndSet(State.STARTING, State.RUNNING);
         Timer.Sample sample = Timer.start(meters);
         List<CdcEvent> events = new ArrayList<>(records.size());
@@ -211,6 +240,7 @@ public class DebeziumCdcSource implements CdcSource, SmartLifecycle {
                 + props.pipeline().replace("'", "''") + "', now()) ON CONFLICT (pipeline) DO UPDATE SET beat_at = now()");
         p.setProperty("max.batch.size", String.valueOf(props.maxBatchSize()));
         p.setProperty("max.queue.size", String.valueOf(props.maxQueueSize()));
+        p.setProperty("max.queue.size.in.bytes", String.valueOf(props.maxQueueSizeBytes()));
         p.setProperty("poll.interval.ms", String.valueOf(props.pollIntervalMs()));
         p.setProperty("decimal.handling.mode", "double");
         p.setProperty("tombstones.on.delete", "false");

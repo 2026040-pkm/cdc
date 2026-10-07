@@ -2,6 +2,7 @@ package dev.hotdb.poll;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import dev.hotdb.cdc.resource.WorkThreads;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -68,7 +69,7 @@ public class PollAutoConfiguration {
                     + String.join("\n  - ", errors));
         }
         jobs.forEach(j -> log.info("폴링 작업 {} (주기 {}ms)", j.name(), j.intervalMs(props.defaultIntervalMs())));
-        return new PollRunner(jobs, props);
+        return new PollRunner(jobs, props, meters);
     }
 
     @Bean
@@ -95,11 +96,13 @@ public class PollAutoConfiguration {
     public static class PollRunner implements SmartLifecycle {
         private final List<PollJob> jobs;
         private final PollProperties props;
+        private final MeterRegistry meters;
         private ScheduledExecutorService scheduler;
 
-        PollRunner(List<PollJob> jobs, PollProperties props) {
+        PollRunner(List<PollJob> jobs, PollProperties props, MeterRegistry meters) {
             this.jobs = jobs;
             this.props = props;
+            this.meters = meters;
         }
 
         public List<PollJob> jobs() {
@@ -108,7 +111,9 @@ public class PollAutoConfiguration {
 
         @Override
         public void start() {
-            scheduler = Executors.newScheduledThreadPool(Math.max(1, props.threads()), r -> new Thread(r, "poll"));
+            // part=poll 로 따로 센다 — 같은 프로세스에 CDC 엔진이 있으면(RFC Service) 둘이 자원을 나눠 쓰는 모양이 보인다
+            scheduler = Executors.newScheduledThreadPool(Math.max(1, props.threads()),
+                    WorkThreads.factory("poll", "poll", meters));
             long stagger = 0;
             for (PollJob j : jobs) {
                 scheduler.scheduleWithFixedDelay(j::runOnce, stagger, j.intervalMs(props.defaultIntervalMs()),

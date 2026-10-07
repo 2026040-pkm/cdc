@@ -24,7 +24,8 @@ empty, total = [], 0
 for p in panels_all:
     for t in p.get("targets", []):
         total += 1
-        url = prom + "/api/v1/query?" + urllib.parse.urlencode({"query": t["expr"]})
+        expr = t["expr"].replace("$pipeline", ".*")   # 대시보드 변수 — 전체로 본다
+        url = prom + "/api/v1/query?" + urllib.parse.urlencode({"query": expr})
         with urllib.request.urlopen(url, timeout=10) as r:
             res = json.load(r)
         if res.get("status") != "success" or not res["data"]["result"]:

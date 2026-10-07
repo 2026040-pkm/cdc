@@ -1,0 +1,1577 @@
+{
+  "uid": "hotdb-engine",
+  "title": "HotDB 엔진 자원",
+  "tags": [
+    "hotdb",
+    "cdc",
+    "engine"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "① 엔진이 프로세스 안에서 쓰는 자원 (평시 · 1만 건 배치 · 적체)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "엔진 CPU 몫 (프로세스 대비)",
+      "description": "Debezium 스레드 CPU / 프로세스 CPU. 배치 콜백(우리 반영)은 빠진 순수 캡처 몫",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:engine_cpu_share{pipeline=~\"$pipeline\"}",
+          "legendFormat": "{{pipeline}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "엔진 힙 할당 몫",
+      "description": "GC 는 할당한 쪽에 안 붙는다 — 할당 몫이 GC 를 누가 부르는지 말해 준다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (rate(hotdb_cdc_engine_alloc_bytes_total{part=\"engine\",pipeline=~\"$pipeline\"}[1m])) / sum by (pipeline) (rate(hotdb_cdc_engine_alloc_bytes_total{part=\"process\",pipeline=~\"$pipeline\"}[1m]))",
+          "legendFormat": "{{pipeline}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "엔진 스레드",
+      "description": "엔진 스레드 그룹의 살아 있는 스레드",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_cdc_engine_threads{pipeline=~\"$pipeline\"}",
+          "legendFormat": "{{pipeline}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "프로세스 CPU 몫별 (코어)",
+      "description": "engine = 슬롯 읽기 · 해석 · 큐 / handler = 배치 콜백(라우트 반영 · RFC 전달) / work:judge = 판정 · work:poll = 레거시 폴링 / JVM 나머지 = GC · JIT · HTTP",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:proc_cpu_cores{pipeline=~\"$pipeline\", part!=\"process\"}",
+          "legendFormat": "{{pipeline}} {{part}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (hotdb:proc_cpu_cores{pipeline=~\"$pipeline\", part=\"process\"}) - sum by (pipeline) (hotdb:proc_cpu_cores{pipeline=~\"$pipeline\", part!=\"process\"})",
+          "legendFormat": "{{pipeline}} JVM 나머지"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "힙 할당률 몫별",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline, part) (rate(hotdb_cdc_engine_alloc_bytes_total{pipeline=~\"$pipeline\", part!=\"process\"}[1m]))",
+          "legendFormat": "{{pipeline}} {{part}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline, part) (rate(hotdb_work_alloc_bytes_total{pipeline=~\"$pipeline\"}[1m]))",
+          "legendFormat": "{{pipeline}} work:{{part}}"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (rate(hotdb_cdc_engine_alloc_bytes_total{pipeline=~\"$pipeline\", part=\"process\"}[1m]))",
+          "legendFormat": "{{pipeline}} 프로세스"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "스레드",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_cdc_engine_threads{pipeline=~\"$pipeline\"}",
+          "legendFormat": "{{pipeline}} 엔진"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_work_threads{pipeline=~\"$pipeline\"}",
+          "legendFormat": "{{pipeline}} work:{{part}}"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "jvm_threads_live_threads{pipeline=~\"$pipeline\"}",
+          "legendFormat": "{{pipeline}} JVM 전체"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "힙 — 사용 · GC 뒤 살아 있는 양 · 상한",
+      "description": "힙은 스레드별로 못 나눈다. 엔진만의 메모리는 엔진을 끈 쌍둥이와의 차이로 본다 (engine-resource.py)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (jvm_memory_used_bytes{area=\"heap\",pipeline=~\"$pipeline\"})",
+          "legendFormat": "{{pipeline}} 사용"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "jvm_gc_live_data_size_bytes{pipeline=~\"$pipeline\"}",
+          "legendFormat": "{{pipeline}} GC 뒤 생존"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (jvm_memory_max_bytes{area=\"heap\",pipeline=~\"$pipeline\"} > 0)",
+          "legendFormat": "{{pipeline}} 상한(-Xmx)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "GC 일시정지/초",
+      "description": "멈추는 동안 엔진과 본연의 일이 같이 선다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (rate(jvm_gc_pause_seconds_sum{pipeline=~\"$pipeline\"}[1m]))",
+          "legendFormat": "{{pipeline}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "② 본연의 일(반영 · 판정 · RFC 전달 · 폴링) ↔ CDC 캡처 — 같은 프로세스에서의 상호 영향",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "캡처 vs 본연의 일 CPU (코어)",
+      "description": "한쪽이 오를 때 다른 쪽이 눌리면(합이 코어 한도에 붙음) 서로 자원을 다투는 것",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:proc_cpu_cores{pipeline=~\"$pipeline\", part=\"engine\"}",
+          "legendFormat": "{{pipeline}} 캡처(엔진)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (hotdb:proc_cpu_cores{pipeline=~\"$pipeline\", part=~\"handler|work:.*\"})",
+          "legendFormat": "{{pipeline}} 본연의 일"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "캡처 지연 — 원천 대비",
+      "description": "본연의 일이 무거워져 캡처가 밀리면 여기가 오른다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_cdc_engine_behind_source_seconds{pipeline=~\"$pipeline\"}",
+          "legendFormat": "{{pipeline}} Debezium"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, pipeline) (rate(hotdb_cdc_lag_commit_seconds_bucket{pipeline=~\"$pipeline\"}[1m])))",
+          "legendFormat": "{{pipeline}} 커밋→반영 p99"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "본연의 일 지연",
+      "description": "캡처가 몰릴 때(적체 따라잡기) 이 값들이 오르면 캡처가 본연의 일을 누르는 것",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, pipeline) (rate(hotdb_cdc_batch_seconds_bucket{pipeline=~\"$pipeline\"}[1m])))",
+          "legendFormat": "{{pipeline}} 배치 반영 p99"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_judge_pending_oldest_seconds{pipeline=~\"$pipeline\"}",
+          "legendFormat": "{{pipeline}} 판정 대기 최장"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max by (zone) (hotdb_rfc_lag_hop2_p99_seconds)",
+          "legendFormat": "RFC 전달 p99 ({{zone}})"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, pipeline) (rate(hotdb_poll_run_seconds_bucket{pipeline=~\"$pipeline\"}[5m])))",
+          "legendFormat": "{{pipeline}} 폴링 한 주기 p99"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "판정 적체 · 처리량",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 38,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_judge_pending{pipeline=~\"$pipeline\"}",
+          "legendFormat": "{{pipeline}} 대기"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (rate(hotdb_judge_judged_total{pipeline=~\"$pipeline\"}[1m])) * 60",
+          "legendFormat": "{{pipeline}} 판정/분"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "③ 원천 DB 부하 — 복제 슬롯 · WAL 보존 · 디스크 · 장기 다운 허용 한계",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 46,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "다운 허용 — 슬롯 무효화까지",
+      "description": "소비자가 지금 멈추면, 지금 WAL 속도로 이 시간 뒤 슬롯이 무효화된다 (max_slot_wal_keep_size). 넘으면 재동기화",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 47,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "min(hotdb:slot_downtime_budget_seconds)",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "다운 허용 — 디스크 가득까지",
+      "description": "이게 위보다 짧으면 슬롯보다 디스크가 먼저 차서 DB 가 멈춘다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 47,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:disk_downtime_budget_seconds",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "pg_wal 크기",
+      "description": "슬롯이 붙잡으면 커진다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 47,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb_wal_dir_bytes)",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "디스크 여유",
+      "description": "Hot DB 데이터 디스크 (node-exporter 대상 라벨 hotdb_db=1)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 47,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "min(max_over_time(node_filesystem_avail_bytes{hotdb_db=\"1\", mountpoint=\"/\"}[5m]))",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 20,
+      "type": "stat",
+      "title": "슬롯 WAL 상한",
+      "description": "max_slot_wal_keep_size",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 47,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(pg_settings_max_slot_wal_keep_size_bytes{job=\"hotdb\"})",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "슬롯별 보존 WAL vs 상한",
+      "description": "소비자가 멈춘 슬롯만 계속 오른다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 51,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_slot_retained_bytes",
+          "legendFormat": "{{slot_name}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(pg_settings_max_slot_wal_keep_size_bytes{job=\"hotdb\"})",
+          "legendFormat": "상한"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "디스크 — pg_wal · DB · 여유",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 51,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb_wal_dir_bytes)",
+          "legendFormat": "pg_wal"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "pg_database_size_bytes{job=\"hotdb\", datname=\"hotdb\"}",
+          "legendFormat": "DB hotdb"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "min(max_over_time(node_filesystem_avail_bytes{hotdb_db=\"1\", mountpoint=\"/\"}[5m]))",
+          "legendFormat": "디스크 여유"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "WAL 생성률",
+      "description": "다운 허용 시간 = 남은 여유 / 이 값",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 59,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:wal_rate_bytes",
+          "legendFormat": "15분 평균"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(rate(hotdb_wal_written_bytes[1m]))",
+          "legendFormat": "1분"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "슬롯별 다운 허용 남은 시간",
+      "description": "1시간 밑으로 5분 이어지면 경보 (CdcDowntimeBudgetLow)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 59,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:slot_downtime_budget_seconds",
+          "legendFormat": "{{slot_name}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:disk_downtime_budget_seconds",
+          "legendFormat": "디스크"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 25,
+      "type": "row",
+      "title": "④ 적체 — 메모리 상한 · backpressure",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 67,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 26,
+      "type": "stat",
+      "title": "엔진 큐 사용률 최대",
+      "description": "1 에 붙으면 엔진이 슬롯 읽기를 멈춘 것 — backpressure 동작",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 68,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb:engine_queue_fill{pipeline=~\"$pipeline\"})",
+          "legendFormat": "건"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb:engine_queue_bytes_fill{pipeline=~\"$pipeline\"})",
+          "legendFormat": "바이트"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 27,
+      "type": "stat",
+      "title": "backpressure 중인 파이프라인",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 68,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "count(hotdb:engine_queue_fill{pipeline=~\"$pipeline\"} > 0.9 or hotdb:engine_queue_bytes_fill{pipeline=~\"$pipeline\"} > 0.9) or vector(0)",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 28,
+      "type": "stat",
+      "title": "힙 사용률 최대",
+      "description": "적체 중에도 이게 평평하면 메모리 상한이 지켜지는 것",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 68,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(sum by (pipeline) (jvm_memory_used_bytes{area=\"heap\",pipeline=~\"$pipeline\"}) / sum by (pipeline) (jvm_memory_max_bytes{area=\"heap\",pipeline=~\"$pipeline\"} > 0))",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 29,
+      "type": "timeseries",
+      "title": "엔진 큐 (건)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_cdc_engine_queue{pipeline=~\"$pipeline\", state=\"used\"}",
+          "legendFormat": "{{pipeline}} 사용"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb_cdc_engine_queue{pipeline=~\"$pipeline\", state=\"capacity\"})",
+          "legendFormat": "상한 (max.queue.size)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "엔진 큐 (바이트)",
+      "description": "상한 0 = 건수로만 막는다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 72,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_cdc_engine_queue_bytes{pipeline=~\"$pipeline\", state=\"used\"}",
+          "legendFormat": "{{pipeline}} 사용"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max by (pipeline) (hotdb_cdc_engine_queue_bytes{pipeline=~\"$pipeline\", state=\"capacity\"})",
+          "legendFormat": "{{pipeline}} 상한 (max.queue.size.in.bytes)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "backpressure 증거 — 큐가 차면 밀림은 원천 슬롯으로",
+      "description": "큐 사용률이 1 에 붙어 있는 동안 이 값은 오르고 힙은 평평해야 한다 — 밀린 것이 프로세스가 아니라 원천에 쌓인다는 뜻",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_slot_confirmed_lag_bytes",
+          "legendFormat": "{{slot_name}} 미확인 WAL"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "힙 사용 vs 상한",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 80,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (jvm_memory_used_bytes{area=\"heap\",pipeline=~\"$pipeline\"})",
+          "legendFormat": "{{pipeline}} 사용"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (pipeline) (jvm_memory_max_bytes{area=\"heap\",pipeline=~\"$pipeline\"} > 0)",
+          "legendFormat": "{{pipeline}} 상한"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "pipeline",
+        "label": "파이프라인",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "hotdb-prom"
+        },
+        "query": {
+          "query": "label_values(hotdb_cdc_state, pipeline)",
+          "refId": "pipeline"
+        },
+        "definition": "label_values(hotdb_cdc_state, pipeline)",
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "refresh": 2,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "측정 구간",
+        "enable": true,
+        "iconColor": "orange",
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "target": {
+          "type": "tags",
+          "tags": [
+            "engine-resource"
+          ],
+          "matchAny": true,
+          "limit": 200
+        }
+      }
+    ]
+  }
+}

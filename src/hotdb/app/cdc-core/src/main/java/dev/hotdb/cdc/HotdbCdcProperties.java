@@ -20,8 +20,14 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param exitOnFailure 엔진이 죽으면 프로세스를 끝낸다 — 컨테이너 재시작에 맡긴다. 스스로 멈춘 경우(정지 판정 ·
  *                      캡처 갭)는 끝내지 않는다 — 재시작해도 같은 이유로 멈추므로, 살아서 health DOWN 과 지표를 보인다
  * @param failOnCaptureGap 기동 때 되받을 수 없는 구간을 찾으면 엔진을 띄우지 않는다 (조용히 어긋난 채 도는 것보다 멈춘다)
+ * @param maxQueueSize  엔진 내부 큐 건수 상한. 꽉 차면 슬롯 읽기가 멈춘다(backpressure) — 밀린 것은 프로세스가 아니라
+ *                      원천 슬롯(WAL)에 쌓인다. 적체 때 프로세스 메모리 상한이 여기서 정해진다
+ * @param maxQueueSizeBytes 같은 큐의 바이트 상한 (Debezium max.queue.size.in.bytes). 0 = 건수로만 막는다.
+ *                      행이 큰 표(산출물 행렬 등)가 섞이면 건수만으로는 메모리가 안 묶이므로 이것을 건다
  * @param deadLetter    격리된 이벤트 재처리
  * @param dbWait        기동 때 Hot DB 가 응답할 때까지 기다리는 간격 · 상한 ({@link DbReadyGate})
+ * @param engineEnabled false 면 엔진만 빼고 같은 프로세스를 띄운다 — 엔진 자원 측정의 기준선(scripts/engine-resource.py).
+ *                      슬롯을 읽지 않으므로 운영에서는 끄지 않는다
  * @param debezium      그 밖의 Debezium 속성을 그대로 넘긴다 (코드 수정 없이 튜닝)
  */
 @ConfigurationProperties("hotdb.cdc")
@@ -37,6 +43,7 @@ public record HotdbCdcProperties(
         @DefaultValue("10000") long heartbeatIntervalMs,
         @DefaultValue("2048") int maxBatchSize,
         @DefaultValue("8192") int maxQueueSize,
+        @DefaultValue("0") long maxQueueSizeBytes,
         @DefaultValue("200") long pollIntervalMs,
         @DefaultValue Apply apply,
         @DefaultValue("true") boolean strictSource,
@@ -44,6 +51,7 @@ public record HotdbCdcProperties(
         @DefaultValue("true") boolean failOnCaptureGap,
         @DefaultValue DeadLetter deadLetter,
         @DefaultValue DbWait dbWait,
+        @DefaultValue("true") boolean engineEnabled,
         Map<String, String> debezium) {
 
     public record Source(String host, @DefaultValue("5432") int port, String database, String user, String password) {}

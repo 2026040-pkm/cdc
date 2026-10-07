@@ -1,2 +1,1 @@
-[ { "targets": ["cadvisor:8080"], "labels": { "server": "services" } },
-  { "targets": ["172.30.1.88:59492"], "labels": { "server": "legacy" } } ]
+[ { "targets": ["podman-exporter:9882"], "labels": { "server": "local" } } ]

@@ -1539,7 +1539,7 @@
     {
       "id": 35,
       "type": "row",
-      "title": "2단 CDC — 권역 RDB → RFC Provider → SAP",
+      "title": "2단 CDC — 권역 RDB → RFC Service → SAP",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1678,7 +1678,7 @@
     {
       "id": 39,
       "type": "stat",
-      "title": "RFC Provider UP",
+      "title": "RFC Service UP",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -1703,7 +1703,7 @@
             "type": "prometheus",
             "uid": "hotdb-prom"
           },
-          "expr": "sum(up{job=\"rfc-provider\"})",
+          "expr": "sum(up{job=\"rfc-service\"})",
           "legendFormat": "UP"
         }
       ],

@@ -26,6 +26,13 @@ hotdb_wal:
   metrics:
     - written_bytes: { usage: COUNTER, description: 지금까지 쓴 WAL — rate 로 WAL 생성률 }
 
+# pg_wal 디렉터리 실제 크기 — 슬롯이 붙잡으면 여기가 커진다 (디스크를 먹는 것은 이것)
+hotdb_wal_dir:
+  query: SELECT coalesce(sum(size), 0) AS bytes, count(*) AS files FROM pg_ls_waldir()
+  metrics:
+    - bytes: { usage: GAUGE, description: pg_wal 디렉터리 크기 }
+    - files: { usage: GAUGE, description: WAL 세그먼트 파일 수 }
+
 hotdb_walsender:
   query: |
     SELECT coalesce(s.slot_name, r.application_name || ':' || r.pid) AS slot_name, r.state,

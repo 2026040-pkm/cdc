@@ -88,7 +88,15 @@ if (-not $SkipBuild) {
 
 
 
-# ── 3. compose ───────────────────────────────────────────────────────────
+# ── 3. Prometheus 수집 대상 — 한 대에 전부 띄울 때의 주소 (서버 to 서버는 up-services.sh 가 서버 주소로 다시 쓴다)
+$tg = "$root\monitoring\prometheus\targets"
+@{
+    "legacy-db.json" = '[ { "targets": ["legacy-exporter:9187"], "labels": { "server": "local" } } ]'
+    "node.json"      = '[ { "targets": ["node-exporter:9100"], "labels": { "server": "local", "hotdb_db": "1" } } ]'
+    "podman.json"    = '[ { "targets": ["podman-exporter:9882"], "labels": { "server": "local" } } ]'
+}.GetEnumerator() | ForEach-Object { [IO.File]::WriteAllText("$tg\$($_.Key)", $_.Value + "`n") }
+
+# ── 4. compose ───────────────────────────────────────────────────────────
 
 $files = @("-f", "compose.db.yml", "-f", "compose.legacy.yml", "-f", "compose.zone.yml", "-f", "compose.rfc.yml", "-f", "compose.agent.yml",
 

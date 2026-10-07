@@ -1,2 +1,1 @@
-[ { "targets": ["node-exporter:9100"], "labels": { "server": "services" } },
-  { "targets": ["172.30.1.88:59489"], "labels": { "server": "legacy" } } ]
+[ { "targets": ["node-exporter:9100"], "labels": { "server": "local", "hotdb_db": "1" } } ]
