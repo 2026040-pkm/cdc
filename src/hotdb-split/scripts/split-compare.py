@@ -66,7 +66,14 @@ METRICS = [
     ("applied", "hotdb_log_applied_seq", "", 1),
     ("batch_s", "hotdb_cdc_batch_seconds_sum", "", 1),
     ("batch_n", "hotdb_cdc_batch_seconds_count", "", 1),
+    ("lag_s", "hotdb_cdc_lag_source_seconds_sum", "", 1),
+    ("lag_n", "hotdb_cdc_lag_source_seconds_count", "", 1),
+    ("judged", "hotdb_judge_judged_total", "", 1),
+    ("judge_pending", "hotdb_judge_pending", "", 1),
 ]
+# 길게 — SPLIT_LONG=1 이면 구간을 늘리고 x3 지속 · CPU 제한 경합 구간을 더한다
+LONG = __import__("os").environ.get("SPLIT_LONG") == "1"
+DUR = dict(idle=300, x1=900, x3=600, rounds=5, backlog=600, contend=300) if LONG else       dict(idle=120, x1=300, x3=0, rounds=3, backlog=180, contend=0)
 COLS = (["t", "phase", "sim_ok", "sim_speed"]
         + [f"{k}_{m[0]}" for k in TARGETS for m in METRICS]
         + [f"{k}_rss" for k in TARGETS] + [f"{k}_pids" for k in TARGETS]
@@ -247,12 +254,44 @@ def healthy(k):
 def load(s):
     SIM.set(False)
     time.sleep(30)
-    record(s, "유휴", 120)
+    record(s, "유휴", DUR["idle"])
     SIM.set(True, 1)
     time.sleep(30)
-    record(s, "평시 x1", 300)
-    batch(s)
-    backlog(s)
+    record(s, "평시 x1", DUR["x1"])
+    if DUR["x3"]:
+        SIM.set(True, 3)
+        time.sleep(30)
+        record(s, "지속 x3", DUR["x3"])
+        SIM.set(True, 1)
+    batch(s, DUR["rounds"])
+    if DUR["contend"]:
+        contend(s)
+    backlog(s, DUR["backlog"])
+
+
+def cpus(k, n):
+    sh("podman", "update", "--cpus", str(n), TARGETS[k][0])
+
+
+def contend(s):
+    """CPU 를 묶어 엔진과 본연의 일(반영 · 판별)이 코어를 다투게 한다 — 일체형 1코어, 분리형 0.5 + 0.5 (합 같음)"""
+    log("경합 — 일체형 1코어 · 캡처부 0.5 + 전달부 0.5")
+    cpus("int", 1); cpus("cap", 0.5); cpus("app", 0.5)
+    mark("contend-start", int=1, cap=0.5, app=0.5)
+    try:
+        SIM.set(True, 3)
+        time.sleep(30)
+        record(s, "경합 x3", DUR["contend"])
+        SIM.set(True, 1)
+        time.sleep(30)
+        for i in (1, 2):
+            run_batch(s, f"경합 배치 {i}")
+    finally:
+        for k in ("int", "cap", "app"):
+            cpus(k, 12)
+        mark("contend-end")
+        SIM.set(True, 1)
+    time.sleep(60)
 
 
 BATCH_SQL = """
@@ -272,27 +311,31 @@ SELECT count(*), count(DISTINCT tag_key) FROM ins
 """
 
 
+def run_batch(s, label):
+    tag = f"BATCH-{datetime.now():%H%M%S}"
+    s.phase = label
+    log(f"{label} — {BATCH_ROWS:,}행 한 트랜잭션 (fov_mode={tag})")
+    t0 = time.time()
+    rows, devices = (int(x) for x in sql(BATCH_SQL.format(mark=tag, zone=ZONE_CODE, rows=BATCH_ROWS)).split("|"))
+    done = {}
+    while time.time() - t0 < 300 and len(done) < 2:
+        for k, sc in SCHEMAS.items():
+            if k not in done and int(sql(f"SELECT count(*) FROM {sc}.device_status_current "
+                                         f"WHERE module = 'asm' AND fov_mode = '{tag}'") or 0) >= devices:
+                done[k] = round(time.time() - t0, 2)
+        time.sleep(0.3)
+    mark("batch", label=label, rows=rows, devices=devices, done_s=done)
+    log(f"{label} 반영 끝 — 일체형 {done.get('int')}초 · 분리형 {done.get('app')}초")
+    time.sleep(15)
+    s.phase = "-"
+    time.sleep(30)
+
+
 def batch(s, rounds=3):
     SIM.set(False)
     time.sleep(30)
     for i in range(1, rounds + 1):
-        tag = f"BATCH-{datetime.now():%H%M%S}"
-        s.phase = f"배치 {i}"
-        log(f"배치 {i} — {BATCH_ROWS:,}행 한 트랜잭션 (fov_mode={tag})")
-        t0 = time.time()
-        rows, devices = (int(x) for x in sql(BATCH_SQL.format(mark=tag, zone=ZONE_CODE, rows=BATCH_ROWS)).split("|"))
-        done = {}
-        while time.time() - t0 < 300 and len(done) < 2:
-            for k, sc in SCHEMAS.items():
-                if k not in done and int(sql(f"SELECT count(*) FROM {sc}.device_status_current "
-                                             f"WHERE module = 'asm' AND fov_mode = '{tag}'") or 0) >= devices:
-                    done[k] = round(time.time() - t0, 2)
-            time.sleep(0.3)
-        mark("batch", round=i, rows=rows, devices=devices, done_s=done)
-        log(f"배치 {i} 반영 끝 — 일체형 {done.get('int')}초 · 분리형 {done.get('app')}초")
-        time.sleep(15)
-        s.phase = "-"
-        time.sleep(30)
+        run_batch(s, f"배치 {i}")
     SIM.set(True, 1)
 
 
@@ -316,7 +359,7 @@ def backlog(s, stop_seconds=180, speed=5):
     sh("podman", "start", TARGETS["int"][0])
     sh("podman", "start", TARGETS["app"][0])
     caught = {}
-    while time.time() - t0 < 900 and len(caught) < 2:
+    while time.time() - t0 < 2400 and len(caught) < 2:
         time.sleep(1)
         if "int" not in caught and (s.last("int_slot_mb") or 99) < 2 and (s.last("int_fresh_s") or 99) < 5:
             caught["int"] = round(time.time() - t0, 1)
@@ -449,6 +492,10 @@ def summarize(rows):
                 "pids": stat(f"{k}_pids"),
                 "gc_ms_s": (rate(f"{k}_gc_s") or 0) * 1000 if series(f"{k}_gc_s") else None,
                 "queue": stat(f"{k}_queue"),
+                "lag_avg_s": (lambda a, b: a / b if a is not None and b else None)(rate(f"{k}_lag_s"), rate(f"{k}_lag_n")),
+                "batch_avg_ms": (lambda a, b: 1000 * a / b if a is not None and b else None)(rate(f"{k}_batch_s"), rate(f"{k}_batch_n")),
+                "judged_s": rate(f"{k}_judged"),
+                "judge_pending": stat(f"{k}_judge_pending"),
             }
         out[p] = {
             "seconds": round(dur, 1),
