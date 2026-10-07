@@ -1,6 +1,7 @@
 package dev.hotdb.lsim;
 
 import java.util.Map;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,7 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
  *   POST /sim/pause · /sim/resume
  *   POST /sim/tick             지금 바로 한 주기 (폴링 확인용)
  * </pre>
+ * 현장 발행기의 부하 제어판(:59480/)이 다른 출처에서 부르므로 CORS 를 연다.
  */
+@CrossOrigin
 @RestController
 @RequestMapping("/sim")
 public class SimController {
