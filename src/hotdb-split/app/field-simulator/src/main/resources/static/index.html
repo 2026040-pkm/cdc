@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HotDB 부하 제어판</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --accent: #eb6834;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(235, 104, 52, 0.12);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+    --accent: #d95926; --accent-soft: rgba(217, 89, 38, 0.18);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+  --accent: #d95926; --accent-soft: rgba(217, 89, 38, 0.18);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+}
+header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+  padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--surface);
+  position: sticky; top: 0; z-index: 5;
+}
+header h1 { font-size: 17px; margin: 0; font-weight: 650; }
+.conn { display: flex; gap: 14px; flex-wrap: wrap; color: var(--ink-2); font-size: 13px; }
+.conn span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted); margin-right: 6px; vertical-align: 1px; }
+.conn span.ok::before { background: var(--good); }
+.conn span.bad::before { background: var(--critical); }
+header .spacer { flex: 1; }
+main { max-width: 1440px; margin: 0 auto; padding: 20px 24px 48px; display: grid; gap: 20px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; min-width: 0; }
+.card h2 { font-size: 15px; margin: 0 0 4px; font-weight: 650; display: flex; align-items: center; gap: 10px; }
+.card .sub { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; }
+.badge { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); }
+.badge.run { color: var(--good); border-color: currentColor; }
+.badge.stop { color: var(--critical); border-color: currentColor; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+.row label { color: var(--ink-2); font-size: 13px; min-width: 44px; }
+button {
+  font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--page); color: var(--ink);
+}
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+input, select {
+  font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--page); color: var(--ink);
+}
+input[type=number] { width: 72px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 12px; }
+.fact { background: var(--page); border-radius: 8px; padding: 8px 10px; }
+.fact b { display: block; font-size: 17px; font-weight: 650; }
+.fact span { color: var(--muted); font-size: 12px; }
+.err { color: var(--critical); font-size: 12.5px; margin-top: 8px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.tile .label { color: var(--ink-2); font-size: 12.5px; }
+.tile .value { font-size: 24px; font-weight: 650; margin-top: 2px; }
+.tile .state { font-size: 12px; margin-top: 2px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+.tile .state i { width: 8px; height: 8px; border-radius: 2px; display: none; }
+.tile .state.good i, .tile .state.warning i, .tile .state.serious i, .tile .state.critical i { display: inline-block; }
+.tile .state.good i { background: var(--good); } .tile .state.warning i { background: var(--warning); }
+.tile .state.serious i { background: var(--serious); } .tile .state.critical i { background: var(--critical); }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 20px; }
+.chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+.plot { position: relative; height: 230px; margin-top: 8px; }
+.plot svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.plot .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+.tip {
+  position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  min-width: 150px; display: none; z-index: 3;
+}
+.tip .t { color: var(--muted); margin-bottom: 4px; }
+.tip .r { display: grid; grid-template-columns: 14px auto 1fr; gap: 6px; align-items: center; }
+.tip .r i { width: 12px; height: 2px; display: inline-block; }
+.tip .r b { font-variant-numeric: tabular-nums; }
+.tip .r span { color: var(--ink-2); }
+details.table { margin-top: 8px; font-size: 12.5px; color: var(--ink-2); }
+details.table table { border-collapse: collapse; margin-top: 6px; }
+details.table td, details.table th { padding: 3px 12px 3px 0; text-align: left; font-variant-numeric: tabular-nums; }
+.scenario-progress { color: var(--ink-2); font-size: 13px; }
+.settings { display: none; gap: 10px; flex-wrap: wrap; align-items: center; padding: 10px 24px;
+  border-bottom: 1px solid var(--border); background: var(--surface); font-size: 13px; }
+.settings.open { display: flex; }
+.settings input { width: 230px; }
+.log { font-size: 12.5px; color: var(--ink-2); max-height: 140px; overflow: auto; margin: 0; padding-left: 18px; }
+.report { border-color: var(--accent); scroll-margin-top: 80px; }
+.report-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.report-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.headline { display: flex; align-items: flex-start; gap: 12px; background: var(--page); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+.headline b { display: block; font-size: 18px; font-weight: 650; }
+.headline span { color: var(--ink-2); font-size: 13px; }
+.table-wrap { overflow-x: auto; }
+.rp-table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 980px; }
+.rp-table th { text-align: right; font-weight: 600; color: var(--ink-2); font-size: 12px; padding: 6px 10px; border-bottom: 1px solid var(--axis); white-space: nowrap; }
+.rp-table td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rp-table th:first-child, .rp-table td:first-child { text-align: left; }
+.rp-table td small { color: var(--muted); margin-left: 4px; }
+.st { display: inline-flex; align-items: center; gap: 6px; }
+.st::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--muted); }
+.st.good::before { background: var(--good); } .st.warning::before { background: var(--warning); }
+.st.serious::before { background: var(--serious); } .st.critical::before { background: var(--critical); }
+.chip { font-weight: 600; }
+.findings { margin: 12px 0 4px; padding-left: 18px; font-size: 13px; }
+.findings li { margin: 3px 0; }
+@media (max-width: 640px) {
+  header, main, .settings { padding-left: 16px; padding-right: 16px; }
+  .controls, .charts { grid-template-columns: 1fr; }
+  .settings input { width: 100%; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>HotDB 부하 제어판</h1>
+  <div class="conn" aria-live="polite">
+    <span id="c-field">현장 발행기</span>
+    <span id="c-legacy">레거시 발행기</span>
+    <span id="c-prom">Prometheus</span>
+  </div>
+  <div class="spacer"></div>
+  <select id="range" aria-label="차트 시간 범위">
+    <option value="300">5분</option>
+    <option value="900" selected>15분</option>
+    <option value="1800">30분</option>
+    <option value="3600">1시간</option>
+  </select>
+  <a id="lnk-grafana" target="_blank" rel="noopener" style="color:var(--ink-2);font-size:13px">Grafana 열기</a>
+  <button id="btn-settings" aria-expanded="false">주소 설정</button>
+  <button id="btn-theme" aria-label="밝기 전환">밝기</button>
+</header>
+<div class="settings" id="settings">
+  <label>레거시 발행기 <input id="url-legacy"></label>
+  <label>Prometheus <input id="url-prom"></label>
+  <label>Grafana <input id="url-grafana"></label>
+  <button id="btn-save">저장</button>
+  <span style="color:var(--muted)">현장 발행기는 이 페이지를 띄운 곳입니다</span>
+</div>
+
+<main>
+  <section class="controls">
+    <div class="card" id="field">
+      <h2>현장 발행기 <span class="badge" id="f-badge">-</span></h2>
+      <p class="sub">HotDB Provider 대역. tsdb 에 3채널(status 1초 · actual 1분 · artifact 1분×12)을 직접 넣습니다</p>
+      <div class="row"><label>배속</label><span id="f-speeds"></span>
+        <input type="number" id="f-custom" min="0.1" step="0.1" aria-label="직접 입력 배속"><button id="f-apply">적용</button></div>
+      <div class="row"><label>발행</label><button id="f-toggle">-</button></div>
+      <div class="facts" id="f-facts"></div>
+      <div class="err" id="f-err"></div>
+    </div>
+    <div class="card" id="legacy">
+      <h2>레거시 발행기 <span class="badge" id="l-badge">-</span></h2>
+      <p class="sub">SAP · Oracle 대역 원천 표를 주기마다 UPDATE · INSERT 해서 폴링이 가져갈 변경분을 만듭니다</p>
+      <div class="row"><label>배속</label><span id="l-speeds"></span>
+        <input type="number" id="l-custom" min="0.1" step="0.1" aria-label="직접 입력 배속"><button id="l-apply">적용</button></div>
+      <div class="row"><label>발행</label><button id="l-toggle">-</button><button id="l-tick">지금 한 주기</button></div>
+      <div class="facts" id="l-facts"></div>
+      <div class="err" id="l-err"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>단계 부하 시나리오</h2>
+    <p class="sub">현장 발행기 배속을 단계마다 올린 뒤 원래 배속으로 되돌립니다. 이 탭을 열어 둔 동안만 진행됩니다</p>
+    <div class="row">
+      <label>단계</label><input id="sc-steps" value="1,2,3,5,10" style="width:150px" aria-label="배속 단계">
+      <label>간격</label><select id="sc-dwell"><option value="60">1분</option><option value="120" selected>2분</option><option value="300">5분</option></select>
+      <button class="primary" id="sc-start">시작</button><button id="sc-stop" disabled>중단</button>
+      <span class="scenario-progress" id="sc-progress"></span>
+    </div>
+    <ol class="log" id="ops-log" reversed></ol>
+  </section>
+
+  <section class="card report" id="report" hidden>
+    <div class="report-head">
+      <h2>시나리오 리포트</h2>
+      <div class="report-actions">
+        <button id="rp-copy">마크다운 복사</button>
+        <button id="rp-json">JSON 저장</button>
+        <button id="rp-close">닫기</button>
+      </div>
+    </div>
+    <p class="sub" id="rp-meta"></p>
+    <div class="headline" id="rp-headline"></div>
+    <div class="table-wrap"><table class="rp-table" id="rp-table"></table></div>
+    <ul class="findings" id="rp-findings"></ul>
+    <p class="sub" id="rp-criteria"></p>
+  </section>
+
+  <section>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section class="charts" id="charts"></section>
+</main>
+
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+'use strict';
+// ── 설정 ─────────────────────────────────────────────────────────────────
+const host = location.hostname || 'localhost';
+const store = {
+  get(k, d) { try { return localStorage.getItem('hotdb-ctl.' + k) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('hotdb-ctl.' + k, v); } catch { /* 저장 불가 환경 */ } },
+};
+const cfg = {
+  field: '',   // 같은 출처
+  legacy: store.get('legacy', `http://${host}:59493`),
+  prom: store.get('prom', `http://${host}:59490`),
+  grafana: store.get('grafana', `http://${host}:59400`),
+};
+const SPEEDS = [0.5, 1, 2, 3, 5, 10];
+const ZONE_COLOR = { asm: 'var(--s1)', oft: 'var(--s2)', pnt: 'var(--s3)', mch: 'var(--s4)', rfc_service: 'var(--s5)' };
+const ZONE_NAME = { asm: '조립', oft: '의장', pnt: '도장', mch: '가공' };
+
+/** 초 단위 시각 → 10:37:54 */
+function hms(t) {
+  const d = new Date(t * 1000);
+  return [d.getHours(), d.getMinutes(), d.getSeconds()].map(v => String(v).padStart(2, '0')).join(':');
+}
+
+// ── 조작 기록 (차트에 세로선으로 표시) ─────────────────────────────────────
+let marks = [];
+try { marks = JSON.parse(store.get('marks', '[]')).filter(m => Date.now() / 1000 - m.t < 3600); } catch { marks = []; }
+function mark(label) {
+  marks.push({ t: Date.now() / 1000, label });
+  marks = marks.slice(-40);
+  store.set('marks', JSON.stringify(marks));
+  renderLog();
+  refreshCharts();
+}
+function renderLog() {
+  const ol = document.getElementById('ops-log');
+  ol.replaceChildren(...marks.slice(-8).reverse().map(m => {
+    const li = document.createElement('li');
+    li.textContent = `${hms(m.t)}  ${m.label}`;
+    return li;
+  }));
+}
+
+// ── 발행기 제어 ────────────────────────────────────────────────────────────
+async function call(base, path, method = 'GET') {
+  const r = await fetch(base + path, { method, cache: 'no-store' });
+  if (!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 200)}`);
+  return r.json();
+}
+const sims = {
+  f: { name: '현장', base: () => cfg.field, conn: 'c-field', state: null },
+  l: { name: '레거시', base: () => cfg.legacy, conn: 'c-legacy', state: null },
+};
+function setConn(id, ok) { const el = document.getElementById(id); el.className = ok ? 'ok' : 'bad'; }
+
+function buildSpeedButtons(key) {
+  const box = document.getElementById(key + '-speeds');
+  for (const s of SPEEDS) {
+    const b = document.createElement('button');
+    b.textContent = 'x' + s; b.dataset.speed = s;
+    b.addEventListener('click', () => act(key, `/sim/speed?value=${s}`, `${sims[key].name} 배속 x${s}`));
+    box.appendChild(b);
+  }
+  document.getElementById(key + '-apply').addEventListener('click', () => {
+    const v = parseFloat(document.getElementById(key + '-custom').value);
+    if (v > 0) act(key, `/sim/speed?value=${v}`, `${sims[key].name} 배속 x${v}`);
+  });
+  document.getElementById(key + '-toggle').addEventListener('click', () => {
+    const run = sims[key].state?.running;
+    act(key, run ? '/sim/pause' : '/sim/resume', `${sims[key].name} ${run ? '멈춤' : '시작'}`);
+  });
+}
+async function act(key, path, label) {
+  const sim = sims[key];
+  try {
+    sim.state = await call(sim.base(), path, 'POST');
+    document.getElementById(key + '-err').textContent = '';
+    mark(label);
+    render(key);
+  } catch (e) {
+    document.getElementById(key + '-err').textContent = `실패: ${e.message}`;
+  }
+}
+async function poll(key) {
+  const sim = sims[key];
+  try {
+    sim.state = await call(sim.base(), '/sim');
+    setConn(sim.conn, true);
+    document.getElementById(key + '-err').textContent = sim.state.lastError ? `마지막 오류: ${sim.state.lastError}` : '';
+  } catch (e) {
+    sim.state = null;
+    setConn(sim.conn, false);
+    document.getElementById(key + '-err').textContent = `연결 안 됨 (${sim.base() || location.origin}): ${e.message}`;
+  }
+  render(key);
+}
+const nf = new Intl.NumberFormat('ko-KR');
+function fact(label, value) {
+  const d = document.createElement('div'); d.className = 'fact';
+  const b = document.createElement('b'); b.textContent = value;
+  const s = document.createElement('span'); s.textContent = label;
+  d.append(b, s); return d;
+}
+function render(key) {
+  const st = sims[key].state;
+  const badge = document.getElementById(key + '-badge');
+  const toggle = document.getElementById(key + '-toggle');
+  badge.textContent = st ? (st.running ? `발행 중 · x${st.speed}` : `멈춤 · x${st.speed}`) : '연결 안 됨';
+  badge.className = 'badge ' + (st ? (st.running ? 'run' : 'stop') : '');
+  toggle.textContent = st?.running ? '멈춤' : '시작';
+  toggle.disabled = !st;
+  document.querySelectorAll(`#${key}-speeds button`).forEach(b => {
+    b.classList.toggle('on', !!st && Number(b.dataset.speed) === st.speed);
+    b.disabled = !st;
+  });
+  const facts = document.getElementById(key + '-facts');
+  if (!st) { facts.replaceChildren(); return; }
+  const items = [];
+  if (key === 'f') {
+    items.push(fact('예상 행/초', nf.format(st.expectedRowsPerSec)));
+    const dev = st.devices || {};
+    items.push(fact('장비 (조립·의장·도장·가공)',
+      [dev.ASSEMBLY, dev.OUTFITTING, dev.PAINTING, dev.MACHINING].map(v => v ?? 0).join(' · ')));
+    for (const [k, v] of Object.entries(st.rowsTotal || {})) items.push(fact(`누적 ${k}`, nf.format(v)));
+  } else {
+    items.push(fact('주기', `${(st.intervalMs / 1000).toFixed(1)}초`));
+    items.push(fact('표마다 UPDATE · INSERT', `${st.updatesPerTable} · ${st.insertsPerTable}`));
+    const src = st.sources || {};
+    items.push(fact('표 (SAP · Oracle)', `${src.sap?.tables ?? 0} · ${src.oracle?.tables ?? 0}`));
+    items.push(fact('주기 수', nf.format(st.ticks)));
+    for (const [k, v] of Object.entries(st.rowsTotal || {})) items.push(fact(`누적 ${k}`, nf.format(v)));
+  }
+  facts.replaceChildren(...items);
+}
+document.getElementById('l-tick').addEventListener('click', () => act('l', '/sim/tick', '레거시 한 주기'));
+
+// ── 단계 부하 시나리오 ────────────────────────────────────────────────────
+// 단계마다 시작 · 끝 시각을 남겨 두고, 끝나면(중단 포함) 그 구간을 Prometheus 로 집계해 리포트를 띄운다.
+let scenario = null;
+document.getElementById('sc-start').addEventListener('click', () => {
+  const steps = document.getElementById('sc-steps').value.split(',').map(Number).filter(v => v > 0);
+  const dwell = Number(document.getElementById('sc-dwell').value);
+  if (!steps.length || !sims.f.state) return;
+  scenario = { steps, dwell, i: 0, restore: sims.f.state.speed, wasRunning: sims.f.state.running, timer: null,
+    startedAt: Date.now() / 1000, log: [] };
+  setScenarioUi(true);
+  mark(`시나리오 시작: ${steps.map(s => 'x' + s).join(' → ')} (${dwell / 60}분씩)`);
+  (async () => { if (!scenario.wasRunning) await act('f', '/sim/resume', '현장 시작'); runStep(); })();
+});
+document.getElementById('sc-stop').addEventListener('click', () => endScenario('중단'));
+async function runStep() {
+  if (!scenario) return;
+  if (scenario.i >= scenario.steps.length) { endScenario('완료'); return; }
+  const s = scenario.steps[scenario.i];
+  await act('f', `/sim/speed?value=${s}`, `시나리오 ${scenario.i + 1}/${scenario.steps.length}: 현장 x${s}`);
+  if (!scenario) return;
+  const step = { speed: s, start: Date.now() / 1000, end: null, expected: sims.f.state?.expectedRowsPerSec ?? null };
+  scenario.log.push(step);
+  const until = Date.now() + scenario.dwell * 1000;
+  const tick = () => {
+    if (!scenario) return;
+    const left = Math.max(0, Math.round((until - Date.now()) / 1000));
+    document.getElementById('sc-progress').textContent =
+      `${scenario.i + 1}/${scenario.steps.length} 단계 · x${s} · 남은 ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+    if (left <= 0) { step.end = Date.now() / 1000; scenario.i++; runStep(); } else scenario.timer = setTimeout(tick, 1000);
+  };
+  tick();
+}
+async function endScenario(why) {
+  if (!scenario) return;
+  const s = scenario; scenario = null;
+  clearTimeout(s.timer);
+  const now = Date.now() / 1000;
+  s.log.forEach(st => { if (st.end == null) st.end = now; });
+  await act('f', `/sim/speed?value=${s.restore}`, `시나리오 ${why} → 현장 x${s.restore} 로 복귀`);
+  if (!s.wasRunning) await act('f', '/sim/pause', '현장 멈춤 (시작 전 상태)');
+  setScenarioUi(false);
+  const progress = document.getElementById('sc-progress');
+  progress.textContent = `시나리오 ${why} · 리포트 만드는 중`;
+  try {
+    const rep = await buildReport({ why, dwell: s.dwell, startedAt: s.startedAt, endedAt: now, steps: s.log });
+    store.set('report', JSON.stringify(rep));
+    renderReport(rep);
+    progress.textContent = `시나리오 ${why} · 리포트는 아래`;
+    document.getElementById('report').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    progress.textContent = `시나리오 ${why} · 리포트 실패: ${e.message}`;
+  }
+}
+function setScenarioUi(running) {
+  document.getElementById('sc-start').disabled = running;
+  document.getElementById('sc-stop').disabled = !running;
+}
+
+// ── 리포트 ──────────────────────────────────────────────────────────────
+// 단계 전환 직후는 앞 단계 값이 섞이므로(지연 지표가 1분 창) 앞부분을 빼고 잰다.
+const STEP_WARMUP_MAX = 60;
+const MIN_WINDOW = 15;
+const GIB = 2 ** 30, MIB = 2 ** 20;
+const RANK = { good: 0, warning: 1, serious: 2, critical: 3 };
+const STATUS_TEXT = { good: '정상', warning: '주의', serious: '확인', critical: '이슈' };
+const STEP_QUERIES = {
+  ingested: W => `sum(increase(hotdb_hypertable_inserted_rows[${W}s])) / ${W}`,
+  sent: W => `sum(increase(hotdb_sim_rows_total[${W}s])) / ${W}`,
+  applied: W => `sum(increase(hotdb_cdc_route_applied_total[${W}s])) / ${W}`,
+  lag: W => `max by (zone) (max_over_time(hotdb_zone_apply_lag_p99_seconds[${W}s]))`,
+  e2e: W => `max(max_over_time(hotdb_rfc_lag_e2e_p99_seconds[${W}s]))`,
+  walMax: W => `max_over_time(max(hotdb_slot_retained_bytes)[${W}s:5s])`,
+  walDelta: W => `max(hotdb_slot_retained_bytes) - max(hotdb_slot_retained_bytes offset ${W}s)`,
+  dlq: W => `(sum(hotdb_dead_letter_total) or vector(0)) - (sum(hotdb_dead_letter_total offset ${W}s) or vector(0))`,
+  upMin: W => `min_over_time(sum(up{job="zone-service"})[${W}s:5s])`,
+  upAll: () => `count(up{job="zone-service"})`,
+  pgCpu: W => `max_over_time(max(hotdb:container_cpu_cores{name="hotdb-pg"})[${W}s:5s])`,
+  tickP99: W => `histogram_quantile(0.99, sum by (le) (increase(hotdb_sim_tick_seconds_bucket{channel="status"}[${W}s])))`,
+};
+
+async function buildReport(run) {
+  const steps = [];
+  for (const st of run.steps) {
+    const dur = st.end - st.start;
+    const warm = Math.min(STEP_WARMUP_MAX, Math.floor(dur / 2));
+    const W = Math.floor(dur - warm);
+    const row = { speed: st.speed, start: st.start, end: st.end, window: W, expected: st.expected };
+    if (W < MIN_WINDOW) { row.skipped = true; steps.push(row); continue; }
+    await Promise.all(Object.entries(STEP_QUERIES).map(async ([k, q]) => {
+      try {
+        const r = await prom('query', { query: q(W), time: st.end.toFixed(3) });
+        if (k === 'lag') {
+          row.lagByZone = Object.fromEntries(r.map(x => [x.metric.zone, Number(x.value[1])]));
+          const worst = r.reduce((a, b) => (!a || Number(b.value[1]) > Number(a.value[1]) ? b : a), null);
+          row.lag = worst ? Number(worst.value[1]) : null;
+          row.lagZone = worst?.metric.zone ?? null;
+        } else {
+          const v = r.length ? Number(r[0].value[1]) : null;
+          row[k] = Number.isFinite(v) ? v : null;
+        }
+      } catch { row[k] = null; }
+    }));
+    judgeStep(row);
+    steps.push(row);
+  }
+  return summarize({ ...run, steps, createdAt: Date.now() / 1000 });
+}
+
+function judgeStep(r) {
+  const checks = [];
+  const base = r.expected || r.sent;
+  r.achieved = base && r.ingested != null ? r.ingested / base : null;
+  if (r.lag != null) {
+    checks.push(['lag', r.lag <= 2 ? 'good' : r.lag <= 5 ? 'warning' : 'critical',
+      `반영 지연 p99 ${fmt.sec(r.lag)} (${zoneLabel(r.lagZone)})`]);
+  }
+  if (r.achieved != null) {
+    checks.push(['achieved', r.achieved >= 0.95 ? 'good' : r.achieved >= 0.8 ? 'warning' : 'critical',
+      `적재 달성률 ${Math.round(r.achieved * 100)}% (예상 ${fmt.rows(base)} → 실제 ${fmt.rows(r.ingested)} 행/초)`]);
+  }
+  if (r.walMax != null) {
+    const growing = (r.walDelta ?? 0) > 256 * MIB;
+    checks.push(['wal', r.walMax >= 10 * GIB ? 'critical' : r.walMax >= GIB || growing ? 'warning' : 'good',
+      growing ? `슬롯 WAL 이 단계 동안 ${fmt.bytes(r.walDelta)} 늘어남 — 소비가 못 따라감` : `슬롯 WAL 최대 ${fmt.bytes(r.walMax)}`]);
+  }
+  if (r.tickP99 != null) {
+    const interval = 1 / r.speed;
+    checks.push(['tick', r.tickP99 > interval ? 'warning' : 'good',
+      r.tickP99 > interval
+        ? `발행기 한 주기 p99 ${Math.round(r.tickP99 * 1000)}ms 가 주기 ${Math.round(interval * 1000)}ms 보다 김 — tsdb INSERT 가 밀림`
+        : '발행 주기 안에 적재']);
+  }
+  if (r.dlq != null) {
+    checks.push(['dlq', r.dlq > 0 ? 'serious' : 'good', r.dlq > 0 ? `dead letter ${fmt.int(r.dlq)}건 늘어남` : 'dead letter 없음']);
+  }
+  if (r.upMin != null && r.upAll != null) {
+    checks.push(['up', r.upMin < r.upAll ? 'critical' : 'good',
+      r.upMin < r.upAll ? `권역 서비스 ${r.upAll - r.upMin}개가 내려간 적 있음` : '권역 서비스 전부 UP']);
+  }
+  r.checks = checks;
+  r.status = checks.length ? checks.reduce((s, c) => (RANK[c[1]] > RANK[s] ? c[1] : s), 'good') : null;
+}
+function zoneLabel(z) { return z ? (ZONE_NAME[z] || z) : '-'; }
+
+function summarize(rep) {
+  const judged = rep.steps.filter(s => s.status);
+  let stable = null, firstBad = null;
+  for (const s of judged) {
+    if (firstBad) break;
+    if (s.status === 'good') stable = s; else firstBad = s;
+  }
+  rep.stable = stable ? { speed: stable.speed, rows: stable.ingested } : null;
+  rep.firstBad = firstBad ? { speed: firstBad.speed, reasons: firstBad.checks.filter(c => c[1] !== 'good').map(c => c[2]) } : null;
+  rep.status = !judged.length ? null : !firstBad ? 'good' : stable ? 'warning' : 'critical';
+  if (!judged.length) {
+    rep.headline = '판정할 단계가 없습니다';
+    rep.detail = `단계가 너무 짧았습니다 (전환 구간을 빼고 ${MIN_WINDOW}초 이상 필요)`;
+  } else if (!firstBad) {
+    const top = judged[judged.length - 1];
+    rep.headline = `모든 단계 통과 — x${top.speed} (≈ ${fmt.rows(top.ingested)} 행/초) 까지 기준 안`;
+    rep.detail = '더 높은 배속을 넣어 한계를 찾아볼 수 있습니다';
+  } else if (stable) {
+    rep.headline = `안정 최대 배속 x${stable.speed} (≈ ${fmt.rows(stable.ingested)} 행/초)`;
+    rep.detail = `x${firstBad.speed} 에서 ${rep.firstBad.reasons.join(' · ')}`;
+  } else {
+    rep.headline = `첫 단계 x${firstBad.speed} 부터 기준을 넘음`;
+    rep.detail = rep.firstBad.reasons.join(' · ');
+  }
+  return rep;
+}
+
+// [제목, 값, 보조 값, 판정 키]
+const RP_COLS = [
+  ['단계', (r, i) => `${i + 1}`],
+  ['배속', r => `x${r.speed}`],
+  ['측정 구간', r => `${timeOf(r.end - r.window)}–${timeOf(r.end)}`, r => `${r.window}초`],
+  ['예상 행/초', r => r.expected != null ? fmt.rows(r.expected) : '-'],
+  ['tsdb 적재 행/초', r => num(r.ingested, fmt.rows), r => r.achieved != null ? `${Math.round(r.achieved * 100)}%` : '', 'achieved'],
+  ['CDC 반영 행/초', r => num(r.applied, fmt.rows)],
+  ['반영 지연 p99 최대', r => num(r.lag, fmt.sec), r => r.lagZone ? zoneLabel(r.lagZone) : '', 'lag'],
+  ['SAP 전 구간 p99', r => num(r.e2e, fmt.sec)],
+  ['슬롯 WAL 최대', r => num(r.walMax, fmt.bytes), r => r.walDelta != null ? `${r.walDelta >= 0 ? '+' : '-'}${fmt.bytes(Math.abs(r.walDelta))}` : '', 'wal'],
+  ['HotDB CPU', r => r.pgCpu != null ? `${r.pgCpu.toFixed(2)}코어` : '-'],
+  ['발행 주기 p99', r => num(r.tickP99, v => `${Math.round(v * 1000)}ms`), r => `주기 ${Math.round(1000 / r.speed)}ms`, 'tick'],
+  ['dead letter', r => num(r.dlq, v => (v > 0 ? '+' : '') + fmt.int(v)), null, 'dlq'],
+  ['판정', r => r.skipped ? '짧아서 뺌' : r.status ? STATUS_TEXT[r.status] : '-', null, 'overall'],
+];
+function num(v, f) { return v == null ? '-' : f(v); }
+function timeOf(t) { return hms(t); }
+function reportMeta(rep) {
+  const runFor = Math.max(1, Math.round((rep.endedAt - rep.startedAt) / 60));
+  return `${`${new Date(rep.startedAt * 1000).toLocaleDateString('ko-KR')} ${hms(rep.startedAt)}`} 시작 · ${runFor}분 · ` +
+    `${rep.steps.length}단계 (${rep.steps.map(s => 'x' + s.speed).join(' → ')}) · 단계마다 ${rep.dwell / 60}분 · ${rep.why}`;
+}
+const REPORT_CRITERIA =
+  '판정 기준 — 반영 지연 p99 ≤ 2초 정상 · ≤ 5초 주의 · 초과 이슈 / tsdb 적재 달성률(실제 ÷ 예상) ≥ 95% 정상 · ≥ 80% 주의 / ' +
+  '슬롯 WAL < 1GB 이고 단계 중 256MB 넘게 늘지 않으면 정상 · 10GB 이상 이슈 / 발행기 한 주기 p99 ≤ 주기 / dead letter 증가 0 / 권역 서비스 전부 UP. ' +
+  `단계마다 처음 최대 ${STEP_WARMUP_MAX}초는 앞 단계 값이 섞이므로 빼고 쟀습니다.`;
+
+let lastReport = null;
+function renderReport(rep) {
+  lastReport = rep;
+  document.getElementById('report').hidden = false;
+  document.getElementById('rp-meta').textContent = reportMeta(rep);
+
+  const chip = document.createElement('span'); chip.className = `st chip ${rep.status || ''}`;
+  chip.textContent = rep.status ? STATUS_TEXT[rep.status] : '-';
+  const txt = document.createElement('div');
+  const b = document.createElement('b'); b.textContent = rep.headline;
+  const sp = document.createElement('span'); sp.textContent = rep.detail;
+  txt.append(b, sp);
+  document.getElementById('rp-headline').replaceChildren(chip, txt);
+
+  const thead = document.createElement('thead'), htr = document.createElement('tr');
+  for (const [h] of RP_COLS) { const th = document.createElement('th'); th.textContent = h; htr.appendChild(th); }
+  thead.appendChild(htr);
+  const tbody = document.createElement('tbody');
+  rep.steps.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    for (const [, main, sub, check] of RP_COLS) {
+      const td = document.createElement('td');
+      const v = document.createElement('span'); v.textContent = main(r, i);
+      const st = check === 'overall' ? r.status : r.checks?.find(c => c[0] === check)?.[1];
+      if (st) v.className = 'st ' + st;
+      td.appendChild(v);
+      const subText = sub && !r.skipped ? sub(r) : '';
+      if (subText) { const s = document.createElement('small'); s.textContent = subText; td.appendChild(s); }
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  });
+  document.getElementById('rp-table').replaceChildren(thead, tbody);
+
+  const items = [];
+  rep.steps.forEach((r, i) => {
+    for (const c of r.checks || []) {
+      if (c[1] === 'good') continue;
+      const li = document.createElement('li');
+      const s = document.createElement('span'); s.className = 'st ' + c[1]; s.textContent = `${i + 1}단계 x${r.speed}`;
+      li.append(s, document.createTextNode(` — ${c[2]}`));
+      items.push(li);
+    }
+  });
+  if (!items.length) { const li = document.createElement('li'); li.textContent = '기준을 넘은 항목이 없습니다'; items.push(li); }
+  document.getElementById('rp-findings').replaceChildren(...items);
+  document.getElementById('rp-criteria').textContent = REPORT_CRITERIA;
+}
+
+function reportMarkdown(rep) {
+  const lines = [`## 단계 부하 리포트 — ${`${new Date(rep.startedAt * 1000).toLocaleDateString('ko-KR')} ${hms(rep.startedAt)}`}`, '',
+    `**${rep.headline}**`, '', rep.detail, '', reportMeta(rep), ''];
+  lines.push('| ' + RP_COLS.map(c => c[0]).join(' | ') + ' |');
+  lines.push('|' + RP_COLS.map((c, i) => (i < 3 ? '---' : '---:')).join('|') + '|');
+  rep.steps.forEach((r, i) => {
+    lines.push('| ' + RP_COLS.map(([, main, sub]) => {
+      const s = sub && !r.skipped ? sub(r) : '';
+      return main(r, i) + (s ? ` (${s})` : '');
+    }).join(' | ') + ' |');
+  });
+  const bad = rep.steps.flatMap((r, i) => (r.checks || []).filter(c => c[1] !== 'good')
+    .map(c => `- ${STATUS_TEXT[c[1]]} · ${i + 1}단계 x${r.speed} — ${c[2]}`));
+  lines.push('', ...(bad.length ? bad : ['- 기준을 넘은 항목이 없습니다']), '', REPORT_CRITERIA);
+  return lines.join('\n');
+}
+document.getElementById('rp-close').addEventListener('click', () => { document.getElementById('report').hidden = true; });
+document.getElementById('rp-copy').addEventListener('click', async e => {
+  if (!lastReport) return;
+  const btn = e.currentTarget;
+  try { await navigator.clipboard.writeText(reportMarkdown(lastReport)); btn.textContent = '복사됨'; }
+  catch { btn.textContent = '복사 안 됨'; }
+  setTimeout(() => { btn.textContent = '마크다운 복사'; }, 1500);
+});
+document.getElementById('rp-json').addEventListener('click', () => {
+  if (!lastReport) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(lastReport, null, 2)], { type: 'application/json' }));
+  a.download = `hotdb-load-report-${new Date(lastReport.startedAt * 1000).toISOString().slice(0, 16).replace(/[:T-]/g, '')}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+// ── Prometheus ──────────────────────────────────────────────────────────
+async function prom(path, params) {
+  const r = await fetch(`${cfg.prom}/api/v1/${path}?${new URLSearchParams(params)}`, { cache: 'no-store' });
+  const j = await r.json();
+  if (j.status !== 'success') throw new Error(j.error || 'query 실패');
+  return j.data.result;
+}
+const instant = q => prom('query', { query: q });
+
+const fmt = {
+  rows: v => nf.format(Math.round(v)),
+  sec: v => v < 10 ? v.toFixed(2) + '초' : nf.format(Math.round(v)) + '초',
+  bytes: v => {
+    const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0;
+    while (Math.abs(v) >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+    return (i ? v.toFixed(v < 10 ? 1 : 0) : Math.round(v)) + u[i];
+  },
+  int: v => nf.format(Math.round(v)),
+};
+
+// ── 지표 타일 ────────────────────────────────────────────────────────────
+const TILES = [
+  { label: 'tsdb 적재 행/초', q: 'sum(rate(hotdb_hypertable_inserted_rows[1m]))', f: fmt.rows },
+  { label: 'CDC 반영 행/초', q: 'sum(rate(hotdb_cdc_route_applied_total[1m]))', f: fmt.rows,
+    note: '모든 권역 · 라우트 합' },
+  { label: '권역 반영 지연 p99 (최대)', q: 'max(hotdb_zone_apply_lag_p99_seconds)', f: fmt.sec,
+    judge: v => v <= 2 ? ['good', '합격 기준 2초 이내'] : v <= 5 ? ['warning', '2초 초과'] : ['critical', '5초 초과'] },
+  { label: 'SAP 전 구간 지연 p99 (최대)', q: 'max(hotdb_rfc_lag_e2e_p99_seconds)', f: fmt.sec, note: 'Provider 수신 → SAP 송신' },
+  { label: '슬롯 최대 보존 WAL', q: 'max(hotdb_slot_retained_bytes)', f: fmt.bytes,
+    judge: v => v < 2 ** 30 ? ['good', '1GB 미만'] : v < 10 * 2 ** 30 ? ['warning', '1GB 넘음'] : ['critical', '20GB 에서 슬롯 무효화'] },
+  { label: 'dead letter', q: 'sum(hotdb_dead_letter_total) or vector(0)', f: fmt.int,
+    judge: v => v === 0 ? ['good', '없음'] : ['serious', 'ops.cdc_dead_letter 확인'] },
+  { label: '권역 서비스', q: 'sum(up{job="zone-service"})', q2: 'count(up{job="zone-service"})', f: fmt.int,
+    judge: (v, all) => v === all ? ['good', `전부 UP`] : ['critical', `${all - v}개 DOWN`], fraction: true },
+];
+function buildTiles() {
+  document.getElementById('tiles').replaceChildren(...TILES.map((t, i) => {
+    const d = document.createElement('div'); d.className = 'tile'; d.id = 'tile-' + i;
+    d.innerHTML = '<div class="label"></div><div class="value">-</div><div class="state"><i></i><span></span></div>';
+    d.querySelector('.label').textContent = t.label;
+    d.querySelector('.state span').textContent = t.note || '';
+    return d;
+  }));
+}
+async function refreshTiles() {
+  await Promise.all(TILES.map(async (t, i) => {
+    const el = document.getElementById('tile-' + i);
+    try {
+      const r = await instant(t.q);
+      const v = r.length ? Number(r[0].value[1]) : NaN;
+      let all;
+      if (t.q2) { const r2 = await instant(t.q2); all = r2.length ? Number(r2[0].value[1]) : 0; }
+      el.querySelector('.value').textContent = Number.isNaN(v) ? '없음' : (t.fraction ? `${t.f(v)} / ${all}` : t.f(v));
+      const st = el.querySelector('.state');
+      if (t.judge && !Number.isNaN(v)) {
+        const [cls, text] = t.judge(v, all);
+        st.className = 'state ' + cls; st.querySelector('span').textContent = text;
+      } else {
+        st.className = 'state'; st.querySelector('span').textContent = Number.isNaN(v) ? '데이터 없음' : (t.note || '');
+      }
+    } catch {
+      el.querySelector('.value').textContent = '-';
+    }
+  }));
+}
+
+// ── 차트 ─────────────────────────────────────────────────────────────────
+const CHARTS = [
+  { title: 'tsdb 적재 · CDC 반영 (행/초)', f: fmt.rows,
+    sub: 'CDC 반영은 이벤트 하나가 라우트 여러 개에 쓰이므로 적재보다 큽니다',
+    queries: [
+      { q: 'sum(rate(hotdb_hypertable_inserted_rows[1m]))', name: () => 'tsdb 적재', color: () => 'var(--s1)' },
+      { q: 'sum(rate(hotdb_cdc_route_applied_total[1m]))', name: () => 'CDC 반영', color: () => 'var(--s2)' },
+    ] },
+  { title: '권역 반영 지연 p99 (초, DB 시계)', f: fmt.sec, threshold: 2,
+    sub: 'tsdb 수신 → 권역 RDB 반영. 점선 = 합격 기준 2초',
+    queries: [{ q: 'max by (zone) (hotdb_zone_apply_lag_p99_seconds)',
+      name: m => `${ZONE_NAME[m.zone] || m.zone} (${m.zone})`, color: m => ZONE_COLOR[m.zone] || 'var(--s5)' }] },
+  { title: '슬롯별 보존 WAL', f: fmt.bytes,
+    sub: '소비자가 멈추거나 못 따라가면 오릅니다',
+    queries: [{ q: 'max by (slot_name) (hotdb_slot_retained_bytes)',
+      name: m => m.slot_name, color: m => ZONE_COLOR[m.slot_name.replace(/^zone_/, '')] || 'var(--s5)' }] },
+  { title: '레거시 원천 변경 · 폴링 (행/분)', f: fmt.rows,
+    sub: '원천 변경이 폴링으로 따라와야 합니다',
+    queries: [
+      { q: 'sum by (source) (rate(hotdb_lsim_rows_total[1m])) * 60',
+        name: m => `원천 변경 ${m.source}`, color: m => m.source === 'sap' ? 'var(--s1)' : 'var(--s2)' },
+      { q: 'sum by (job) (rate(hotdb_poll_rows_total[5m])) * 60',
+        name: m => `폴링 ${m.job}`, color: m => m.job === 'rfc-service' ? 'var(--s3)' : 'var(--s4)' },
+    ] },
+];
+const chartData = [];
+function buildCharts() {
+  document.getElementById('charts').replaceChildren(...CHARTS.map((c, i) => {
+    const card = document.createElement('div'); card.className = 'card';
+    card.innerHTML = `<div class="chart-head"><h2></h2><div class="legend"></div></div><p class="sub"></p>
+      <div class="plot"><svg role="img"></svg><div class="empty">불러오는 중</div></div>
+      <details class="table"><summary>표로 보기 (마지막 값)</summary><table><tbody></tbody></table></details>`;
+    card.querySelector('h2').textContent = c.title;
+    card.querySelector('.sub').textContent = c.sub || '';
+    card.querySelector('svg').setAttribute('aria-label', c.title);
+    card.id = 'chart-' + i;
+    return card;
+  }));
+}
+async function refreshCharts() {
+  const range = Number(document.getElementById('range').value);
+  const end = Math.floor(Date.now() / 1000), start = end - range;
+  const step = Math.max(5, Math.round(range / 180));
+  let anyOk = false;
+  await Promise.all(CHARTS.map(async (c, i) => {
+    try {
+      const series = [];
+      for (const qq of c.queries) {
+        const r = await prom('query_range', { query: qq.q, start, end, step });
+        for (const s of r) {
+          series.push({ name: qq.name(s.metric), color: qq.color(s.metric),
+            pts: s.values.map(([t, v]) => [Number(t), Number(v)]).filter(p => Number.isFinite(p[1])) });
+        }
+      }
+      anyOk = true;
+      chartData[i] = { series, start, end, step };
+      drawChart(i);
+    } catch (e) {
+      const card = document.getElementById('chart-' + i);
+      card.querySelector('.empty').textContent = `Prometheus 오류: ${e.message}`;
+      card.querySelector('.empty').style.display = '';
+    }
+  }));
+  setConn('c-prom', anyOk);
+}
+const SVGNS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function niceMax(v, binary) {
+  if (!(v > 0)) return 1;
+  if (binary) {
+    const u = 1024 ** Math.max(0, Math.floor(Math.log(v) / Math.log(1024)));
+    return niceMax(v / u) * u;
+  }
+  const p = 10 ** Math.floor(Math.log10(v)), n = v / p;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+}
+function drawChart(i) {
+  const c = CHARTS[i], d = chartData[i];
+  if (!d) return;
+  const card = document.getElementById('chart-' + i);
+  const svg = card.querySelector('svg'), empty = card.querySelector('.empty');
+  const legend = card.querySelector('.legend');
+  legend.replaceChildren(...d.series.map(s => {
+    const sp = document.createElement('span'); const k = document.createElement('i');
+    k.style.background = s.color; sp.append(k, document.createTextNode(s.name)); return sp;
+  }));
+  const tbody = card.querySelector('tbody');
+  tbody.replaceChildren(...d.series.map(s => {
+    const tr = document.createElement('tr'); const a = document.createElement('td'); const b = document.createElement('td');
+    a.textContent = s.name; b.textContent = s.pts.length ? c.f(s.pts[s.pts.length - 1][1]) : '-';
+    tr.append(a, b); return tr;
+  }));
+  svg.replaceChildren();
+  if (!d.series.some(s => s.pts.length)) { empty.textContent = '데이터 없음'; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+
+  const W = svg.clientWidth || 600, H = svg.clientHeight || 230;
+  const pad = { l: 64, r: d.series.length <= 4 ? 96 : 12, t: 8, b: 24 };
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+  let max = Math.max(...d.series.flatMap(s => s.pts.map(p => p[1])), c.threshold ?? 0);
+  max = niceMax(max * 1.05, c.f === fmt.bytes);
+  const x = t => pad.l + (t - d.start) / (d.end - d.start) * iw;
+  const y = v => pad.t + ih - v / max * ih;
+
+  // 격자 · 축
+  for (let k = 0; k <= 4; k++) {
+    const v = max * k / 4, yy = y(v);
+    el('line', { x1: pad.l, x2: pad.l + iw, y1: yy, y2: yy, stroke: k ? 'var(--grid)' : 'var(--axis)', 'stroke-width': 1 }, svg);
+    const t = el('text', { x: pad.l - 8, y: yy + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, svg);
+    t.textContent = c.f(v);
+  }
+  const span = d.end - d.start, tickEvery = span <= 600 ? 60 : span <= 1800 ? 300 : 600;
+  for (let t = Math.ceil(d.start / tickEvery) * tickEvery; t <= d.end; t += tickEvery) {
+    const tx = el('text', { x: x(t), y: H - 6, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, svg);
+    tx.textContent = new Date(t * 1000).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  if (c.threshold != null) {
+    el('line', { x1: pad.l, x2: pad.l + iw, y1: y(c.threshold), y2: y(c.threshold), stroke: 'var(--muted)',
+      'stroke-width': 1, 'stroke-dasharray': '4 4' }, svg);
+  }
+  // 조작 표시
+  for (const m of marks) {
+    if (m.t < d.start || m.t > d.end) continue;
+    el('line', { x1: x(m.t), x2: x(m.t), y1: pad.t, y2: pad.t + ih, stroke: 'var(--accent)', 'stroke-width': 1,
+      'stroke-dasharray': '2 3', opacity: .8 }, svg);
+    const lt = el('text', { x: x(m.t) + 4, y: pad.t + 10, 'font-size': 10.5, fill: 'var(--ink-2)' }, svg);
+    lt.textContent = m.label.replace(/^시나리오 \d+\/\d+: /, '');
+  }
+  // 선
+  for (const s of d.series) {
+    if (!s.pts.length) continue;
+    const dd = s.pts.map((p, k) => `${k ? 'L' : 'M'}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join('');
+    el('path', { d: dd, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+  }
+  // 끝 라벨 (4개 이하) — 겹치지 않게 아래로 민다
+  if (d.series.length <= 4) {
+    const ends = d.series.filter(s => s.pts.length).map(s => ({ s, yy: y(s.pts[s.pts.length - 1][1]) }))
+      .sort((a, b) => a.yy - b.yy);
+    let last = -Infinity;
+    for (const e of ends) { e.yy = Math.max(e.yy, last + 13); last = e.yy; }
+    const over = last - (pad.t + ih);
+    for (const e of ends) {
+      if (over > 0) e.yy -= over;
+      const t = el('text', { x: pad.l + iw + 6, y: e.yy + 4, 'font-size': 11, fill: 'var(--ink-2)' }, svg);
+      t.textContent = e.s.name.length > 13 ? e.s.name.slice(0, 12) + '…' : e.s.name;
+    }
+  }
+  // 십자선 · 툴팁
+  const cross = el('line', { y1: pad.t, y2: pad.t + ih, stroke: 'var(--axis)', 'stroke-width': 1, visibility: 'hidden' }, svg);
+  const dots = d.series.map(s => el('circle', { r: 4, fill: s.color, stroke: 'var(--surface)', 'stroke-width': 2, visibility: 'hidden' }, svg));
+  const hit = el('rect', { x: pad.l, y: pad.t, width: iw, height: ih, fill: 'transparent' }, svg);
+  const tip = document.getElementById('tip');
+  hit.addEventListener('pointermove', ev => {
+    const rect = svg.getBoundingClientRect();
+    const t = d.start + (ev.clientX - rect.left - pad.l) / iw * (d.end - d.start);
+    const at = Math.round((t - d.start) / d.step) * d.step + d.start;
+    cross.setAttribute('x1', x(at)); cross.setAttribute('x2', x(at)); cross.setAttribute('visibility', 'visible');
+    const rows = [];
+    d.series.forEach((s, k) => {
+      let best = null;
+      for (const p of s.pts) if (!best || Math.abs(p[0] - at) < Math.abs(best[0] - at)) best = p;
+      if (best && Math.abs(best[0] - at) <= d.step) {
+        dots[k].setAttribute('cx', x(best[0])); dots[k].setAttribute('cy', y(best[1])); dots[k].setAttribute('visibility', 'visible');
+        rows.push([s, best[1]]);
+      } else dots[k].setAttribute('visibility', 'hidden');
+    });
+    const head = document.createElement('div'); head.className = 't';
+    head.textContent = hms(at);
+    tip.replaceChildren(head, ...rows.sort((a, b) => b[1] - a[1]).map(([s, v]) => {
+      const r = document.createElement('div'); r.className = 'r';
+      const k = document.createElement('i'); k.style.background = s.color;
+      const b = document.createElement('b'); b.textContent = c.f(v);
+      const n = document.createElement('span'); n.textContent = s.name;
+      r.append(k, b, n); return r;
+    }));
+    tip.style.display = 'block';
+    const tw = tip.offsetWidth, px = ev.pageX + 14;
+    tip.style.left = (px + tw > window.scrollX + innerWidth - 8 ? ev.pageX - tw - 14 : px) + 'px';
+    tip.style.top = (ev.pageY + 12) + 'px';
+  });
+  hit.addEventListener('pointerleave', () => {
+    tip.style.display = 'none'; cross.setAttribute('visibility', 'hidden');
+    dots.forEach(dt => dt.setAttribute('visibility', 'hidden'));
+  });
+}
+
+// ── 화면 설정 ────────────────────────────────────────────────────────────
+document.getElementById('btn-settings').addEventListener('click', e => {
+  const open = document.getElementById('settings').classList.toggle('open');
+  e.currentTarget.setAttribute('aria-expanded', open);
+});
+document.getElementById('url-legacy').value = cfg.legacy;
+document.getElementById('url-prom').value = cfg.prom;
+document.getElementById('url-grafana').value = cfg.grafana;
+document.getElementById('btn-save').addEventListener('click', () => {
+  for (const k of ['legacy', 'prom', 'grafana']) {
+    cfg[k] = document.getElementById('url-' + k).value.trim().replace(/\/$/, '');
+    store.set(k, cfg[k]);
+  }
+  tick();
+});
+document.getElementById('btn-theme').addEventListener('click', () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  store.set('theme', root.dataset.theme);
+});
+{ const t = store.get('theme', ''); if (t) document.documentElement.dataset.theme = t; }
+document.getElementById('range').addEventListener('change', refreshCharts);
+let resizeTimer;
+addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => chartData.forEach((_, i) => drawChart(i)), 150); });
+
+function syncLinks() { document.getElementById('lnk-grafana').href = cfg.grafana; }
+function tick() { syncLinks(); poll('f'); poll('l'); refreshTiles(); refreshCharts(); }
+buildSpeedButtons('f'); buildSpeedButtons('l'); buildTiles(); buildCharts(); renderLog();
+try { const saved = JSON.parse(store.get('report', 'null')); if (saved) renderReport(saved); } catch { /* 지난 리포트 없음 */ }
+tick();
+setInterval(() => { poll('f'); poll('l'); refreshTiles(); }, 3000);
+setInterval(refreshCharts, 10000);
+</script>
+</body>
+</html>

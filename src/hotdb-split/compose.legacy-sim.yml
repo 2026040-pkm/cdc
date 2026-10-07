@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 레거시 대역 — 로컬 검증용 SAP · Oracle. 운영에서는 띄우지 않는다.
+#
+#   sap-sim    : PostgreSQL. SAP HANA 대신 erp 모양 원천 표(erpsrc.*)와 RFC Service 가 쓰는 Z 표를 둔다
+#   oracle-sim : Oracle Free 23. 레거시 Oracle 원천 — FREEPDB1 에 소유자 MES · LGS · GEO (64표) + 읽기 계정 LEGACY_READER (기동 1~2분)
+#   legacy-simulator : 레거시 발행기 — 위 두 대역의 원천 표를 주기마다 바꾼다(UPDATE 워터마크 = 지금 · INSERT).
+#                      필드 발행기가 tsdb 를 채우듯, RFC Service · DB Agent 폴링이 매 주기 가져갈 변경분을 만든다
+#                      http://localhost:59493/sim · POST /sim/speed?value=5 · /sim/pause · /sim/tick
+#
+# 표와 시험 데이터는 scripts/legacy-sim.py 가 만든다 (db/legacy-db/V2 의 표 모양 그대로, 값은 지어냄):
+#   python scripts/legacy-sim.py setup     # 표 만들기 + 시드
+#   python scripts/legacy-sim.py mutate    # 몇 행의 upd_date · upd_time 을 지금으로 — 증분 폴링 확인
+# ─────────────────────────────────────────────────────────────────────────────
+name: hotdb
+
+services:
+  sap-sim:
+    image: docker.io/timescale/timescaledb:2.29.2-pg17   # 이미 받아 둔 이미지를 평범한 PostgreSQL 로 쓴다
+    container_name: hotdb-sap-sim
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sapsim
+      POSTGRES_USER: sapsim
+      POSTGRES_PASSWORD: sapsim
+      TZ: Asia/Seoul
+    ports: ["${SAP_SIM_PORT:-59434}:5432"]
+    volumes: [hotdb-sap-sim-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sapsim -d sapsim"]
+      interval: 5s
+      retries: 30
+
+  oracle-sim:
+    image: docker.io/gvenzl/oracle-free:23-slim
+    container_name: hotdb-oracle-sim
+    restart: unless-stopped
+    environment:
+      ORACLE_PASSWORD: hotdb_sim_sys
+    ports: ["${ORACLE_SIM_PORT:-59521}:1521"]
+    volumes: [hotdb-oracle-sim-data:/opt/oracle/oradata]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  legacy-simulator:
+    build:
+      context: ./app
+      args: { MODULE: legacy-simulator }
+    image: localhost/hotdb/legacy-simulator:local
+    container_name: hotdb-legacy-simulator
+    restart: on-failure
+    depends_on:
+      sap-sim: { condition: service_healthy }
+      oracle-sim: { condition: service_healthy }
+    environment:
+      SAP_URL: ${SAP_URL:-jdbc:postgresql://sap-sim:5432/sapsim}
+      SAP_USER: ${SAP_USER:-sapsim}
+      SAP_PASSWORD: ${SAP_PASSWORD:-sapsim}
+      SAP_SCHEMA: ${SAP_SCHEMA:-erpsrc}
+      ORACLE_URL: ${ORACLE_URL:-jdbc:oracle:thin:@//oracle-sim:1521/FREEPDB1}
+      ORACLE_ADMIN_USER: ${ORACLE_ADMIN_USER:-system}        # 소유자 MES · LGS · GEO 표에 다 쓰려고 관리자로
+      ORACLE_ADMIN_PASSWORD: ${ORACLE_ADMIN_PASSWORD:-hotdb_sim_sys}
+      LSIM_INTERVAL_MS: ${LSIM_INTERVAL_MS:-10000}
+      LSIM_UPDATES: ${LSIM_UPDATES:-3}
+      LSIM_INSERTS: ${LSIM_INSERTS:-1}
+      LSIM_SPEED: ${LSIM_SPEED:-1}
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx160m
+    ports: ["${LSIM_PORT:-59493}:8080"]
+
+volumes:
+  hotdb-sap-sim-data:
+  hotdb-oracle-sim-data:

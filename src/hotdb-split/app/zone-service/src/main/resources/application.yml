@@ -1,0 +1,240 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 실적 판별 모듈 — tsdb(CDC) → svc (module = ZONE)
+#
+# 판별 모듈은 ZONE 하나로 고른다:  mch(가공) · asm(조립) · oft(의장) · pnt(도장) — 늘 수 있다
+#   → 권역 코드(tsdb.device.zone 값)는 ZONE_CODE 로 주거나, application-<zone>.yml 에 둔다.
+#   → 새 모듈: V 파일에 SELECT ops.provision_module('<zone>', '<ZONE_CODE>', '<이름>'); 한 줄 + compose 서비스 하나.
+#   → 모듈마다 라우트가 달라야 하면 application-<zone>.yml 에 hotdb.routes 를 통째로 다시 적는다.
+#   → 계정 · 스키마 · 슬롯 · 오프셋 이름은 전부 ZONE 에서 나온다 (겹치면 슬롯을 다툰다).
+#
+# 스키마가 바뀌면:
+#   1) db/migration 에 V 파일을 더하고   2) 아래 hotdb.routes 의 columns 를 고친다.
+#   코드는 손대지 않는다. 기동 시 라우트를 실제 표와 대조해서 어긋나면 전부 모아 보여 주고 멈춘다.
+#
+# 실적 판별 (hotdb.judge): 라우트는 actual_result 를 PENDING 으로 넣기만 하고, 판별 단계(다른 스레드)가
+#   PENDING 을 집어 CONFIRMED · REJECTED 로 바꾼다. 모듈마다 규칙이 다르면 @Profile("<zone>") 인
+#   JudgementRule 빈을 dev.hotdb.zone.judge 에 두고, 없으면 아래 임계값 규칙을 쓴다.
+# ─────────────────────────────────────────────────────────────────────────────
+spring:
+  application:
+    name: zone-${ZONE:asm}
+  profiles:
+    active: ${ZONE:asm}
+  datasource:
+    url: jdbc:postgresql://${HOTDB_HOST:localhost}:${HOTDB_PORT:59433}/${HOTDB_DB:hotdb}?ApplicationName=zone-${ZONE:asm}&reWriteBatchedInserts=true
+    username: ${HOTDB_USER:svc_${ZONE:asm}}
+    password: ${HOTDB_PASSWORD:svc_${ZONE:asm}}
+    hikari:
+      maximum-pool-size: 4
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus, metrics, info
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      pipeline: zone-${ZONE:asm}
+      zone: ${ZONE:asm}
+
+hotdb:
+  zone:
+    schema: ${ZONE_SCHEMA:svc}  # 판별 모듈 RDB 는 스키마 하나 — 모듈은 module 컬럼으로 (V9). 분리판 비교는 svc_split
+    module: ${ZONE:asm}
+    code: ${ZONE_CODE:}       # 비우면 application-<zone>.yml 의 값
+
+  cdc:
+    pipeline: zone-${ZONE:asm}
+    source:
+      host: ${HOTDB_HOST:localhost}
+      port: ${HOTDB_PORT:59433}
+      database: ${HOTDB_DB:hotdb}
+      user: ${HOTDB_USER:svc_${ZONE:asm}}
+      password: ${HOTDB_PASSWORD:svc_${ZONE:asm}}
+    slot: zone_${ZONE:asm}
+    publication: tsdb_cdc_pub
+    # 하이퍼테이블 행은 청크로 온다 — 청크 정규식으로 받고, 논리 이름은 cdc-core 가 되돌린다.
+    # Debezium 은 전체 일치로 보므로 압축 뭉치(_hyper_N_M_chunk_compressed)와 bgw_* 는 걸리지 않는다.
+    include-tables:
+      - tsdb\.device
+      - tsdb\.tag_catalog
+      - ops\.cdc_heartbeat
+      - _timescaledb_internal\._hyper_[0-9]+_[0-9]+_chunk
+    snapshot-mode: no_data
+    offset-file: ${CDC_OFFSET_DIR:./data}/offsets-zone-${ZONE:asm}.dat
+    max-batch-size: ${CDC_MAX_BATCH_SIZE:2048}
+    strict-source: true
+
+  judge:
+    enabled: ${JUDGE_ENABLED:true}
+    interval-ms: 1000
+    batch-size: 200
+    threshold:                      # 모듈 규칙 빈이 없을 때 — 둘 다 넘어야 CONFIRMED, 아니면 REJECTED
+      min-progress-rate: 100        # block_progress_rate (0~100)
+      min-match-confidence: 0.9     # match_confidence (0~1)
+
+  # tag_key → 장비 · 권역. 이력에는 tag_key 만 있어서 권역을 거르려면 이게 필요하다.
+  lookups:
+    tag:
+      key: tag_key
+      sql: >-
+        SELECT t.tag_key, t.device_id, t.channel, t.artifact_type, d.zone, d.site, d.shop, d.bay
+          FROM tsdb.tag_catalog t
+          JOIN tsdb.device d ON d.site = t.site AND d.device_id = t.device_id
+      reload-on: [tsdb.tag_catalog, tsdb.device]
+
+  routes:
+    # ── status (1초) ─────────────────────────────────────────────────────────
+    - name: status-current
+      source: tsdb.status_history
+      lookups: { tag: row.tag_key }
+      when: [ "tag.zone=${hotdb.zone.code}" ]
+      target: ${hotdb.zone.schema}.device_status_current
+      mode: upsert
+      keys: [ device_id ]
+      newer-than: src_event_time        # 늦게 온 옛 이벤트가 최신값을 덮지 않게
+      lag-from: row.received_at
+      columns:
+        module: "'${hotdb.zone.module}'"     # 이 모듈 행 — RLS 가 다른 모듈 값을 거부한다
+        site: tag.site                  # 장비 마스터(tsdb.device) FK
+        device_id: tag.device_id
+        status: row.status
+        error_code: row.error_code
+        last_heartbeat_at: row.last_heartbeat_at
+        scan_rate_pts_per_sec: row.scan_rate_pts_per_sec
+        temperature_c: row.temperature_c
+        connectivity_rssi: row.connectivity_rssi
+        fov_mode: row.fov_mode
+        src_event_time: row.event_time
+        src_received_at: row.received_at
+        applied_at: $now
+
+    - name: status-change
+      source: tsdb.status_history
+      lookups: { tag: row.tag_key }
+      when: [ "tag.zone=${hotdb.zone.code}" ]
+      target: ${hotdb.zone.schema}.device_status_change
+      mode: insert-on-change
+      partition-by: [ device_id ]
+      order-by: changed_at
+      change-of: [ status, error_code ]
+      columns:
+        module: "'${hotdb.zone.module}'"     # 이 모듈 행 — RLS 가 다른 모듈 값을 거부한다
+        device_id: tag.device_id
+        changed_at: row.event_time
+        status: row.status
+        error_code: row.error_code
+        src_received_at: row.received_at
+        applied_at: $now
+
+    # ── actual (1분) ─────────────────────────────────────────────────────────
+    - name: scan
+      source: tsdb.actual_history
+      lookups: { tag: row.tag_key }
+      when: [ "tag.zone=${hotdb.zone.code}" ]
+      target: ${hotdb.zone.schema}.scan
+      mode: upsert
+      keys: [ scan_id ]
+      newer-than: last_event_at
+      lag-from: row.received_at
+      columns:
+        module: "'${hotdb.zone.module}'"     # 이 모듈 행 — RLS 가 다른 모듈 값을 거부한다
+        scan_id: row.scan_id
+        site: tag.site
+        device_id: tag.device_id
+        hull_no: row.hull_no
+        block_id: row.block_id
+        first_event_at: row.event_time | min   # 산출물이 먼저 만든 자리(scan-stub)보다 START 가 이르면 그 값
+        last_event_at: row.event_time
+        last_event_type: row.event_type
+        block_progress_rate: row.block_progress_rate
+        match_confidence: row.match_confidence
+        reference_cad_id: row.reference_cad_id
+        model_version: row.model_version
+        completed_at: row.event_time if row.event_type=COMPLETE | coalesce
+        src_received_at: row.received_at
+        applied_at: $now
+
+    - name: actual-result
+      source: tsdb.actual_history
+      lookups: { tag: row.tag_key }
+      when: [ "tag.zone=${hotdb.zone.code}", "row.event_type=COMPLETE" ]
+      target: ${hotdb.zone.schema}.actual_result
+      mode: upsert
+      keys: [ hull_no, block_id, scan_id ]
+      lag-from: row.received_at
+      columns:
+        module: "'${hotdb.zone.module}'"     # 이 모듈 행 — RLS 가 다른 모듈 값을 거부한다
+        hull_no: row.hull_no
+        block_id: row.block_id
+        scan_id: row.scan_id
+        device_id: tag.device_id
+        completed_at: row.event_time
+        block_progress_rate: row.block_progress_rate
+        match_confidence: row.match_confidence
+        reference_cad_id: row.reference_cad_id
+        model_version: row.model_version
+        judged_status: "'PENDING' | keep"   # 판별 단계(hotdb.judge)가 바꾼 값을 재전송이 되돌리지 않게
+        src_received_at: row.received_at
+        applied_at: $now
+
+    # ── artifact (1분 × 12건) ────────────────────────────────────────────────
+    # 산출물은 스캔(scan)의 자식이다(FK). 채널이 달라 산출물이 스캔 START 보다 먼저 올 수 있으므로
+    # 부모 자리를 먼저 만든다 — 이미 있으면 아무것도 안 한다. last_event_at 을 -infinity 로 두어
+    # 뒤에 오는 START · PROGRESS 가 newer-than 을 통과해 제자리 값으로 덮게 한다.
+    # 이 라우트는 artifact 보다 위에 있어야 한다 (한 배치 안에서 설정 순서대로 쓴다).
+    - name: scan-stub
+      source: tsdb.artifact_history
+      lookups: { tag: row.tag_key }
+      when: [ "tag.zone=${hotdb.zone.code}" ]
+      target: ${hotdb.zone.schema}.scan
+      mode: insert
+      columns:
+        module: "'${hotdb.zone.module}'"     # 이 모듈 행 — RLS 가 다른 모듈 값을 거부한다
+        scan_id: row.scan_id
+        site: tag.site
+        device_id: tag.device_id
+        hull_no: row.hull_no
+        block_id: row.block_id
+        first_event_at: row.event_time
+        last_event_at: "'-infinity'"
+        last_event_type: "'PENDING'"
+        src_received_at: row.received_at
+        applied_at: $now
+
+    - name: artifact
+      source: tsdb.artifact_history
+      lookups: { tag: row.tag_key }
+      when: [ "tag.zone=${hotdb.zone.code}" ]
+      target: ${hotdb.zone.schema}.artifact
+      mode: insert
+      lag-from: row.received_at
+      columns:
+        module: "'${hotdb.zone.module}'"     # 이 모듈 행 — RLS 가 다른 모듈 값을 거부한다
+        scan_id: row.scan_id
+        artifact_type: row.artifact_type
+        segment_key: row.segment_key
+        device_id: tag.device_id
+        hull_no: row.hull_no
+        block_id: row.block_id
+        storage_uri: row.storage_uri
+        file_size_bytes: row.file_size_bytes
+        checksum: row.checksum
+        transformation_matrix: row.transformation_matrix
+        produced_by_device_id: row.produced_by_device_id
+        model_version: row.model_version
+        src_event_time: row.event_time
+        src_received_at: row.received_at
+        applied_at: $now
+
+logging:
+  level:
+    dev.hotdb: info
+    io.debezium: info
+    # 청크 해석 로그는 새 청크마다 한 번이라 info 로 둔다

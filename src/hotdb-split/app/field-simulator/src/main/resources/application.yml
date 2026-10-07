@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: field-simulator
+  datasource:
+    # HotDB Provider 계정으로 쓴다 — tsdb 에만 쓸 수 있다
+    url: jdbc:postgresql://${HOTDB_HOST:localhost}:${HOTDB_PORT:59433}/${HOTDB_DB:hotdb}?ApplicationName=field-simulator&reWriteBatchedInserts=true
+    username: ${HOTDB_USER:hotdb_provider}
+    password: ${HOTDB_PASSWORD:hotdb_provider}
+    hikari:
+      maximum-pool-size: 3
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus, metrics
+  metrics:
+    tags:
+      pipeline: field-simulator
+
+hotdb:
+  sim:
+    site: geoje
+    # 권역 → 장비 수. 카탈로그 기준 조립 210 · 의장 140. 도장 · 가공은 필드 정의서가 없어 기본 0
+    devices:
+      ASSEMBLY: ${SIM_ASSEMBLY:210}
+      OUTFITTING: ${SIM_OUTFITTING:140}
+      PAINTING: ${SIM_PAINTING:0}
+      MACHINING: ${SIM_MACHINING:0}
+    status-interval-ms: ${SIM_STATUS_INTERVAL_MS:1000}
+    actual-interval-ms: ${SIM_ACTUAL_INTERVAL_MS:60000}
+    speed: ${SIM_SPEED:1}
+    anomaly-rate: ${SIM_ANOMALY_RATE:0.002}
+    artifacts: true
+    auto-start: ${SIM_AUTO_START:true}

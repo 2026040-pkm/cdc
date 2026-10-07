@@ -1,0 +1,29 @@
+{
+  "key": "schema-status",
+  "title": "status 한 건이 표를 지나가는 길",
+  "hint": "LDR-ASM-007 의 1초 status · 2행은 거기서 버려지거나 갈라지는 것",
+  "cols": "repeat(6, 1fr)",
+  "cells": [
+    {"type": "node", "id": "m", "col": 1, "row": 1, "no": 1, "title": "MQTT 메시지", "sub": "id + raw_payload 13필드", "ic": "inbox", "role": "src", "tag": "ot/device/assembly/status"},
+    {"type": "node", "id": "t", "col": 2, "row": 1, "no": 2, "title": "tsdb.status_history", "sub": "측정 7필드 + 시각 3 + tag_key", "ic": "db", "role": "store", "tag": "청크 6시간"},
+    {"type": "node", "id": "l", "col": 3, "row": 1, "no": 3, "title": "tag lookup", "sub": "tag_key → device_id · zone", "ic": "tag", "role": "decide new", "tag": "tag_catalog ⋈ device"},
+    {"type": "node", "id": "c", "col": 4, "row": 1, "no": 4, "title": "device_status_current", "sub": "장비당 1행 · 더 새 시각만 덮음", "ic": "db", "role": "store new", "tag": "status-current"},
+    {"type": "node", "id": "h", "col": 5, "row": 1, "no": 5, "title": "device_status_change", "sub": "직전과 status · error_code 가 다를 때만", "ic": "db", "role": "store new", "tag": "status-change"},
+    {"type": "node", "id": "lag", "col": 6, "row": 1, "no": 6, "title": "반영 지연", "sub": "applied_at - src_received_at", "ic": "gauge", "role": "ok", "tag": "hotdb_zone_apply_lag"},
+    {"type": "node", "id": "d1", "col": 1, "row": 2, "title": "tsdb.device 로", "sub": "site · zone · shop · bay · device_role — 이력엔 안 실음", "ic": "split", "role": "small"},
+    {"type": "node", "id": "d2", "col": 2, "row": 2, "title": "버림", "sub": "idempotency_key — PK 충돌로 대신 판정", "ic": "trash", "role": "dim small"},
+    {"type": "node", "id": "d3", "col": 3, "row": 2, "title": "다른 권역 거름", "sub": "zone ≠ 서비스 권역 · filtered 카운트", "ic": "filter", "role": "dim small"},
+    {"type": "node", "id": "d4", "col": 4, "row": 2, "title": "옛 이벤트 무시", "sub": "src_event_time 이 더 오래됨", "ic": "clock", "role": "warn small"}
+  ],
+  "links": [
+    {"from": "m", "to": "t", "kind": "flow"},
+    {"from": "t", "to": "l", "kind": "flow"},
+    {"from": "l", "to": "c", "kind": "flow"},
+    {"from": "c", "to": "h", "kind": "flow"},
+    {"from": "h", "to": "lag", "kind": "ok"},
+    {"from": "m", "to": "d1", "kind": "plain", "label": "위치 필드", "port": "b>t"},
+    {"from": "t", "to": "d2", "kind": "muted", "label": "멱등 키", "port": "b>t"},
+    {"from": "l", "to": "d3", "kind": "muted", "label": "남의 권역", "port": "b>t"},
+    {"from": "c", "to": "d4", "kind": "muted", "label": "순서 역전", "port": "b>t"}
+  ]
+}

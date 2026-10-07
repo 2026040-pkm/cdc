@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: legacy-simulator
+  main:
+    banner-mode: off
+  # 데이터소스는 두 개(SAP · Oracle)를 코드에서 만든다 — 기본 spring.datasource 자동 구성은 끈다
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus, metrics
+  metrics:
+    tags:
+      pipeline: legacy-simulator
+
+hotdb:
+  lsim:
+    # 한 주기마다 표마다 updates 행을 고치고(upd_date · upd_time = 지금) inserts 행을 새로 넣는다. speed 2 면 주기가 절반
+    interval-ms: ${LSIM_INTERVAL_MS:10000}
+    speed: ${LSIM_SPEED:1}
+    updates-per-table: ${LSIM_UPDATES:3}
+    inserts-per-table: ${LSIM_INSERTS:1}
+    auto-start: ${LSIM_AUTO_START:true}
+    # SAP 대역 (PostgreSQL) — RFC Service 가 폴링하는 erpsrc 원천 표. Z 표(송신 대상)는 건드리지 않는다
+    sap:
+      url: ${SAP_URL:jdbc:postgresql://localhost:59434/sapsim}
+      user: ${SAP_USER:sapsim}
+      password: ${SAP_PASSWORD:sapsim}
+      schema: ${SAP_SCHEMA:erpsrc}
+      tables: ${LSIM_SAP_TABLES:}           # 비우면 스키마의 표 전부 (Z 표 제외) — 레거시 사본 114표
+    # Oracle 대역 — DB Agent 가 폴링하는 소유자 MES · LGS · GEO 의 표 전부. 소유자 셋에 다 쓰려고 관리자 계정으로 붙는다
+    oracle:
+      url: ${ORACLE_URL:jdbc:oracle:thin:@//localhost:59521/FREEPDB1}
+      user: ${ORACLE_ADMIN_USER:system}
+      password: ${ORACLE_ADMIN_PASSWORD:hotdb_sim_sys}
+      schemas: ${LSIM_ORACLE_SCHEMAS:MES,LGS,GEO}

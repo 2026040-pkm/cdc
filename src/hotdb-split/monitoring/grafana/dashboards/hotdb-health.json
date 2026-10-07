@@ -1,0 +1,1181 @@
+{
+  "uid": "hotdb-health",
+  "title": "HotDB 상태 — 부하 · CDC 판정",
+  "tags": [
+    "hotdb",
+    "health"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "① 판정 — 지금 문제가 있나",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "CDC · HotDB 전체",
+      "description": "아래 13개 점검 중 가장 나쁜 값. '정상' 이면 CDC · HotDB 에 이슈가 없다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 6,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:health",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "정상",
+                  "color": "green",
+                  "index": 0
+                },
+                "1": {
+                  "text": "주의",
+                  "color": "yellow",
+                  "index": 1
+                },
+                "2": {
+                  "text": "이슈",
+                  "color": "red",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "점검 항목 (13)",
+      "description": "0 정상 · 1 주의 · 2 이슈. 임계값은 rules/hotdb.yml 의 hotdb-health 그룹.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 1,
+        "w": 18,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:check",
+          "legendFormat": "{{check}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "정상",
+                  "color": "green",
+                  "index": 0
+                },
+                "1": {
+                  "text": "주의",
+                  "color": "yellow",
+                  "index": 1
+                },
+                "2": {
+                  "text": "이슈",
+                  "color": "red",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "state-timeline",
+      "title": "지난 판정 이력 — 언제 어떤 항목이 나빴나",
+      "description": "빨강 · 노랑 띠가 있는 구간이 문제가 있던 시간. 아래 패널의 같은 시간대를 보면 원인이 보인다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb:check",
+          "legendFormat": "{{check}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "정상",
+                  "color": "green",
+                  "index": 0
+                },
+                "1": {
+                  "text": "주의",
+                  "color": "yellow",
+                  "index": 1
+                },
+                "2": {
+                  "text": "이슈",
+                  "color": "red",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "fillOpacity": 80
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showValue": "never",
+        "rowHeight": 0.8,
+        "mergeValues": true,
+        "legend": {
+          "showLegend": false
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "row",
+      "title": "② HotDB 부하 — 무엇이 오르나",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "HotDB CPU",
+      "description": "hotdb-pg 컨테이너 CPU / 서버 코어 수. 60% 주의 · 80% 이슈",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb:pg_cpu_ratio)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.6
+              },
+              {
+                "color": "red",
+                "value": 0.8
+              }
+            ]
+          },
+          "mappings": [],
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "서버 메모리 사용",
+      "description": "HotDB 서버(로컬은 podman VM) 의 사용 중 메모리. 80% 주의 · 90% 이슈",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 18,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb:host_mem_ratio)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "mappings": [],
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "CDC 반영 지연 p99",
+      "description": "tsdb 수신 → 모듈 RDB 반영 (DB 시계). 2초 주의 · 5초 이슈",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 18,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb_zone_apply_lag_p99_seconds)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "mappings": [],
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "슬롯이 붙잡은 WAL",
+      "description": "가장 뒤처진 CDC 소비자 때문에 지우지 못한 WAL. 10GB 에서 슬롯 무효화",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb_slot_retained_bytes)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000000000.0
+              },
+              {
+                "color": "red",
+                "value": 5000000000.0
+              }
+            ]
+          },
+          "mappings": [],
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "WAL 생성",
+      "description": "HotDB 가 쓰는 양. 적재량 · UPSERT 에 비례 — CDC 소비자가 읽어야 할 양",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 18,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(rate(hotdb_wal_written_bytes[1m]))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "tsdb 적재",
+      "description": "초당 들어오는 필드 데이터 행 (×1 ≈ 426)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 18,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(rate(hotdb_hypertable_inserted_rows[1m]))",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [],
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "CPU — 누가 쓰나 (코어)",
+      "description": "HotDB 만 오르면 DB 쪽(디코딩 · 쓰기), 모듈만 오르면 소비자 쪽(해석 · 반영) 부하",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(hotdb:container_cpu_cores{name=\"hotdb-pg\"})",
+          "legendFormat": "HotDB (PostgreSQL)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(hotdb:container_cpu_cores{name=~\"hotdb-zone-.*\"})",
+          "legendFormat": "판별 모듈 합"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(hotdb:container_cpu_cores{name=\"hotdb-rfc-service\"})",
+          "legendFormat": "RFC Service"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(hotdb:container_cpu_cores{name=\"hotdb-db-agent\"})",
+          "legendFormat": "DB Agent"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "메모리 — 누가 쓰나",
+      "description": "PostgreSQL 은 페이지 캐시까지 잡혀 높게 보인다 — 계속 오르기만 하는지가 중요",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(hotdb:container_mem_bytes{name=\"hotdb-pg\"})",
+          "legendFormat": "HotDB (캐시 포함)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(hotdb:container_mem_bytes{name=~\"hotdb-zone-.*\"})",
+          "legendFormat": "판별 모듈 합"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(hotdb:container_mem_bytes{name=~\"hotdb-(rfc-service|db-agent)\"})",
+          "legendFormat": "RFC · DB Agent"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)",
+          "legendFormat": "서버 사용 중"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "지연 — 어디서 늦나 (초)",
+      "description": "1단만 늦으면 판별 모듈, 2단만 늦으면 RFC Service · SAP 쪽",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max by (zone) (hotdb_zone_apply_lag_p99_seconds)",
+          "legendFormat": "1단 tsdb → 모듈 {{zone}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb_rfc_lag_hop2_p99_seconds)",
+          "legendFormat": "2단 모듈 → SAP"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "max(hotdb_heartbeat_age_seconds)",
+          "legendFormat": "heartbeat 경과 (참고)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "CDC 뒤처짐 — 슬롯별 미확인 WAL",
+      "description": "평소엔 0 근처에서 톱니. 한 슬롯만 계속 오르면 그 소비자가 멈췄거나 느리다",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_slot_confirmed_lag_bytes",
+          "legendFormat": "{{slot_name}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "hotdb_walsender_sent_lag_bytes",
+          "legendFormat": "{{slot_name}} 미전송"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "DB 안 — 접속 · 트랜잭션",
+      "description": "active 가 계속 늘면 쿼리가 쌓이는 중. rollback 이 늘면 반영 실패 · 재시도",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (state) (pg_stat_activity_count{datname=\"hotdb\"})",
+          "legendFormat": "접속 {{state}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "rate(pg_stat_database_xact_commit{datname=\"hotdb\"}[1m])",
+          "legendFormat": "commit/초"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "rate(pg_stat_database_xact_rollback{datname=\"hotdb\"}[1m])",
+          "legendFormat": "rollback/초"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "들어오는 양 — 원인 쪽",
+      "description": "CPU · 지연이 오를 때 여기도 같이 올랐으면 '양이 늘어서', 그대로면 다른 원인",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotdb-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 38,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum by (hypertable) (rate(hotdb_hypertable_inserted_rows[1m]))",
+          "legendFormat": "적재 {{hypertable}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(rate(hotdb_cdc_route_applied_total[1m]))",
+          "legendFormat": "모듈 반영 행/초"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotdb-prom"
+          },
+          "expr": "sum(rate(hotdb_poll_rows_total[5m]))",
+          "legendFormat": "레거시 폴링 행/초"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "③ 읽는 법",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 46,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 19,
+      "type": "text",
+      "title": "증상 → 원인",
+      "gridPos": {
+        "x": 0,
+        "y": 47,
+        "w": 24,
+        "h": 10
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "\n| 보이는 것 | 뜻 | 볼 곳 |\n|---|---|---|\n| 판정 **정상**, 그래프 평평 | CDC 이슈 없음 · 여유 있음 | — |\n| CPU 오름 + 적재량도 오름, 지연 그대로 | 양이 늘었지만 따라가는 중 | CPU 가 80% 를 넘는 배속이 한계 |\n| HotDB CPU 오름 + 슬롯 미확인 WAL 은 0 | WAL 디코딩 부하 (슬롯 수만큼 전체 WAL 을 읽음) | 슬롯 수 · BRD Q2 |\n| 지연 오름 + 한 슬롯의 미확인 WAL 증가 | 그 소비자(모듈 · RFC)가 못 따라감 · 멈춤 | 서비스 응답 · 그 서비스 로그 |\n| 슬롯 WAL 이 계속 쌓임 + 서비스 down | 소비자 정지 — 살리면 따라잡음 | 10GB 전에 복구 |\n| dead letter 증가 | 데이터 · 스키마가 안 맞아 반영 실패 | `ops.cdc_dead_letter.error` — 고친 뒤 `status = 'RETRY_REQUESTED'` 로 재처리 |\n| CDC 정지 · 캡처 갭 | 소비자가 스스로 멈춤 (표 · 권한 문제, 대부분 실패, 되받을 수 없는 구간) | 그 서비스 `/actuator/health` 의 failure |\n| 메모리만 계속 오름 | 캐시라면 정상, JVM 이면 누수 의심 | 컨테이너별 메모리 |\n| 레거시 폴링 주의 | SAP · Oracle 접속 또는 표 변경 | `ops.poll_state.last_error` |\n"
+      }
+    }
+  ]
+}

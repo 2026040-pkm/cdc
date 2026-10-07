@@ -1,0 +1,23 @@
+# 필드 데이터 발행기 — HotDB Provider 대신 tsdb 에 직접 적재 (부하 시험용)
+#   배속:  curl -X POST "http://localhost:59480/sim/speed?value=5"
+name: hotdb
+
+services:
+  field-simulator:
+    build:
+      context: ./app
+      args: { MODULE: field-simulator }
+    image: localhost/hotdb/field-simulator:local
+    container_name: hotdb-field-simulator
+    restart: on-failure
+    environment:
+      HOTDB_HOST: ${HOTDB_HOST:-hotdb-pg}
+      HOTDB_PORT: ${HOTDB_PORT:-5432}
+      SIM_SPEED: ${SIM_SPEED:-1}
+      SIM_ACTUAL_INTERVAL_MS: ${SIM_ACTUAL_INTERVAL_MS:-60000}
+      SIM_AUTO_START: ${SIM_AUTO_START:-true}
+      # 도장 · 가공은 필드 정의서가 없어 기본 0. up.ps1 -AllZones 면 30대씩 (LiDAR 페이로드를 그대로 쓰는 가정값)
+      SIM_PAINTING: ${SIM_PAINTING:-0}
+      SIM_MACHINING: ${SIM_MACHINING:-0}
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx192m
+    ports: ["${SIM_PORT:-59480}:8080"]

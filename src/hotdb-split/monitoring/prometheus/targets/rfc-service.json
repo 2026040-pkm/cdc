@@ -1,0 +1,3 @@
+[
+  { "targets": ["rfc-service:8080"], "labels": { "server": "local" } }
+]

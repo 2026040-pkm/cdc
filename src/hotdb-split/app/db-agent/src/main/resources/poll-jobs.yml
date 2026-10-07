@@ -1,0 +1,264 @@
+# 폴링 작업 목록 — scripts/gen-sample-legacy.py 가 만든다. 손으로 고치지 않는다 (application.yml 이 import)
+# 원천: DB Agent — Oracle 사용자(스키마)마다 표. 소유자 이름은 ORACLE_SCHEMA_<스키마> 로 바꾼다
+# PK 있는 표: incremental (upd_date || upd_time) · PK 없는 표: replace (매 주기 지우고 다시, 한 트랜잭션)
+# 표 64개 = mes 60 · lgs 3 · geo 1
+hotdb:
+  poll:
+    jobs:
+      - target: mes.alarm
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.alarm
+        watermark: upd_date || upd_time
+      - target: mes.cell_cfg
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.cell_cfg
+        mode: replace
+      - target: mes.cell_detail
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.cell_detail
+        mode: replace
+      - target: mes.cell_if
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.cell_if
+        watermark: upd_date || upd_time
+      - target: mes.cell_log
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.cell_log
+        watermark: upd_date || upd_time
+      - target: mes.cell_master
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.cell_master
+        watermark: upd_date || upd_time
+      - target: mes.cell_req
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.cell_req
+        watermark: upd_date || upd_time
+      - target: mes.cell_stat
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.cell_stat
+        mode: replace
+      - target: mes.defect_detail
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.defect_detail
+        mode: replace
+      - target: mes.defect_map
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.defect_map
+        watermark: upd_date || upd_time
+      - target: mes.defect_stat
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.defect_stat
+        watermark: upd_date || upd_time
+      - target: mes.downtime_detail
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.downtime_detail
+        mode: replace
+      - target: mes.downtime_req
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.downtime_req
+        mode: replace
+      - target: mes.downtime_stat
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.downtime_stat
+        watermark: upd_date || upd_time
+      - target: mes.fixture_cfg
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.fixture_cfg
+        watermark: upd_date || upd_time
+      - target: mes.fixture_detail
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.fixture_detail
+        watermark: upd_date || upd_time
+      - target: mes.fixture_hist
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.fixture_hist
+        watermark: upd_date || upd_time
+      - target: mes.fixture_log
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.fixture_log
+        watermark: upd_date || upd_time
+      - target: mes.fixture_req
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.fixture_req
+        mode: replace
+      - target: mes.inspection_detail
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.inspection_detail
+        mode: replace
+      - target: mes.inspection_hist
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.inspection_hist
+        watermark: upd_date || upd_time
+      - target: mes.inspection_log
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.inspection_log
+        watermark: upd_date || upd_time
+      - target: mes.line_hist
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.line_hist
+        watermark: upd_date || upd_time
+      - target: mes.line_log
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.line_log
+        mode: replace
+      - target: mes.line_map
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.line_map
+        mode: replace
+      - target: mes.line_master
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.line_master
+        watermark: upd_date || upd_time
+      - target: mes.line_stat
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.line_stat
+        mode: replace
+      - target: mes.lot_cfg
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.lot_cfg
+        mode: replace
+      - target: mes.lot_if
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.lot_if
+        watermark: upd_date || upd_time
+      - target: mes.lot_log
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.lot_log
+        watermark: upd_date || upd_time
+      - target: mes.lot_req
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.lot_req
+        mode: replace
+      - target: mes.lot_stat
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.lot_stat
+        watermark: upd_date || upd_time
+      - target: mes.machine_log
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.machine_log
+        watermark: upd_date || upd_time
+      - target: mes.machine_rslt
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.machine_rslt
+        watermark: upd_date || upd_time
+      - target: mes.machine_stat
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.machine_stat
+        mode: replace
+      - target: mes.operator_log
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.operator_log
+        mode: replace
+      - target: mes.operator_map
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.operator_map
+        watermark: upd_date || upd_time
+      - target: mes.operator_master
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.operator_master
+        watermark: upd_date || upd_time
+      - target: mes.operator_rslt
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.operator_rslt
+        watermark: upd_date || upd_time
+      - target: mes.process_master
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.process_master
+        mode: replace
+      - target: mes.process_req
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.process_req
+        mode: replace
+      - target: mes.process_rslt
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.process_rslt
+        watermark: upd_date || upd_time
+      - target: mes.recipe_detail
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.recipe_detail
+        mode: replace
+      - target: mes.recipe_req
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.recipe_req
+        mode: replace
+      - target: mes.routing_hist
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.routing_hist
+        watermark: upd_date || upd_time
+      - target: mes.routing_master
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.routing_master
+        mode: replace
+      - target: mes.sensor_log
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.sensor_log
+        mode: replace
+      - target: mes.sensor_map
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.sensor_map
+        watermark: upd_date || upd_time
+      - target: mes.sensor_req
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.sensor_req
+        watermark: upd_date || upd_time
+      - target: mes.shift_if
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.shift_if
+        watermark: upd_date || upd_time
+      - target: mes.shift_log
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.shift_log
+        watermark: upd_date || upd_time
+      - target: mes.shift_rslt
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.shift_rslt
+        watermark: upd_date || upd_time
+      - target: mes.shift_stat
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.shift_stat
+        watermark: upd_date || upd_time
+      - target: mes.station_detail
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.station_detail
+        watermark: upd_date || upd_time
+      - target: mes.station_map
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.station_map
+        mode: replace
+      - target: mes.tool_hist
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.tool_hist
+        watermark: upd_date || upd_time
+      - target: mes.tool_if
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.tool_if
+        watermark: upd_date || upd_time
+      - target: mes.tool_req
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.tool_req
+        watermark: upd_date || upd_time
+      - target: mes.tool_rslt
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.tool_rslt
+        mode: replace
+      - target: mes.work_log
+        source: oracle
+        from: ${ORACLE_SCHEMA_MES:mes}.work_log
+        watermark: upd_date || upd_time
+      - target: lgs.shipment
+        source: oracle
+        from: ${ORACLE_SCHEMA_LGS:lgs}.shipment
+        watermark: upd_date || upd_time
+      - target: lgs.tracking
+        source: oracle
+        from: ${ORACLE_SCHEMA_LGS:lgs}.tracking
+        watermark: upd_date || upd_time
+        interval-ms: ${POLL_FAST_INTERVAL_MS:10000}
+      - target: lgs.yard_map
+        source: oracle
+        from: ${ORACLE_SCHEMA_LGS:lgs}.yard_map
+        mode: replace
+      - target: geo.zone_area
+        source: oracle
+        from: ${ORACLE_SCHEMA_GEO:geo}.zone_area
+        watermark: upd_date || upd_time

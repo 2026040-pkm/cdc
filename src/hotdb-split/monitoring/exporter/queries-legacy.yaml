@@ -1,0 +1,26 @@
+# 레거시 DB 용 postgres_exporter 사용자 쿼리 (계정 hotdb_monitor). 지표 이름은 Hot DB 시절과 같다 — 대시보드 그대로
+# 레거시 폴링 (RFC Service: SAP → erp · DB Agent: Oracle → mes · lgs · geo)
+hotdb_poll:
+  query: |
+    SELECT agent, job,
+           coalesce(extract(epoch FROM now() - last_ok_at), -1) AS ok_age_seconds,
+           coalesce(last_rows, 0) AS last_rows,
+           CASE WHEN last_error IS NOT NULL AND (last_ok_at IS NULL OR last_run_at > last_ok_at) THEN 1 ELSE 0 END AS failing
+      FROM ops.poll_state
+  metrics:
+    - agent: { usage: LABEL, description: rfc-service · db-agent }
+    - job: { usage: LABEL, description: 작업 (대상 표) }
+    - ok_age_seconds: { usage: GAUGE, description: 마지막 성공 이후. -1 = 성공한 적 없음 }
+    - last_rows: { usage: GAUGE, description: 마지막 주기에 옮긴 행 }
+    - failing: { usage: GAUGE, description: 마지막 주기가 실패면 1 }
+
+hotdb_legacy_rows:
+  query: |
+    SELECT n.nspname AS schema, count(*) AS tables, coalesce(sum(greatest(c.reltuples, 0)), 0)::bigint AS rows_estimate
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname IN ('erp', 'mes', 'lgs', 'geo') AND c.relkind = 'r'
+     GROUP BY 1
+  metrics:
+    - schema: { usage: LABEL, description: 레거시 스키마 }
+    - tables: { usage: GAUGE, description: 표 수 }
+    - rows_estimate: { usage: GAUGE, description: 행 수 추정 (reltuples) }

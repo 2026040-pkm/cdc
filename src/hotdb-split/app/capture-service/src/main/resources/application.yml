@@ -1,0 +1,62 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 캡처부 — tsdb 슬롯 → 변경 로그 (분리판). 라우트 · 판별 없음.
+#
+# 모듈(ZONE)마다 하나 띄우지만, 거르는 일은 전달부가 하므로 캡처부 하나에 전달부 여럿을 붙여도 된다
+# (hotdb.capture.consumers 에 이름을 더한다). 그러면 슬롯도 하나다.
+# ─────────────────────────────────────────────────────────────────────────────
+spring:
+  application:
+    name: capture-${ZONE:asm}
+  datasource:
+    url: jdbc:postgresql://${HOTDB_HOST:localhost}:${HOTDB_PORT:59433}/${HOTDB_DB:hotdb}?ApplicationName=capture-${ZONE:asm}
+    username: ${HOTDB_USER:svc_${ZONE:asm}}
+    password: ${HOTDB_PASSWORD:svc_${ZONE:asm}}
+    hikari:
+      maximum-pool-size: 2
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus, metrics, info
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      pipeline: capture-${ZONE:asm}
+      zone: ${ZONE:asm}
+
+hotdb:
+  cdc:
+    pipeline: capture-${ZONE:asm}
+    source:
+      host: ${HOTDB_HOST:localhost}
+      port: ${HOTDB_PORT:59433}
+      database: ${HOTDB_DB:hotdb}
+      user: ${HOTDB_USER:svc_${ZONE:asm}}
+      password: ${HOTDB_PASSWORD:svc_${ZONE:asm}}
+    slot: ${CAPTURE_SLOT:capture_${ZONE:asm}}
+    publication: tsdb_cdc_pub
+    include-tables:
+      - tsdb\.device
+      - tsdb\.tag_catalog
+      - ops\.cdc_heartbeat
+      - _timescaledb_internal\._hyper_[0-9]+_[0-9]+_chunk
+    snapshot-mode: no_data
+    offset-file: ${CDC_OFFSET_DIR:./data}/offsets-capture-${ZONE:asm}.dat
+    max-batch-size: ${CDC_MAX_BATCH_SIZE:2048}
+
+  capture:
+    log-dir: ${CAPTURE_LOG_DIR:./data/log}
+    segment-size: 64MB
+    max-size: ${CAPTURE_LOG_MAX:2GB}
+    consumers: [ "apply-${ZONE:asm}" ]
+
+logging:
+  level:
+    dev.hotdb: info
+    io.debezium: info

@@ -1,0 +1,24 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 전달부 (분리판) — zone-service 의 application.yml 위에 덮는다 (classpath:/config/ 가 먼저 읽힌다).
+# 라우트 · 참조 · 판별 설정은 zone-service 것을 그대로 쓰고, 원천만 바꾼다.
+# ─────────────────────────────────────────────────────────────────────────────
+spring:
+  application:
+    name: apply-${ZONE:asm}
+  datasource:
+    url: jdbc:postgresql://${HOTDB_HOST:localhost}:${HOTDB_PORT:59433}/${HOTDB_DB:hotdb}?ApplicationName=apply-${ZONE:asm}&reWriteBatchedInserts=true
+
+management:
+  metrics:
+    tags:
+      pipeline: apply-${ZONE:asm}
+
+hotdb:
+  cdc:
+    adapter: log                       # 엔진 대신 캡처부 변경 로그
+    pipeline: apply-${ZONE:asm}
+  log:
+    capture-url: ${CAPTURE_URL:http://localhost:59495}
+    consumer: apply-${ZONE:asm}        # 캡처부 hotdb.capture.consumers 와 같아야 멈춘 동안 로그가 남는다
+    offset-file: ${CDC_OFFSET_DIR:./data}/offset-apply-${ZONE:asm}.txt
+    max-records: ${CDC_MAX_BATCH_SIZE:2048}

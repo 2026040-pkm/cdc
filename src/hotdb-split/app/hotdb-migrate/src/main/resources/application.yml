@@ -1,0 +1,16 @@
+spring:
+  main:
+    web-application-type: none
+  datasource:
+    # 마이그레이션은 관리자 계정으로 돈다 (역할 · 확장 · publication 생성)
+    url: jdbc:postgresql://${HOTDB_HOST:localhost}:${HOTDB_PORT:59433}/${HOTDB_DB:hotdb}
+    username: ${HOTDB_ADMIN_USER:postgres}
+    password: ${HOTDB_ADMIN_PASSWORD:postgres}
+  flyway:
+    # Hot DB(필드): db/migration · 레거시 DB: db/legacy-db (같은 이미지를 두 번 돌린다 — compose.legacy.yml)
+    locations: ${HOTDB_MIGRATION_LOCATIONS:filesystem:../db/migration}
+    # 이력 표는 ops 에 둔다 (public 은 막아 두었다)
+    default-schema: ops
+    create-schemas: true
+    # SQL 안의 ${…} 를 Flyway 자리표시자로 해석하지 않는다
+    placeholder-replacement: false

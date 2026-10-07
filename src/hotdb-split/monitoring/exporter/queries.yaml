@@ -1,0 +1,134 @@
+# postgres_exporter 사용자 쿼리 (계정 hotdb_monitor = pg_monitor + 각 스키마 SELECT)
+# 지표 이름 = <최상위 키>_<컬럼명>
+#
+# CDC 부하에서 가장 먼저 볼 것은 슬롯이다. 소비자(권역 서비스)가 늦으면 슬롯이 WAL 을 붙잡고,
+# 그게 max_slot_wal_keep_size(10GB)를 넘으면 슬롯이 무효화된다 — 그 전에 경보가 떠야 한다.
+
+hotdb_slot:
+  query: |
+    SELECT slot_name,
+           coalesce(wal_status, 'unknown') AS wal_status,
+           CASE WHEN active THEN 1 ELSE 0 END AS active,
+           coalesce(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn), 0) AS retained_bytes,
+           coalesce(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn), 0) AS confirmed_lag_bytes,
+           coalesce(safe_wal_size, -1) AS safe_wal_size_bytes
+      FROM pg_replication_slots
+  metrics:
+    - slot_name: { usage: LABEL, description: 복제 슬롯 }
+    - wal_status: { usage: LABEL, description: "reserved · extended · unreserved · lost" }
+    - active: { usage: GAUGE, description: 소비자가 붙어 있으면 1 }
+    - retained_bytes: { usage: GAUGE, description: 슬롯이 붙잡은 WAL (restart_lsn 기준) }
+    - confirmed_lag_bytes: { usage: GAUGE, description: 소비자가 확인 못 한 WAL (confirmed_flush_lsn 기준) }
+    - safe_wal_size_bytes: { usage: GAUGE, description: 무효화까지 남은 WAL. -1 = 제한 없음 }
+
+hotdb_wal:
+  query: SELECT pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0') AS written_bytes
+  metrics:
+    - written_bytes: { usage: COUNTER, description: 지금까지 쓴 WAL — rate 로 WAL 생성률 }
+
+hotdb_walsender:
+  query: |
+    SELECT coalesce(s.slot_name, r.application_name || ':' || r.pid) AS slot_name, r.state,
+           coalesce(pg_wal_lsn_diff(pg_current_wal_lsn(), r.sent_lsn), 0) AS sent_lag_bytes,
+           coalesce(extract(epoch FROM r.replay_lag), 0) AS replay_lag_seconds
+      FROM pg_stat_replication r
+      LEFT JOIN pg_replication_slots s ON s.active_pid = r.pid
+  metrics:
+    # Debezium 은 접속 이름이 모두 "Debezium Streaming" 이라 슬롯 이름으로 구분한다
+    - slot_name: { usage: LABEL, description: 복제 슬롯 }
+    - state: { usage: LABEL, description: streaming · catchup … }
+    - sent_lag_bytes: { usage: GAUGE, description: 아직 보내지 못한 WAL }
+    - replay_lag_seconds: { usage: GAUGE, description: 소비자 확인 지연 }
+
+# 하이퍼테이블별 크기 · 청크 수 · 적재 행 수(청크 n_tup_ins 합)
+hotdb_hypertable:
+  query: |
+    SELECT h.hypertable_schema || '.' || h.hypertable_name AS hypertable,
+           hypertable_size(format('%I.%I', h.hypertable_schema, h.hypertable_name)::regclass) AS bytes,
+           (SELECT count(*) FROM timescaledb_information.chunks c
+             WHERE c.hypertable_schema = h.hypertable_schema AND c.hypertable_name = h.hypertable_name) AS chunks,
+           (SELECT count(*) FROM timescaledb_information.chunks c
+             WHERE c.hypertable_schema = h.hypertable_schema AND c.hypertable_name = h.hypertable_name AND c.is_compressed) AS compressed_chunks,
+           (SELECT coalesce(sum(s.n_tup_ins), 0) FROM timescaledb_information.chunks c
+              JOIN pg_stat_user_tables s ON s.schemaname = c.chunk_schema AND s.relname = c.chunk_name
+             WHERE c.hypertable_schema = h.hypertable_schema AND c.hypertable_name = h.hypertable_name) AS inserted_rows
+      FROM timescaledb_information.hypertables h
+     WHERE h.hypertable_schema = 'tsdb'
+  metrics:
+    - hypertable: { usage: LABEL, description: 하이퍼테이블 }
+    - bytes: { usage: GAUGE, description: 전체 크기 (인덱스 · 압축 포함) }
+    - chunks: { usage: GAUGE, description: 청크 수 }
+    - compressed_chunks: { usage: GAUGE, description: 압축된 청크 수 }
+    - inserted_rows: { usage: COUNTER, description: "적재 행 수 — 청크가 지워지면 줄어든다(보존 정책)" }
+
+# 원천 수신(received_at) → 권역 RDB 반영(applied_at). 둘 다 DB 시계라 서버 간 시계 편차가 없다.
+# 최근 1분 사이 갱신된 최신값 행으로 잰다. 권역이 늘면 여기 UNION 한 줄을 더한다.
+hotdb_zone_apply_lag:
+  # 판별 모듈 수와 상관없이 함수 하나 (ops.module 등록부를 돈다 — V7). 레이블 이름은 zone 그대로
+  query: SELECT zone, rows_1m, p50_seconds, p99_seconds, max_seconds FROM ops.module_apply_lag()
+  metrics:
+    - zone: { usage: LABEL, description: 판별 모듈 }
+    - rows_1m: { usage: GAUGE, description: 최근 1분 갱신 장비 수 }
+    - p50_seconds: { usage: GAUGE, description: 반영 지연 p50 }
+    - p99_seconds: { usage: GAUGE, description: 반영 지연 p99 }
+    - max_seconds: { usage: GAUGE, description: 반영 지연 최대 }
+
+# 2단 CDC: 권역 RDB 반영(applied_at) → SAP 송신(sent_at), 그리고 Provider 수신부터 전 구간. 전부 DB 시계.
+hotdb_rfc_lag:
+  query: |
+    SELECT zone,
+           count(*) AS sent_1m,
+           coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY extract(epoch FROM sent_at - src_applied_at)), 0) AS hop2_p99_seconds,
+           coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY extract(epoch FROM sent_at - src_received_at)), 0) AS e2e_p99_seconds,
+           coalesce(max(extract(epoch FROM sent_at - src_received_at)), 0) AS e2e_max_seconds
+      FROM ops.rfc_sent
+     WHERE sent_at > now() - interval '1 minute'
+     GROUP BY zone
+  metrics:
+    - zone: { usage: LABEL, description: 권역 }
+    - sent_1m: { usage: GAUGE, description: 최근 1분 송신 건수 }
+    - hop2_p99_seconds: { usage: GAUGE, description: "권역 RDB 반영 → SAP 송신 p99" }
+    - e2e_p99_seconds: { usage: GAUGE, description: "Provider 수신 → SAP 송신 p99 (CDC 두 번)" }
+    - e2e_max_seconds: { usage: GAUGE, description: "Provider 수신 → SAP 송신 최대" }
+
+# 권역 RDB 행 수
+hotdb_zone_rows:
+  query: |
+    SELECT n.nspname AS schema, c.relname AS table_name, c.reltuples::bigint AS estimate
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'svc' AND c.relkind = 'r'
+  metrics:
+    - schema: { usage: LABEL, description: 권역 스키마 }
+    - table_name: { usage: LABEL, description: 표 }
+    - estimate: { usage: GAUGE, description: "행 수 추정 (reltuples — ANALYZE 주기만큼 늦다)" }
+
+hotdb_heartbeat:
+  query: SELECT pipeline, extract(epoch FROM now() - beat_at) AS age_seconds FROM ops.cdc_heartbeat
+  metrics:
+    - pipeline: { usage: LABEL, description: CDC 소비자 }
+    - age_seconds: { usage: GAUGE, description: 마지막 heartbeat 이후 }
+
+hotdb_dead_letter:
+  # 해결(RESOLVED) · 폐기(DISCARDED)한 건은 빼고 센다 — 재처리하면 줄어든다
+  query: >-
+    SELECT pipeline, route, count(*) FILTER (WHERE status IN ('PENDING', 'RETRY_REQUESTED')) AS total
+      FROM ops.cdc_dead_letter GROUP BY pipeline, route
+  metrics:
+    - pipeline: { usage: LABEL, description: CDC 소비자 }
+    - route: { usage: LABEL, description: 라우트 }
+    - total: { usage: GAUGE, description: 미해결 dead letter }
+
+# 캡처 갭을 DB 만으로 판정한다 — 소비자가 아예 안 떠 hotdb_cdc_capture_gap 이 안 나올 때의 대체 경로.
+# 처리 이력은 있는데 슬롯이 없거나 · 무효화됐거나 · 처리 위치보다 앞을 이미 버렸으면 1
+hotdb_capture:
+  query: >-
+    SELECT c.pipeline, c.slot_name,
+           CASE WHEN s.slot_name IS NULL OR s.wal_status = 'lost' OR s.restart_lsn > c.last_applied_lsn
+                THEN 1 ELSE 0 END AS gap,
+           extract(epoch FROM now() - c.updated_at) AS checkpoint_age_seconds
+      FROM ops.cdc_checkpoint c LEFT JOIN pg_replication_slots s ON s.slot_name = c.slot_name
+  metrics:
+    - pipeline: { usage: LABEL, description: CDC 소비자 }
+    - slot_name: { usage: LABEL, description: 복제 슬롯 }
+    - gap: { usage: GAUGE, description: "1 = 되받을 수 없는 구간이 있다" }
+    - checkpoint_age_seconds: { usage: GAUGE, description: 처리 위치를 마지막으로 남긴 뒤 }

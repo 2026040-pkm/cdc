@@ -1,0 +1,1 @@
+[ { "targets": ["legacy-simulator:8080"], "labels": { "server": "services" } } ]

@@ -1,0 +1,1 @@
+[ { "targets": ["field-simulator:8080"], "labels": { "server": "local" } } ]

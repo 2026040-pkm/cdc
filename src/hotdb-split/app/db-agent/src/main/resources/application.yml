@@ -1,0 +1,52 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DB Agent (O-6) — Oracle 레거시 폴링 → 레거시 DB mes · lgs · geo
+#
+#   원천: ORACLE_URL (기본은 로컬 대역 hotdb-oracle-sim 의 FREEPDB1). 읽기 계정 LEGACY_READER, 표는 소유자 MES · LGS · GEO 아래
+#   대상: 레거시 DB (compose.legacy.yml), 계정 db_agent (mes · lgs · geo 에만 쓴다)
+#
+# 작업 목록은 poll-jobs.yml. 컬럼은 원천 · 대상 양쪽에 있는 것만 옮긴다.
+# 워터마크 upd_date || upd_time = 레거시 표의 "최종 수정 일자 · 시각" (YYYYMMDD · HHMMSS 문자열)
+# ─────────────────────────────────────────────────────────────────────────────
+spring:
+  application:
+    name: db-agent
+  config:
+    import: classpath:poll-jobs.yml
+  datasource:
+    # 레거시 DB (Hot DB 와 분리된 별도 DB) — mes · lgs · geo
+    url: jdbc:postgresql://${LEGACY_HOST:localhost}:${LEGACY_PORT:59435}/${LEGACY_DB:legacy}?ApplicationName=db-agent&reWriteBatchedInserts=true
+    username: ${LEGACY_USER:db_agent}
+    password: ${LEGACY_PASSWORD:db_agent}
+    hikari:
+      maximum-pool-size: 4
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus, metrics, info
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      pipeline: db-agent
+
+hotdb:
+  poll:
+    agent: db-agent
+    default-interval-ms: ${POLL_INTERVAL_MS:60000}
+    threads: ${POLL_THREADS:4}
+    sources:
+      oracle:
+        url: ${ORACLE_URL:jdbc:oracle:thin:@//localhost:59521/FREEPDB1}
+        user: ${ORACLE_USER:legacy_reader}
+        password: ${ORACLE_PASSWORD:legacy_reader}
+    # 작업 목록은 poll-jobs.yml — scripts/gen-sample-legacy.py 가 Oracle 사본 표 전부(64)로 만든다
+
+logging:
+  level:
+    dev.hotdb: info

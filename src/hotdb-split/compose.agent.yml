@@ -1,0 +1,31 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DB Agent (O-6) — Oracle 레거시 폴링 → 레거시 DB mes · lgs · geo
+#
+#   DB AGENT 서버: .env 에 LEGACY_HOST · LEGACY_PORT, ORACLE_URL · ORACLE_USER · ORACLE_PASSWORD · ORACLE_SCHEMA_MES/LGS/GEO
+#                  podman compose -f compose.agent.yml up -d
+#   한 대에 전부:  scripts/up.ps1 (원천은 compose.legacy-sim.yml 의 oracle-sim)
+# ─────────────────────────────────────────────────────────────────────────────
+name: hotdb
+
+services:
+  db-agent:
+    build:
+      context: ./app
+      args: { MODULE: db-agent }
+    image: localhost/hotdb/db-agent:local
+    container_name: hotdb-db-agent
+    restart: on-failure
+    environment:
+      LEGACY_HOST: ${LEGACY_HOST:-legacy-db}     # 레거시 DB (Hot DB 가 아니다)
+      LEGACY_PORT: ${LEGACY_PORT:-5432}
+      ORACLE_URL: ${ORACLE_URL:-jdbc:oracle:thin:@//oracle-sim:1521/FREEPDB1}
+      ORACLE_USER: ${ORACLE_USER:-legacy_reader}
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-legacy_reader}
+      # 원천 표 소유자 (Oracle 사용자) — 레거시 DB 의 mes · lgs · geo 에 대응
+      ORACLE_SCHEMA_MES: ${ORACLE_SCHEMA_MES:-mes}
+      ORACLE_SCHEMA_LGS: ${ORACLE_SCHEMA_LGS:-lgs}
+      ORACLE_SCHEMA_GEO: ${ORACLE_SCHEMA_GEO:-geo}
+      POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-60000}
+      POLL_FAST_INTERVAL_MS: ${POLL_FAST_INTERVAL_MS:-10000}
+      JAVA_TOOL_OPTIONS: ${AGENT_JAVA_OPTS:--Xms64m -Xmx192m}
+    ports: ["${DB_AGENT_PORT:-59486}:8080"]

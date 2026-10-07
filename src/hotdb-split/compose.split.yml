@@ -1,0 +1,89 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 분리판 — 캡처부 · 전달부를 프로세스(컨테이너)로 나눈 조립 모듈(asm). 일체형(src/hotdb 의 zone-asm)과 나란히 띄워 비교한다.
+#
+#   전제: src/hotdb 스택이 떠 있다 (Hot DB · 발행기 · 네트워크 hotdb_default)
+#   준비: python scripts/split-compare.py setup      # svc_split 스키마 (일체형 svc 와 같은 표, 결과를 행 단위로 맞춰 본다)
+#   기동: podman compose -f compose.split.yml up -d --build
+#   비교: python scripts/split-compare.py all
+#   정리: python scripts/split-compare.py teardown   # 컨테이너 · 슬롯 capture_asm · svc_split
+#
+# 비교 상대(일체형)도 이 복사본 코드로 띄운다 — 두 방식의 차이가 "나눴느냐" 하나만 남게.
+#   int-asm   일체형 (zone-service = 엔진 + 반영 + 판별 한 프로세스) · 슬롯 int_asm     → svc_int
+#   capture   캡처부 (엔진 + 변경 로그)                                · 슬롯 capture_asm → (로그)
+#   apply     전달부 (로그 당겨오기 + 반영 + 판별, 엔진 없음)                              → svc_split
+#   int-base  일체형에서 엔진만 끈 쌍둥이 — 엔진이 차지하는 메모리의 기준선 (판별도 끔)
+# 원래 스택(src/hotdb)의 zone_asm · svc 는 건드리지 않는다. 세 표 묶음은 같은 module 값(asm)이라 행 단위로 맞대 본다.
+# ─────────────────────────────────────────────────────────────────────────────
+name: hotdb-split
+
+x-env: &env
+  HOTDB_HOST: hotdb-pg
+  HOTDB_PORT: "5432"
+  ZONE: asm
+  CDC_OFFSET_DIR: /app/data
+  JAVA_TOOL_OPTIONS: ${SPLIT_JAVA_OPTS:--Xms64m -Xmx256m}
+
+services:
+  capture-asm:
+    build: { context: ./app, args: { MODULE: capture-service } }
+    image: localhost/hotdb-split/capture-service:local
+    container_name: hotdb-split-capture-asm
+    restart: on-failure
+    environment:
+      <<: *env
+      CAPTURE_LOG_DIR: /app/data/log
+    ports: ["${SPLIT_CAPTURE_PORT:-59495}:8080"]
+    volumes: [capture-asm-data:/app/data]
+    networks: [hotdb]
+
+  apply-asm:
+    build: { context: ./app, args: { MODULE: apply-service } }
+    image: localhost/hotdb-split/apply-service:local
+    container_name: hotdb-split-apply-asm
+    restart: on-failure
+    environment:
+      <<: *env
+      ZONE_SCHEMA: svc_split
+      CAPTURE_URL: http://hotdb-split-capture-asm:8080
+    ports: ["${SPLIT_APPLY_PORT:-59496}:8080"]
+    volumes: [apply-asm-data:/app/data]
+    networks: [hotdb]
+
+  int-asm:
+    build: { context: ./app, args: { MODULE: zone-service } }
+    image: localhost/hotdb-split/zone-service:local
+    container_name: hotdb-split-int-asm
+    restart: on-failure
+    environment:
+      <<: *env
+      ZONE_SCHEMA: svc_int
+      HOTDB_CDC_PIPELINE: int-asm
+      HOTDB_CDC_SLOT: int_asm
+    ports: ["${SPLIT_INT_PORT:-59497}:8080"]
+    volumes: [int-asm-data:/app/data]
+    networks: [hotdb]
+
+  int-base:
+    image: localhost/hotdb-split/zone-service:local
+    container_name: hotdb-split-int-base
+    environment:
+      <<: *env
+      ZONE_SCHEMA: svc_int
+      HOTDB_CDC_PIPELINE: int-base
+      HOTDB_CDC_SLOT: int_base
+      HOTDB_CDC_ENGINE_ENABLED: "false"
+      HOTDB_CDC_DEAD_LETTER_REPROCESS_ENABLED: "false"
+      JUDGE_ENABLED: "false"
+    ports: ["${SPLIT_BASE_PORT:-59498}:8080"]
+    networks: [hotdb]
+    depends_on: [int-asm]
+
+volumes:
+  int-asm-data:
+  capture-asm-data:
+  apply-asm-data:
+
+networks:
+  hotdb:
+    name: hotdb_default
+    external: true

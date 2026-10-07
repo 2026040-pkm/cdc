@@ -1,0 +1,165 @@
+groups:
+  # 컨테이너 리소스를 한 벌로 맞춘다 (podman-exporter · cAdvisor 중 떠 있는 쪽만 값이 생긴다)
+  - name: hotdb-container
+    rules:
+      - record: hotdb:container_cpu_cores
+        expr: sum by (name, instance, server) (rate(podman_container_cpu_seconds_total[1m]))
+      - record: hotdb:container_mem_bytes
+        expr: sum by (name, instance, server) (podman_container_mem_usage_bytes)
+      - record: hotdb:container_cpu_cores
+        expr: sum by (name, instance, server) (rate(container_cpu_usage_seconds_total{name!=""}[1m]))
+      - record: hotdb:container_mem_bytes
+        expr: sum by (name, instance, server) (container_memory_working_set_bytes{name!=""})
+
+  # 임계값은 BRD §07 합격 기준 초안에서 왔다. 실측 후 조정한다.
+  - name: hotdb-cdc-alerts
+    rules:
+      - alert: CdcConsumerDown
+        expr: up{job=~"zone-service|rfc-service|db-agent"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "CDC 소비자 {{ $labels.job }} {{ $labels.instance }} 응답 없음"
+          description: "슬롯이 WAL 을 붙잡기 시작한다. hotdb_slot_retained_bytes 를 같이 본다."
+
+      - alert: CdcSlotInactive
+        expr: hotdb_slot_active == 0
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "복제 슬롯 {{ $labels.slot_name }} 에 소비자가 없음"
+
+      - alert: CdcSlotRetainingWal
+        expr: hotdb_slot_retained_bytes > 1e9
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "슬롯 {{ $labels.slot_name }} 이 WAL {{ $value | humanize1024 }}B 를 붙잡고 있음"
+          description: "20GB(max_slot_wal_keep_size)를 넘으면 슬롯이 무효화되고 재동기화가 필요하다."
+
+      - alert: CdcSlotNearInvalidation
+        expr: hotdb_slot_safe_wal_size_bytes >= 0 and hotdb_slot_safe_wal_size_bytes < 2e9
+        labels: { severity: critical }
+        annotations:
+          summary: "슬롯 {{ $labels.slot_name }} 무효화까지 {{ $value | humanize1024 }}B"
+
+      - alert: CdcApplyLagHigh
+        expr: hotdb_zone_apply_lag_p99_seconds > 5
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "권역 {{ $labels.zone }} 반영 지연 p99 {{ $value | printf \"%.1f\" }}초"
+
+      - alert: CdcHeartbeatStale
+        expr: hotdb_heartbeat_age_seconds > 60
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.pipeline }} heartbeat 가 {{ $value | printf \"%.0f\" }}초째 없음"
+
+      - alert: CdcDeadLetter
+        expr: increase(hotdb_cdc_dead_letter_total[5m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.pipeline }} 라우트 {{ $labels.route }} dead letter 발생"
+          description: "ops.cdc_dead_letter 의 error 컬럼을 본다. 스키마 · 라우트 설정 어긋남이 흔한 원인이다."
+
+      # 이전 Java 판(embedded-cdc)의 V3 · V4 경보. 앱이 내는 신호가 먼저다 — 원인을 이름으로 말해 준다
+      - alert: CdcCaptureGap
+        expr: hotdb_cdc_capture_gap == 1
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.pipeline }} 캡처 갭 — 엔진을 띄우지 않았다"
+          description: "끊긴 구간은 WAL 로 다시 받을 수 없다. 대상 표를 다시 맞춘 뒤 ops.cdc_checkpoint 의 그 행을 지우고 재기동한다. 이유는 /actuator/health 의 failure."
+
+      # 앱이 아예 안 떠 위 지표가 없을 때의 대체 판정 (DB 만으로) — 지우지 말 것
+      - alert: CdcCaptureGapByLsn
+        expr: hotdb_capture_gap == 1
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.pipeline }} 캡처 갭(DB 판정) — 슬롯 {{ $labels.slot_name }} 이 없거나 처리 위치보다 앞을 버렸다"
+          description: "앱이 살아 있으면 CdcCaptureGap 을 먼저 본다."
+
+      # 스스로 멈췄다 (구조 문제 · dead letter 비율 · 캡처 갭). 위치를 넘기지 않아 유실은 없다
+      - alert: CdcPipelineHalted
+        expr: hotdb_cdc_state == 4
+        for: 30s
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $labels.pipeline }} CDC 정지 — 원인을 고치고 재기동해야 재개된다"
+          description: "이유는 /actuator/health 의 failure. hotdb_cdc_pipeline_halts_total 의 reason 라벨: UNRECOVERABLE(표 · 컬럼 · 권한) · DLQ_RATIO(대부분 실패)."
+
+      - alert: HotdbDown
+        expr: pg_up{job="hotdb"} == 0
+        for: 30s
+        labels: { severity: critical }
+        annotations:
+          summary: "HotDB 에 접속할 수 없음 (postgres_exporter)"
+
+      # 레거시 폴링 — 주기(기본 60초)의 5배 넘게 성공이 없으면
+      - alert: LegacyPollStale
+        expr: hotdb_poll_ok_age_seconds > 300 or hotdb_poll_failing == 1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.agent }} 작업 {{ $labels.job }} 폴링이 멈춤"
+          description: "ops.poll_state.last_error 를 본다. 원천(SAP · Oracle) 접속 또는 표 · 컬럼 변경이 흔한 원인이다."
+
+  # ── 한눈 판정 (대시보드 "HotDB 상태") ──────────────────────────────────────
+  # 점검 항목마다 0 = 정상 · 1 = 주의 · 2 = 이슈. 전체 판정은 그 최댓값이다.
+  # 모든 항목이 0 이면 "CDC · HotDB 이슈 없음" 이라고 말할 수 있다.
+  # 임계값은 BRD §07 합격 기준 초안 · 경보 규칙과 같다 — 바꿀 때 둘 다 고친다.
+  - name: hotdb-health
+    rules:
+      - record: hotdb:host_cpu_cores
+        expr: count by (server) (node_cpu_seconds_total{mode="idle"})
+      - record: hotdb:pg_cpu_ratio          # HotDB 컨테이너 CPU / 그 서버 코어 수
+        expr: sum by (server) (hotdb:container_cpu_cores{name="hotdb-pg"}) / on (server) hotdb:host_cpu_cores
+      - record: hotdb:pg_mem_ratio          # HotDB 컨테이너 메모리(페이지 캐시 포함) / 그 서버 메모리
+        expr: sum by (server) (hotdb:container_mem_bytes{name="hotdb-pg"}) / on (server) group_left max by (server) (node_memory_MemTotal_bytes)
+      - record: hotdb:host_mem_ratio
+        expr: 1 - max by (server) (node_memory_MemAvailable_bytes) / max by (server) (node_memory_MemTotal_bytes)
+
+      - record: hotdb:check
+        labels: { check: "01 HotDB 접속" }
+        expr: ((1 - min(pg_up{job="hotdb"})) * 2) or vector(2)
+      - record: hotdb:check
+        labels: { check: "02 서비스 응답 (모듈 · RFC · DB Agent)" }
+        expr: (max(1 - up{job=~"zone-service|rfc-service|db-agent"}) * 2) or vector(0)
+      - record: hotdb:check
+        labels: { check: "03 CDC 소비자 붙음 (슬롯)" }
+        expr: ((min(hotdb_slot_active) == bool 0) * 2) or vector(0)
+      - record: hotdb:check
+        labels: { check: "04 CDC 반영 지연 (p99 2초 / 5초)" }
+        expr: clamp_max((max(hotdb_zone_apply_lag_p99_seconds) > bool 2) + (max(hotdb_zone_apply_lag_p99_seconds) > bool 5), 2) or vector(0)
+      - record: hotdb:check
+        labels: { check: "05 슬롯이 붙잡은 WAL (1GB / 무효화 2GB 전)" }
+        expr: clamp_max((max(hotdb_slot_retained_bytes) > bool 1e9) + (min(hotdb_slot_safe_wal_size_bytes >= 0) < bool 2e9) * 2, 2) or vector(0)
+      - record: hotdb:check
+        labels: { check: "06 CDC 진행 신호 (heartbeat 60초)" }
+        expr: ((max(hotdb_heartbeat_age_seconds) > bool 60) * 2) or vector(0)
+      - record: hotdb:check
+        labels: { check: "07 반영 실패 (dead letter 5분)" }
+        expr: (sum(increase(hotdb_cdc_dead_letter_total[5m])) > bool 0) or vector(0)
+      - record: hotdb:check
+        labels: { check: "08 SAP 송신 지연 (2단 p99 5초)" }
+        expr: (max(hotdb_rfc_lag_hop2_p99_seconds) > bool 5) or vector(0)
+      - record: hotdb:check
+        labels: { check: "13 CDC 정지 · 캡처 갭" }
+        expr: clamp_max(((max(hotdb_cdc_state == bool 4) or vector(0)) + (max(hotdb_cdc_capture_gap) or vector(0)) + (max(hotdb_capture_gap) or vector(0))) * 2, 2)
+      - record: hotdb:check
+        labels: { check: "12 레거시 DB 접속" }
+        expr: ((1 - min(pg_up{job="legacy-db"})) * 2) or vector(2)
+      - record: hotdb:check
+        labels: { check: "09 레거시 폴링" }
+        expr: clamp_max((max(hotdb_poll_failing) > bool 0) + (max(hotdb_poll_ok_age_seconds) > bool 300), 2) or vector(0)
+      - record: hotdb:check
+        labels: { check: "10 HotDB CPU (60% / 80%)" }
+        expr: clamp_max((max(hotdb:pg_cpu_ratio) > bool 0.6) + (max(hotdb:pg_cpu_ratio) > bool 0.8), 2) or vector(0)
+      - record: hotdb:check
+        labels: { check: "11 서버 메모리 (80% / 90%)" }
+        expr: clamp_max((max(hotdb:host_mem_ratio) > bool 0.8) + (max(hotdb:host_mem_ratio) > bool 0.9), 2) or vector(0)
+      - record: hotdb:health
+        expr: max(hotdb:check)
