@@ -1,0 +1,154 @@
+{
+ "key": "split",
+ "title": "분리형 — 캡처부와 전달부 사이에 변경 로그를 둔다",
+ "hint": "캡처부는 로그에 fsync 한 뒤 슬롯을 넘기고, 전달부는 반영한 뒤 자기 순번을 남긴다. 위치를 쥔 쪽이 둘이다",
+ "cols": "repeat(6, 1fr)",
+ "cells": [
+  {
+   "type": "node",
+   "id": "slot",
+   "col": 1,
+   "row": 1,
+   "title": "슬롯 capture_asm",
+   "sub": "Hot DB pgoutput",
+   "ic": "db",
+   "role": "src"
+  },
+  {
+   "type": "node",
+   "id": "eng",
+   "col": 2,
+   "row": 1,
+   "title": "엔진",
+   "sub": "Debezium Embedded",
+   "ic": "stream",
+   "role": "new",
+   "tag": "capture-asm",
+   "no": 1
+  },
+  {
+   "type": "node",
+   "id": "log",
+   "col": 3,
+   "row": 1,
+   "title": "변경 로그",
+   "sub": "세그먼트 64MB · fsync 뒤 슬롯 전진",
+   "ic": "archive",
+   "role": "new",
+   "tag": "capture-asm",
+   "no": 2
+  },
+  {
+   "type": "node",
+   "id": "pull",
+   "col": 4,
+   "row": 1,
+   "title": "당겨오기",
+   "sub": "GET /log/records · long poll",
+   "ic": "inbox",
+   "role": "new",
+   "tag": "apply-asm",
+   "no": 3
+  },
+  {
+   "type": "node",
+   "id": "apply",
+   "col": 5,
+   "row": 1,
+   "title": "반영 + 판별",
+   "sub": "zone-service 코드 그대로",
+   "ic": "code",
+   "role": "new",
+   "tag": "apply-asm",
+   "no": 4
+  },
+  {
+   "type": "node",
+   "id": "svc",
+   "col": 6,
+   "row": 1,
+   "title": "svc_split",
+   "sub": "오프셋 파일 → ack",
+   "ic": "db",
+   "role": "store"
+  },
+  {
+   "type": "node",
+   "id": "full",
+   "col": 3,
+   "row": 2,
+   "title": "로그 상한 2GB",
+   "sub": "덧붙이기를 막아 슬롯이 WAL 을 쥔다",
+   "ic": "alert",
+   "role": "warn small"
+  },
+  {
+   "type": "node",
+   "id": "gone",
+   "col": 4,
+   "row": 2,
+   "title": "지워진 구간 요청",
+   "sub": "410 → 전달부 HALTED",
+   "ic": "alert",
+   "role": "risk small"
+  },
+  {
+   "type": "node",
+   "id": "fail",
+   "col": 5,
+   "row": 2,
+   "title": "반영 실패",
+   "sub": "재시도 → dead letter · 정지 판정",
+   "ic": "alert",
+   "role": "risk small"
+  }
+ ],
+ "links": [
+  {
+   "from": "slot",
+   "to": "eng",
+   "kind": "flow"
+  },
+  {
+   "from": "eng",
+   "to": "log",
+   "kind": "flow"
+  },
+  {
+   "from": "log",
+   "to": "pull",
+   "kind": "flow"
+  },
+  {
+   "from": "pull",
+   "to": "apply",
+   "kind": "flow"
+  },
+  {
+   "from": "apply",
+   "to": "svc",
+   "kind": "ok"
+  },
+  {
+   "from": "log",
+   "to": "full",
+   "kind": "muted",
+   "label": "가득",
+   "port": "b>t"
+  },
+  {
+   "from": "pull",
+   "to": "gone",
+   "kind": "risk",
+   "label": "410",
+   "port": "b>t"
+  },
+  {
+   "from": "apply",
+   "to": "fail",
+   "kind": "risk",
+   "label": "실패",
+   "port": "b>t"
+  }
+ ]
+}

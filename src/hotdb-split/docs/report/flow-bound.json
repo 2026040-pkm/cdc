@@ -1,0 +1,133 @@
+{
+ "key": "bound",
+ "title": "엔진 교체 경계 — 바꾸는 것은 어댑터 모듈 하나",
+ "hint": "세 어댑터가 같은 포트(CdcSource)를 채우고 무엇을 줄 수 있는지(SourceCapabilities) 밝힌다. 라우트가 그 원천으로 안 되는 일을 쓰면 기동에서 멈춘다",
+ "cols": "repeat(5, 1fr)",
+ "cells": [
+  {
+   "type": "node",
+   "id": "dbz",
+   "col": 1,
+   "row": 1,
+   "title": "Debezium Embedded",
+   "sub": "지금 · cdc-debezium",
+   "ic": "stream",
+   "role": "isl",
+   "tag": "pg-lsn · 전부"
+  },
+  {
+   "type": "node",
+   "id": "pgo",
+   "col": 1,
+   "row": 2,
+   "title": "pgoutput 직접 수신",
+   "sub": "PgJDBC replication API",
+   "ic": "stream",
+   "role": "new",
+   "tag": "pg-lsn · 전부"
+  },
+  {
+   "type": "node",
+   "id": "poll",
+   "col": 1,
+   "row": 3,
+   "title": "버전 컬럼 폴링",
+   "sub": "updated_at + 키 워터마크",
+   "ic": "retry",
+   "role": "new",
+   "tag": "watermark · 삭제 없음"
+  },
+  {
+   "type": "node",
+   "id": "port",
+   "col": 2,
+   "row": 2,
+   "title": "CdcSource",
+   "sub": "capabilities() · status() · decode()",
+   "ic": "link",
+   "role": "src",
+   "tag": "cdc-core 포트"
+  },
+  {
+   "type": "node",
+   "id": "chk",
+   "col": 3,
+   "row": 2,
+   "title": "incompatibilities()",
+   "sub": "라우트 ↔ 원천 능력 대조",
+   "ic": "filter",
+   "role": "decide",
+   "tag": "판정"
+  },
+  {
+   "type": "node",
+   "id": "sink",
+   "col": 4,
+   "row": 2,
+   "title": "CdcSink",
+   "sub": "RouteApplier · LogAppendingSink",
+   "ic": "code",
+   "role": "new",
+   "tag": "cdc-core 포트"
+  },
+  {
+   "type": "node",
+   "id": "out",
+   "col": 5,
+   "row": 2,
+   "title": "svc 표 / 변경 로그",
+   "sub": "멱등 반영",
+   "ic": "db",
+   "role": "store"
+  },
+  {
+   "type": "node",
+   "id": "halt",
+   "col": 3,
+   "row": 3,
+   "title": "기동 거부 (HALTED)",
+   "sub": "예: 폴링 + mode delete",
+   "ic": "alert",
+   "role": "risk small"
+  }
+ ],
+ "links": [
+  {
+   "from": "dbz",
+   "to": "port",
+   "kind": "plain"
+  },
+  {
+   "from": "pgo",
+   "to": "port",
+   "kind": "plain"
+  },
+  {
+   "from": "poll",
+   "to": "port",
+   "kind": "plain"
+  },
+  {
+   "from": "port",
+   "to": "chk",
+   "kind": "flow"
+  },
+  {
+   "from": "chk",
+   "to": "sink",
+   "kind": "flow"
+  },
+  {
+   "from": "sink",
+   "to": "out",
+   "kind": "ok"
+  },
+  {
+   "from": "chk",
+   "to": "halt",
+   "kind": "risk",
+   "label": "안 됨",
+   "port": "b>t"
+  }
+ ]
+}

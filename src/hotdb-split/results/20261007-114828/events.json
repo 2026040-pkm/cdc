@@ -1,0 +1,155 @@
+[
+ {
+  "t": 1791341825.86,
+  "kind": "batch",
+  "round": 1,
+  "rows": 10000,
+  "devices": 234,
+  "done_s": {
+   "int": 1.53,
+   "app": 2.26
+  }
+ },
+ {
+  "t": 1791341873.89,
+  "kind": "batch",
+  "round": 2,
+  "rows": 10000,
+  "devices": 234,
+  "done_s": {
+   "app": 1.91,
+   "int": 2.72
+  }
+ },
+ {
+  "t": 1791341922.2,
+  "kind": "batch",
+  "round": 3,
+  "rows": 10000,
+  "devices": 234,
+  "done_s": {
+   "app": 2.2,
+   "int": 3.01
+  }
+ },
+ {
+  "t": 1791341989.25,
+  "kind": "backlog-stop"
+ },
+ {
+  "t": 1791342169.28,
+  "kind": "backlog-start",
+  "int_slot_mb": 413.234544,
+  "cap_slot_mb": 1.023064,
+  "cap_log_mb": 310.89039399999996
+ },
+ {
+  "t": 1791342237.01,
+  "kind": "backlog-caught",
+  "caught_s": {
+   "app": 52.7,
+   "int": 67.7
+  }
+ },
+ {
+  "t": 1791342336.77,
+  "kind": "fault",
+  "fault": "crash",
+  "victim": "int",
+  "watch": "int",
+  "fresh_before": 0.607159,
+  "up_s": 7.7,
+  "recover_s": 9.7,
+  "fresh_peak_s": 6.4,
+  "other_fresh_peak_s": 1.1,
+  "cap_slot_peak_mb": 1.07
+ },
+ {
+  "t": 1791342390.98,
+  "kind": "fault",
+  "fault": "crash",
+  "victim": "app",
+  "watch": "app",
+  "fresh_before": 0.75539,
+  "up_s": 6.2,
+  "recover_s": 9.2,
+  "fresh_peak_s": 6.7,
+  "other_fresh_peak_s": 0.7,
+  "cap_slot_peak_mb": 1.48
+ },
+ {
+  "t": 1791342453.26,
+  "kind": "fault",
+  "fault": "crash",
+  "victim": "cap",
+  "watch": "app",
+  "fresh_before": 0.816507,
+  "up_s": 8.3,
+  "recover_s": 17.3,
+  "fresh_peak_s": 12.6,
+  "other_fresh_peak_s": 0.8,
+  "cap_slot_peak_mb": 3.07
+ },
+ {
+  "t": 1791342507.68,
+  "kind": "fault",
+  "fault": "redeploy",
+  "victim": "int",
+  "watch": "int",
+  "fresh_before": 0.775113,
+  "up_s": 6.4,
+  "recover_s": 9.4,
+  "fresh_peak_s": 5.7,
+  "other_fresh_peak_s": 0.8,
+  "cap_slot_peak_mb": 0.83
+ },
+ {
+  "t": 1791342563.17,
+  "kind": "fault",
+  "fault": "redeploy",
+  "victim": "app",
+  "watch": "app",
+  "fresh_before": 0.781439,
+  "up_s": 6.5,
+  "recover_s": 10.5,
+  "fresh_peak_s": 6.5,
+  "other_fresh_peak_s": 0.5,
+  "cap_slot_peak_mb": 0.8
+ },
+ {
+  "t": 1791342620.96,
+  "kind": "verify",
+  "result": {
+   "device_status_current": {
+    "int_rows": 234,
+    "split_rows": 234,
+    "only_int": 0,
+    "only_split": 0
+   },
+   "device_status_change": {
+    "int_rows": 9873,
+    "split_rows": 9873,
+    "only_int": 0,
+    "only_split": 0
+   },
+   "scan": {
+    "int_rows": 1438,
+    "split_rows": 1438,
+    "only_int": 0,
+    "only_split": 0
+   },
+   "actual_result": {
+    "int_rows": 1251,
+    "split_rows": 1251,
+    "only_int": 0,
+    "only_split": 0
+   },
+   "artifact": {
+    "int_rows": 15060,
+    "split_rows": 15060,
+    "only_int": 0,
+    "only_split": 0
+   }
+  }
+ }
+]

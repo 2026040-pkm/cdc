@@ -1,0 +1,148 @@
+{
+ "key": "proc",
+ "title": "일체형 프로세스 안 — 무엇을 엔진 몫으로 세는가",
+ "hint": "주황 띠 카드가 엔진 스레드 그룹(cdc-engine-<pipeline>)에 든 스레드입니다. 배치 콜백은 엔진 스레드 위에서 돌지만 handler 로 따로 셉니다",
+ "cols": "repeat(6, 1fr)",
+ "cells": [
+  {
+   "type": "node",
+   "id": "slot",
+   "col": 1,
+   "row": 1,
+   "title": "슬롯 int_asm",
+   "sub": "Hot DB pgoutput",
+   "ic": "db",
+   "role": "src",
+   "tag": "tsdb_cdc_pub"
+  },
+  {
+   "type": "node",
+   "id": "coord",
+   "col": 2,
+   "row": 1,
+   "title": "슬롯 읽기 · 해석",
+   "sub": "change-event-source-coordinator",
+   "ic": "stream",
+   "role": "new",
+   "tag": "engine",
+   "no": 1
+  },
+  {
+   "type": "node",
+   "id": "queue",
+   "col": 3,
+   "row": 1,
+   "title": "ChangeEventQueue",
+   "sub": "max.queue.size 8,192",
+   "ic": "layers",
+   "role": "new",
+   "tag": "engine",
+   "no": 2
+  },
+  {
+   "type": "node",
+   "id": "poll",
+   "col": 4,
+   "row": 1,
+   "title": "꺼내기 · JSON 변환",
+   "sub": "pool-2 task · pool-3 record",
+   "ic": "split",
+   "role": "new",
+   "tag": "engine",
+   "no": 3
+  },
+  {
+   "type": "node",
+   "id": "handler",
+   "col": 5,
+   "row": 1,
+   "title": "배치 콜백",
+   "sub": "해석 + 라우트 반영 + 체크포인트",
+   "ic": "code",
+   "role": "new",
+   "tag": "handler",
+   "no": 4
+  },
+  {
+   "type": "node",
+   "id": "svc",
+   "col": 6,
+   "row": 1,
+   "title": "svc 표",
+   "sub": "device_status_current 외 4",
+   "ic": "db",
+   "role": "store"
+  },
+  {
+   "type": "node",
+   "id": "other",
+   "col": 1,
+   "row": 2,
+   "title": "그 밖의 JVM",
+   "sub": "GC · JIT · 판별 · Tomcat · Hikari",
+   "ic": "server",
+   "role": "dim small"
+  },
+  {
+   "type": "node",
+   "id": "full",
+   "col": 3,
+   "row": 2,
+   "title": "큐가 차면 읽기 멈춤",
+   "sub": "WAL 은 슬롯에 남는다 — 힙 상한",
+   "ic": "alert",
+   "role": "warn small"
+  },
+  {
+   "type": "node",
+   "id": "fail",
+   "col": 5,
+   "row": 2,
+   "title": "반영 실패",
+   "sub": "재시도 3회 → dead letter · 정지 판정",
+   "ic": "alert",
+   "role": "risk small"
+  }
+ ],
+ "links": [
+  {
+   "from": "slot",
+   "to": "coord",
+   "kind": "flow"
+  },
+  {
+   "from": "coord",
+   "to": "queue",
+   "kind": "flow"
+  },
+  {
+   "from": "queue",
+   "to": "poll",
+   "kind": "flow"
+  },
+  {
+   "from": "poll",
+   "to": "handler",
+   "kind": "flow"
+  },
+  {
+   "from": "handler",
+   "to": "svc",
+   "kind": "ok"
+  },
+  {
+   "from": "queue",
+   "to": "full",
+   "kind": "muted",
+   "label": "가득",
+   "port": "b>t"
+  },
+  {
+   "from": "handler",
+   "to": "fail",
+   "kind": "risk",
+   "label": "실패",
+   "port": "b>t"
+  }
+ ]
+}
