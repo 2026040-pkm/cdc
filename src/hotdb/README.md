@@ -12,8 +12,8 @@ field-simulator ─INSERT─▶ [tsdb] ─WAL─┬─▶ zone-mch ─┐       
                                       ├─▶ zone-oft ─┼─▶ [svc]         한 스키마 · module 컬럼 · 행 수준 보안
                                       └─▶ zone-pnt ─┘    │ WAL · svc_cdc_pub = svc.actual_result
                                                          ▼
- SAP (HANA · 로컬은 sap-sim) ◀── Z 표 INSERT ── rfc-provider = RFC Service (실적 CDC → SAP, ops.rfc_sent 로 한 번만)
-                             ──JDBC 폴링──▶ rfc-provider ─▶ 레거시 DB [erp]
+ SAP (HANA · 로컬은 sap-sim) ◀── Z 표 INSERT ── rfc-service = RFC Service (실적 CDC → SAP, ops.rfc_sent 로 한 번만)
+                             ──JDBC 폴링──▶ rfc-service ─▶ 레거시 DB [erp]
  Oracle (로컬은 oracle-sim)  ──JDBC 폴링──▶ db-agent = DB Agent ─▶ 레거시 DB [mes · lgs · geo]
       ▲ legacy-simulator (레거시 발행기, 시험용) — sap-sim · oracle-sim 원천 표를 10초마다 UPDATE · INSERT 해 폴링이 가져갈 변경분을 만든다
 
@@ -47,11 +47,67 @@ python scripts\legacy-sim.py mutate   # 레거시 대역 원천 몇 행을 고�
 | DB Agent health | http://localhost:59486/actuator/health |
 | SAP 대역 | `localhost:59434` db `sapsim` (sapsim/sapsim) — 원천 `erpsrc.*` · 송신 대상 `erpsrc.zhotdb_actual_result` |
 | Oracle 대역 | `localhost:59521/FREEPDB1` — 원천 표 소유자 MES · LGS · GEO (64표), 읽기 계정 legacy_reader/legacy_reader, 관리자 system/hotdb_sim_sys |
+| **부하 제어판** | http://localhost:59480/ — 두 발행기 배속 · 멈춤 버튼, 단계 부하 시나리오, 적재 · 반영 · 지연 · WAL 실시간 차트(Prometheus). 조작 시점이 차트에 세로선으로 찍힌다 |
 | 발행기 | http://localhost:59480/sim · 배속 `POST /sim/speed?value=5` · `POST /sim/pause` |
 | 레거시 발행기 | http://localhost:59493/sim — SAP · Oracle 대역 원천 표를 10초마다 바꿔(UPDATE 3 · INSERT 1) 폴링이 가져갈 변경분을 만든다. 배속 · pause 같음 |
 
 필요한 것: podman (+ docker-compose), JDK 21 (`~/.jdks` 에 있으면 자동), Python 3.
 레거시 표(erp 114 · mes 60 · lgs 3 · geo 1 = 178표)는 `scripts/gen-sample-legacy.py` 가 만든 시험용 표다 — 이름 · 컬럼 · 값은 지어냈고, 표 수 · PK · 컬럼 수만 실제 레거시와 비슷하게 맞췄다.
+
+## 보면서 돌려 보기 (Grafana + 시뮬레이터)
+
+`.\scripts\up.ps1` 로 띄운 뒤 브라우저로 넷을 연다.
+
+| 창 | 주소 | 보는 것 |
+|---|---|---|
+| Grafana 첫 화면 **HotDB 상태** | http://localhost:59400 (admin/admin) | 맨 위 판정 13칸 — 0 정상 · 1 주의 · 2 이슈. 아래는 Hot DB CPU · 메모리 · CDC 지연 · 레거시 폴링 |
+| Grafana **HotDB CDC** (상세) | http://localhost:59400/d/hotdb-cdc/hotdb-cdc | 슬롯 · WAL · 모듈별 반영 지연 · SAP 송신 · 폴링 작업별 행 수 · 발행기 배속 |
+| Grafana **HotDB 엔진 자원** | http://localhost:59400/d/hotdb-engine | 아래 네 줄 — 엔진이 서비스 프로세스 안에서 쓰는 몫과 그 영향 (파이프라인 변수로 거른다) |
+| 현장 발행기 (field-simulator) | http://localhost:59480/sim | tsdb 로 들어가는 장비 데이터 — 장비 수 · 초당 행 · 누적 |
+| 레거시 발행기 (legacy-simulator) | http://localhost:59493/sim | SAP · Oracle 대역 원천 표 변경 — 주기 · 표마다 UPDATE · INSERT 수 · 누적 |
+
+두 발행기는 같은 조작을 받는다 (PowerShell 에서는 `curl` 이 다른 명령이라 `curl.exe`).
+
+```powershell
+curl.exe -s localhost:59480/sim                          # 상태
+curl.exe -s -X POST "localhost:59480/sim/speed?value=5"  # 배속 x5 (현장 약 2,100 행/초)
+curl.exe -s -X POST localhost:59480/sim/pause            # 멈춤
+curl.exe -s -X POST localhost:59480/sim/resume           # 다시
+curl.exe -s -X POST "localhost:59493/sim/speed?value=3"  # 레거시 발행기 배속 x3 (주기 10초 → 약 3.3초)
+curl.exe -s -X POST localhost:59493/sim/tick             # 레거시 발행기 한 주기를 지금 바로
+```
+
+해 볼 만한 것과 Grafana 에서 보이는 것:
+
+| 해 보기 | 기대 |
+|---|---|
+| 현장 발행기 배속 x5 | **HotDB CDC** 의 적재 행/초가 5배, 모듈 반영 지연 p99 가 조금 오르고 판정은 정상 유지 |
+| 현장 발행기 pause 2분 | 적재 0. heartbeat 가 있어 CDC 판정은 정상 (멈춘 건 원천이지 CDC 가 아니다) |
+| `podman stop hotdb-zone-oft`, 1분 뒤 `podman start hotdb-zone-oft` | 판정 02 · 03 · 06 이 이슈 → 다시 정상. 멈춘 사이 쌓인 WAL 을 따라잡는다 (`scripts\outage-test.ps1` 이 자동으로) |
+| 레거시 발행기 tick · 배속 | 폴링 작업별 행 수가 오르고 판정 09 정상. 원천 = 레거시 DB 인지는 `scripts\test.ps1` (OraclePollIT · RfcServiceSapIT) |
+| `podman stop hotdb-legacy-db`, 뒤에 start | 판정 12 레거시 DB 접속 · 09 레거시 폴링이 이슈. start 하면 다음 주기에 밀린 변경분을 가져온다 |
+
+### 엔진 자원 — Embedded 엔진이 서비스 프로세스 안에서
+
+**HotDB 엔진 자원** 대시보드의 네 줄이 네 질문에 답한다.
+
+| 줄 | 질문 | 보는 지표 |
+|---|---|---|
+| ① 엔진 자원 | 엔진이 프로세스 CPU · 메모리 · 스레드를 얼마나 쓰나 (평시 · 1만 건 배치 · 적체) | `hotdb_cdc_engine_cpu/alloc{part=engine\|handler\|process}` · `hotdb_cdc_engine_threads` · 힙 · GC |
+| ② 상호 영향 | 본연의 일(라우트 반영 · 판정 · RFC 전달 · 폴링)과 캡처가 자원을 다툴 때 서로 밀리나 | `hotdb_work_*{part=judge\|poll}` 와 엔진 CPU 나란히 · 캡처 지연 · 배치 반영 p99 · 판정 대기 · RFC 2단 지연 · 폴링 주기 |
+| ③ 원천 DB 부하 | 슬롯이 WAL 을 얼마나 붙잡나, 소비자가 얼마나 오래 멈춰도 되나 | 슬롯 보존 WAL vs `max_slot_wal_keep_size` · `pg_wal` 크기 · 디스크 여유 · **다운 허용 시간** = 남은 여유 / WAL 속도 |
+| ④ 적체 | 밀릴 때 메모리 상한이 지켜지나, backpressure 가 도나 | 엔진 큐 건수 · 바이트 사용률 · 힙 vs `-Xmx` · 슬롯 미확인 WAL |
+
+- 본연의 일 스레드는 `WorkThreads.factory("<part>", …)` 로 만들면 엔진과 같은 방식으로 따로 센다 (판정 `judge` · 폴링 `poll`).
+  배치 콜백(라우트 반영 · RFC 전달)은 엔진 스레드 위에서 돌아 `handler` 로 잡힌다
+- 적체 때 메모리는 엔진 큐에서 묶인다 — `max-queue-size`(8192건) · `max-queue-size-bytes`(zone 64MB · rfc 32MB). 큐가 차면
+  엔진이 슬롯 읽기를 멈추고 밀린 것은 원천 WAL 에 남는다. ④ 에서 큐 사용률이 1 에 붙어 있는 동안 힙이 평평하고 슬롯 미확인 WAL 이
+  오르면 backpressure 가 도는 것이다
+- 다운 허용 시간은 "지금 WAL 속도로 소비자가 멈추면" 이다. 디스크 쪽이 슬롯 쪽보다 짧으면 슬롯 무효화 전에 디스크가 차서 DB 가 멈춘다.
+  디스크는 node-exporter 대상 중 라벨 `hotdb_db="1"` 인 서버의 `/` 로 본다 (`up.ps1` · `up-services.sh` 가 붙인다)
+- 경보: `CdcEngineBackpressure`(큐 90% 5분) · `CdcDowntimeBudgetLow`(다운 허용 1시간 미만) · `HotdbDiskBelowSlotCap`(디스크 여유 < 슬롯 상한)
+- 세 시나리오를 실제로 재려면 `python scripts/engine-resource.py all` — 구간마다 Grafana 주석(tag `engine-resource`)을 남겨
+  그래프 위에 평시 · 배치 · 적체 띠가 보인다. 힙의 엔진 몫은 엔진을 끈 쌍둥이와의 차이로 `summary.json` 에 나온다
 
 ## 구성
 
@@ -62,7 +118,7 @@ python scripts\legacy-sim.py mutate   # 레거시 대역 원천 몇 행을 고�
 | `app/cdc-core` | CDC 포트(`port.CdcSource` 입력 · `port.CdcSink` 출력) · Debezium 어댑터(`adapter.debezium`, `hotdb.cdc.adapter` 로 선택) · 청크 → 하이퍼테이블 역매핑 · 설정 기반 라우팅 · JDBC 반영 |
 | `app/poll-core` | 레거시 폴링 라이브러리 — 원천 표 → 레거시 DB 표, 워터마크 증분 · 설정의 작업 목록만 |
 | `app/zone-service` | 실적 판별 모듈. **코드 없이 설정(`application.yml` 의 `hotdb.routes`)만 있다**. `ZONE` 으로 모듈 선택 |
-| `app/rfc-provider` | RFC Service (O-8) — ① SAP 폴링 → erp (poll-core) ② `svc.actual_result` CDC → SAP. SAP 송신은 `RfcSender` — `jdbc`(Z 표) · `dry-run` |
+| `app/rfc-service` | RFC Service (O-8) — ① SAP 폴링 → erp 114표 전부 (poll-core, 작업 목록 `poll-jobs.yml` 은 `scripts/gen-sample-legacy.py` 생성) ② `svc.actual_result` CDC → SAP. SAP 송신은 `RfcSender` — `jdbc`(Z 표) · `dry-run` |
 | `app/db-agent` | DB Agent (O-6) — Oracle 폴링 → mes · lgs · geo 64표 전부 (poll-core). 작업 목록 `poll-jobs.yml` 은 `scripts/gen-sample-legacy.py` 가 만든다 |
 | `compose.legacy-sim.yml` · `scripts/legacy-sim.py` | 로컬 검증용 SAP 대역(PostgreSQL) · Oracle 대역(oracle-free 23) · 원천 표 시드 · 레거시 발행기 |
 | `app/field-simulator` | 카탈로그 기준 3채널 · 350대 발행기 (×1 ≈ 426 행/초) |
@@ -111,6 +167,30 @@ python scripts\legacy-sim.py mutate   # 레거시 대역 원천 몇 행을 고�
 
 새 권역 표 · 새 원천 표도 라우트 한 블록이면 된다. 판별 로직처럼 설정으로 안 되는 것만 서비스에 코드를 더한다.
 
+## 실적 판별
+
+라우트는 실적(`svc.actual_result`)을 `PENDING` 으로 넣기만 한다. 판정은 같은 프로세스의 **판별 단계**
+(`dev.hotdb.zone.judge.JudgementWorker`, 스레드 `judge-<모듈>`)가 한다 — 1초마다 자기 모듈의 PENDING 을
+오래된 것부터 최대 200건 `FOR UPDATE SKIP LOCKED` 로 집어 규칙을 적용하고 `judged_status` · `judged_at`(V15)을 쓴다.
+
+- CDC 반영(엔진 스레드)과 떨어져 있어 판정이 느리거나 규칙이 터져도 슬롯은 밀리지 않는다
+- 라우트가 `judged_status` 를 `keep` 으로 써서 같은 실적이 다시 와도 판정이 되돌아가지 않는다
+- 판정이 바뀌면 RFC Service 가 (실적 키 + 판정 상태) 새 키로 SAP 에 한 번 더 보낸다 — PENDING 한 번, 판정 한 번
+- 규칙이 예외를 던진 행은 PENDING 으로 두고 재기동 전까지 다시 집지 않는다 (`hotdb_judge_failed_total`)
+- 지표: `hotdb_judge_judged_total{status}` · `hotdb_judge_pending` · `hotdb_judge_pending_oldest_seconds`
+
+규칙은 모듈마다 다르게 둘 수 있다. 빈이 없으면 `hotdb.judge.threshold`(진척률 ≥ 100 · 정합도 ≥ 0.9 → CONFIRMED,
+아니면 REJECTED)를 쓴다. 모듈 전용 규칙은 프로필(= `ZONE`)을 붙인 빈 하나다:
+
+```java
+@Component @Profile("pnt")
+class PaintRule implements JudgementRule {
+    public String judge(ActualResult r) { ... return CONFIRMED; }
+}
+```
+
+판정을 끄려면 `JUDGE_ENABLED=false` (실적은 PENDING 으로만 남는다).
+
 ## 실적 판별 모듈을 더하려면
 
 ```sql
@@ -119,7 +199,7 @@ SELECT ops.provision_module('cut', 'CUTTING', '절단 실적 판별');
 ```
 
 그다음 `compose.zone.yml` 에 블록 하나(`ZONE: cut`, `ZONE_CODE: CUTTING`)와 `monitoring/prometheus/targets/zone-service.json` 에 주소 하나.
-코드 · 라우트는 그대로다 — 모듈마다 규칙이 달라야 하면 `application-cut.yml` 에 그 모듈 라우트만 적는다.
+코드 · 라우트는 그대로다 — 모듈마다 라우트가 달라야 하면 `application-cut.yml` 에 그 모듈 라우트만, 판정 규칙이 달라야 하면 `@Profile("cut")` 규칙 빈 하나 (위 실적 판별).
 모니터링(`ops.module_apply_lag()`)과 RFC Service 의 CDC(include 정규식 `svc_[a-z][a-z0-9]*`)는 알아서 새 모듈을 센다.
 
 모듈 RDB 안의 표는 FK 로 묶여 있다 — 장비 마스터 ◀ 최신 상태 ◀ 전이, 장비 ◀ 스캔 ◀ 실적 · 산출물.
@@ -168,7 +248,7 @@ docker 에서는 podman-exporter 대신 `cadvisor`(59492) 를 띄운다 — rule
 ### 운영 안전장치 (2026-10-06 서버 to 서버에서 겪고 넣은 것)
 
 - **서비스는 Hot DB 없이 죽지 않는다** — 기동 때 `DbReadyGate` 가 `SELECT 1` 이 될 때까지 5초마다 기다린다(`hotdb.cdc.db-wait`). 전에는 DB 가 내려가 있으면 컨텍스트가 실패해 컨테이너가 재시작을 반복했다
-- **슬롯 WAL 상한 20GB** (`max_slot_wal_keep_size`, `HOTDB_SLOT_WAL_KEEP`). 발행기 ×10 을 20분 돌리자 rfc_provider 슬롯이 12GB 뒤처져 10GB 상한에 무효화됐다(`wal_status=lost`). 무효화되면 슬롯 · `ops.cdc_checkpoint` · 오프셋을 지우고 다시 붙여야 하고, RFC Service 는 `svc.actual_result` 를 처음부터 스냅샷해 안 보낸 것만 보낸다(`ops.rfc_sent` 가 거른다)
+- **슬롯 WAL 상한 20GB** (`max_slot_wal_keep_size`, `HOTDB_SLOT_WAL_KEEP`). 발행기 ×10 을 20분 돌리자 rfc_service 슬롯이 12GB 뒤처져 10GB 상한에 무효화됐다(`wal_status=lost`). 무효화되면 슬롯 · `ops.cdc_checkpoint` · 오프셋을 지우고 다시 붙여야 하고, RFC Service 는 `svc.actual_result` 를 처음부터 스냅샷해 안 보낸 것만 보낸다(`ops.rfc_sent` 가 거른다)
 - 한 대(Mac)에서는 **×3~×5 까지**가 안전하다. 올릴 때 Grafana "슬롯 최대 보존 WAL" 과 경보 `CdcSlotRetainingWal` 을 본다
 
 ## 처음 잰 값 (2026-10-06, 로컬 podman VM 2GiB · 권역 서비스 2개)
@@ -184,12 +264,12 @@ docker 에서는 podman-exporter 대신 `cadvisor`(59492) 를 띄운다 — rule
 
 ### 2단 CDC 를 붙인 뒤 (2026-10-06, `-Fast` = actual 5초 주기라 행/초가 ×1 기준의 약 3배)
 
-| 배속 | tsdb 적재 | WAL | walsender CPU (슬롯당) | 권역 서비스 CPU (각) | rfc-provider 수신 · CPU | PG CPU | 2단 지연 (반영 → 송신) |
+| 배속 | tsdb 적재 | WAL | walsender CPU (슬롯당) | 권역 서비스 CPU (각) | rfc-service 수신 · CPU | PG CPU | 2단 지연 (반영 → 송신) |
 |---|---|---|---|---|---|---|---|
 | ×1 | ≈ 1,170 행/초 | ≈ 1.0 MB/s | 0.009 코어 (rfc 0.007) | 0.17 코어 | 10 ev/s · 0.02 코어 | 0.21 코어 | 평균 0.28초 · 최대 0.56초 |
 | ×3 | ≈ 3,680 행/초 | ≈ 2.9 MB/s | 0.04 코어 (rfc 0.019) | 0.52 코어 | 33 ev/s · 0.05 코어 | 0.61 코어 | 평균 0.31초 · 전 구간 최대 3.5초 |
 
-- rfc_provider 슬롯은 publication 으로 1% 만 받는데도 walsender CPU 가 권역 슬롯의 절반이다 — **논리 디코딩은 publication 과 상관없이 슬롯마다 전체 WAL 을 읽는다**
+- rfc_service 슬롯은 publication 으로 1% 만 받는데도 walsender CPU 가 권역 슬롯의 절반이다 — **논리 디코딩은 publication 과 상관없이 슬롯마다 전체 WAL 을 읽는다**
 - 비용의 대부분은 HotDB 가 아니라 소비자 JVM 쪽이다 (모든 이벤트를 받아 JSON 을 풀고 권역 밖 것을 버린다)
 
 ## 알아 둘 것
@@ -199,11 +279,11 @@ docker 에서는 podman-exporter 대신 `cadvisor`(59492) 를 띄운다 — rule
 - 레거시 폴링은 워터마크(`upd_date || upd_time`) 이상만 다시 읽는다 — 같은 값의 행은 매번 다시 읽히지만 UPSERT 라 결과가 같다.
   작업 상태는 `ops.poll_state`, 멈추면 경보 `LegacyPollStale`
 - SAP 송신을 JCo(RFC 함수)로 바꿀 때는 `RfcSender` 구현 하나만 더한다 — CDC · 중복 차단(`ops.rfc_sent`) · 재시도는 그대로
-- 압축 정책은 7일 뒤에 건다. 압축은 원본 행을 이벤트 없이 비우므로, 소비자가 7일 넘게 멈추면 그 구간은 CDC 로 안 나온다
+- 압축은 7일 뒤, 보존은 90일(V13). 압축은 원본 행을 이벤트 없이 비우므로, 소비자가 7일 넘게 멈추면 그 구간은 CDC 로 안 나온다
 - 슬롯은 서비스가 처음 붙을 때 만든다. 서비스를 영영 안 쓸 거면 슬롯을 지워야 WAL 이 풀린다 (모듈째 걷어낼 때는 `ops.drop_module` 이 슬롯 · 체크포인트까지 지운다):
   `SELECT pg_drop_replication_slot('zone_pnt');`
 - `svc_cdc_pub` 에는 `actual_result` 만 싣는다 (V6). 다른 표를 SAP 로 보내야 하면 V 파일로 더한다
-- RFC Provider 는 실적 키 + 판정 상태당 한 번만 보낸다(`ops.rfc_sent`). SAP 가 내용으로 거절하면(`RfcRejectedException`) dead letter, 접속 장애는 재시도 후 재시작 — 오프셋이 안 넘어가 빠지는 실적이 없다
+- RFC Service 는 실적 키 + 판정 상태당 한 번만 보낸다(`ops.rfc_sent`). SAP 가 내용으로 거절하면(`RfcRejectedException`) dead letter, 접속 장애는 재시도 후 재시작 — 오프셋이 안 넘어가 빠지는 실적이 없다
 - 오프셋 볼륨(`zone-*-data`)을 지워도 슬롯이 살아 있으면 유실은 없다 — 슬롯의 confirmed_flush 위치부터 다시 받는다
 
 ### CDC 안전장치 (이전 Java 판 embedded-cdc · latest-poc 에서 옮김)

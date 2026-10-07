@@ -10,7 +10,7 @@
     {"type": "node", "id": "tsdb", "col": 3, "row": 1, "rowspan": 2, "align": "center", "title": "tsdb", "sub": "device · tag_catalog · *_history 3", "ic": "db", "role": "store src", "tag": "tsdb_cdc_pub"},
     {"type": "node", "id": "zone", "col": 4, "row": 1, "rowspan": 2, "align": "center", "title": "실적 판별 모듈 ×N", "sub": "가공 · 조립 · 의장 · 도장 — 자기 권역만", "ic": "code", "role": "new", "tag": "Debezium Embedded"},
     {"type": "node", "id": "svc", "col": 5, "row": 1, "rowspan": 2, "align": "center", "title": "svc_<모듈>", "sub": "RDB field data · 관계형 5표", "ic": "db", "role": "store new", "tag": "svc_cdc_pub = 실적"},
-    {"type": "node", "id": "rfc", "col": 6, "row": 2, "rowspan": 2, "align": "center", "title": "RFC Service", "sub": "① SAP 폴링 → erp ② 실적 CDC → SAP", "ic": "link", "role": "new", "tag": "rfc-provider"},
+    {"type": "node", "id": "rfc", "col": 6, "row": 2, "rowspan": 2, "align": "center", "title": "RFC Service", "sub": "① SAP 폴링 → erp ② 실적 CDC → SAP", "ic": "link", "role": "new", "tag": "rfc-service"},
     {"type": "node", "id": "zsap", "col": 6, "row": 1, "title": "SAP Z 표", "sub": "zhotdb_actual_result", "ic": "server", "role": "isl", "tag": "SAP RDB field data"},
     {"type": "node", "id": "sap", "col": 6, "row": 4, "title": "SAP HANA 원천", "sub": "YDEH050M · YDEH060M · YCPS301M …", "ic": "server", "role": "isl", "tag": "Legacy RDB sap"},
     {"type": "node", "id": "erp", "col": 5, "row": 3, "title": "erp", "sub": "레거시 DB · 114표", "ic": "db", "role": "store", "tag": "rfc_agent"},

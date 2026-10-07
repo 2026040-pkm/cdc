@@ -124,7 +124,7 @@ def render():
   <div class="smap__row smap__row--3">{ops}{internal}{pub}</div>
   <div class="smap__pub">
     <div><b>tsdb_cdc_pub</b> <span class="ar">→</span> 슬롯 <b>zone_mch · zone_asm · zone_oft · zone_pnt</b> <span class="ar">→</span> 실적 판별 모듈 → svc_&lt;모듈&gt;</div>
-    <div><b>svc_cdc_pub</b> <span class="ar">→</span> 슬롯 <b>rfc_provider</b> <span class="ar">→</span> RFC Service ② → SAP Z 표 (ops.rfc_sent 로 한 번만)</div>
+    <div><b>svc_cdc_pub</b> <span class="ar">→</span> 슬롯 <b>rfc_service</b> <span class="ar">→</span> RFC Service ② → SAP Z 표 (ops.rfc_sent 로 한 번만)</div>
   </div>
 </div>"""
 

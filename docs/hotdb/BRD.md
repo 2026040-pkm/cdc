@@ -11,17 +11,18 @@ v0.3 · 2026-10-06 · 상태: 파란 영역(HotDB Provider 제외) 구현 · 로
 | 2026-10-06 | Q1 → **A안 확정** (청크 스키마째 publication + 역매핑) | 스파이크: 새 청크 자동 편입 · publication 이 있어도 새 하이퍼테이블 · 연속집계 생성 가능. 압축 뭉치는 `_hyper_N_M_chunk_compressed` 로 실려 정규식으로 버린다 |
 | 2026-10-06 | 2.29 의 자동 압축 정책은 지우고 **7일 뒤 압축**으로 다시 건다 | `tsdb.segmentby` 를 주면 기본 정책이 자동으로 붙는다 — 그대로 두면 CDC 가 읽기 전에 압축될 수 있다 |
 | 2026-10-06 | Q3 → 레거시 사본은 **시험용으로 지어낸 표**로 둔다 (실제 표 이름 · 값을 쓰지 않음, 보안) | `erp`(SAP 사본) · `mes` · `lgs`(Oracle 사본) — 178표(erp 114 · mes 60 · lgs 3 · geo 1), `scripts/gen-sample-legacy.py` → `db/legacy-db/V2`. 이름 · 값은 지어내고 규모(표 · PK · 컬럼 수)만 실제와 맞춘다. 덤프 기반 DDL 생성은 폐기 |
-| 2026-10-06 | **2단 CDC** — 권역 RDB 를 다시 CDC 로 받는 RFC Provider 를 붙인다 (`app/rfc-provider`) | 사용자 결정: Provider → tsdb → (CDC) 권역 서비스 → svc_* → (CDC) 다른 서비스. cdc-core 엔진을 그대로 쓰고 반영 대상만 `CdcSink` 로 바꾼다. SAP 송신은 dry-run |
-| 2026-10-06 | `svc_cdc_pub` 를 `svc_*` 스키마 전체 → **`actual_result` 만**으로 좁힘 (V6) | 스키마째면 `device_status_current` 의 초당 갱신(≈ 350/s)이 전부 RFC Provider 로 가 버려진다. 대신 새 표는 자동으로 안 실린다 |
+| 2026-10-06 | **2단 CDC** — 권역 RDB 를 다시 CDC 로 받는 RFC Service 를 붙인다 (`app/rfc-service`) | 사용자 결정: Provider → tsdb → (CDC) 권역 서비스 → svc_* → (CDC) 다른 서비스. cdc-core 엔진을 그대로 쓰고 반영 대상만 `CdcSink` 로 바꾼다. SAP 송신은 dry-run |
+| 2026-10-06 | `svc_cdc_pub` 를 `svc_*` 스키마 전체 → **`actual_result` 만**으로 좁힘 (V6) | 스키마째면 `device_status_current` 의 초당 갱신(≈ 350/s)이 전부 RFC Service 로 가 버려진다. 대신 새 표는 자동으로 안 실린다 |
 | 2026-10-06 | 개발 범위 = 그림의 **파란 영역**(Hot DB · RFC Service · DB Agent · 실적 판별 모듈), **HotDB Provider 는 제외** | 사용자 결정 (§00.1 그림) |
 | 2026-10-06 | 실적 판별 모듈은 **N 개** — 가공 · 조립 · 의장 · 도장, 더 늘 수 있다 → `ops.provision_module()` 한 줄로 스키마 · 계정 · 표 · 관계 · publication 생성 (V7) | 사용자: "모듈은 다수가 될 수 있다". 모듈 수에 따라 바뀌던 곳(V3 의 고정 4개, exporter 의 UNION 4줄, compose 프로파일)을 등록부(`ops.module`) 하나로 모았다 |
 | 2026-10-06 | 모듈 RDB 안의 **연관 데이터는 FK 로 잇는다** — 장비 마스터(`tsdb.device`) ◀ 최신 상태 ◀ 전이, 장비 ◀ 스캔 ◀ 실적 · 산출물 | 사용자: "연관이 있는 데이터는 연관성 있게". 모듈 안 FK 는 `DEFERRABLE INITIALLY DEFERRED`, 채널 순서가 뒤바뀐 경우(산출물 먼저)는 `scan-stub` 라우트가 부모 자리를 먼저 만든다 |
-| 2026-10-06 | **RFC Service = SAP 폴링(→ erp) + 2단 CDC(→ SAP)** 한 서비스. 모듈 · 슬롯 · 계정 이름은 `rfc-provider` 그대로 | 그림의 O-8. 폴링은 `poll-core`(계정 `rfc_agent`), CDC 는 cdc-core(계정 `rfc_provider`) — 한 프로세스에 계정 둘 |
+| 2026-10-06 | **RFC Service = SAP 폴링(→ erp) + 2단 CDC(→ SAP)** 한 서비스. 모듈 · 슬롯 · 계정 이름도 `rfc-service` / `rfc_service` (2026-10-07 V14 에서 옛 이름 rfc-provider 정리) | 그림의 O-8. 폴링은 `poll-core`(계정 `rfc_agent`), CDC 는 cdc-core(계정 `rfc_service`) — 한 프로세스에 계정 둘 |
 | 2026-10-06 | SAP 쓰기는 **갈아 끼우는 방식**(`RfcSender`) — 우선 **JDBC 로 Z 테이블 INSERT**, JCo(RFC 함수)는 커넥터를 받으면 구현 하나 추가 | 사용자 결정. JCo 는 S-user 로만 받을 수 있다 |
 | 2026-10-06 | **DB Agent** = `poll-core` + Oracle JDBC. 워터마크(`upd_date ∥ upd_time`) 증분 · 설정의 작업 목록만 늘리면 표가 는다 | 그림의 O-6 |
 | 2026-10-06 | 그림 갱신 — 네 개 모두 **실적 판별 모듈**(dockerized java module)로 통일, 모듈 묶음에 **"순차적으로 적재를 위한 큐 필요"** 메모 | 큐는 §10 Q10 — 의도 확인 전까지 구현하지 않음 |
 | 2026-10-06 | 로컬 검증은 **SAP 대역 DB**(PostgreSQL) · **Oracle 대역**(oracle-free 23) — 실제 SAP 는 띄우지 않음 | 사용자 결정. 운영 HANA 는 접속 설정(`SAP_URL`)만 바꾼다 |
 | 2026-10-06 | **레거시 DB 를 Hot DB 와 나눈다** — Hot DB(필드 DB) = tsdb · svc · ops, 레거시 DB(`hotdb-legacy-db`) = erp · mes · lgs · geo · `ops.poll_state` | 사용자 결정. V10 이 Hot DB 에서 폴링 상태 · `rfc_agent` · `db_agent` 를 지운다. `compose.legacy.yml` |
+| 2026-10-07 | 이름 **rfc-provider → rfc-service** — 모듈 · 컨테이너 · 이미지 · 지표 레이블 · 계정(`rfc_service`) · 슬롯(`rfc_service`) 전부 | 사용자 결정. 그림의 RFC Service(O-8)와 맞춘다. V14: 계정 이름 변경, 슬롯은 이름을 못 바꿔 새로 만듦(실적을 처음부터 다시 읽지만 `ops.rfc_sent` 가 걸러 SAP 중복 0) |
 
 ![HotDB 구조 — 파란 영역이 개발 범위](img/hotdb-architecture-2026-10-06.png)
 
@@ -61,7 +62,7 @@ CDC 소비자(권역별 서비스)는 그 위에서 2단계로 붙인다.
 |---|---|---|
 | Hot DB (O-7) — Legacy RDB sap · Legacy RDB oracle · TSDB field data · RDB field data | Hot DB(PostgreSQL 17 + TimescaleDB) `tsdb` · `svc` + 레거시 DB(PostgreSQL) `erp` · `mes`/`lgs` | 구현 |
 | 가공 · 조립 · 의장 · 도장 실적 판별 모듈 (다수, 그림의 박스 하나) | `app/zone-service` 한 이미지 × 모듈 수 (`ZONE=mch·asm·oft·pnt`) — tsdb CDC → `svc_<모듈>` INSERT | 구현 (도장 · 가공은 필드 정의서 전이라 대역 장비로만 확인) |
-| RFC Service (O-8) — Embed debezium · polling · RFC service | `app/rfc-provider` — ① SAP 폴링 → `erp` ② `svc.actual_result` CDC → SAP Z 표 | 구현 (SAP 대역으로 확인, JCo 는 미정) |
+| RFC Service (O-8) — Embed debezium · polling · RFC service | `app/rfc-service` — ① SAP 폴링 → `erp` ② `svc.actual_result` CDC → SAP Z 표 | 구현 (SAP 대역으로 확인, JCo 는 미정) |
 | DB Agent (O-6) | `app/db-agent` — Oracle 폴링 → `mes` · `lgs` | 구현 (Oracle 대역으로 확인) |
 | HotDB Provider (파란 영역 밖) | — `field-simulator` 가 tsdb 에 직접 써서 대신한다 | 범위 밖 |
 
@@ -84,7 +85,7 @@ CDC 소비자(권역별 서비스)는 그 위에서 2단계로 붙인다.
 
 - HotDB Provider (MQTT Agent → tsdb) — 그림의 파란 영역 밖. `field-simulator` 가 tsdb 에 직접 써서 대신한다
 - 장비 → MQTT 브로커 → MQTT Agent 구간 (태그 카탈로그 문서 소관)
-- 실적 판별 **로직**(블록 진척률 → 실적 확정 규칙). 1단계 RDB 는 판별 결과를 담을 그릇까지만 만든다
+- 실적 판별 **규칙의 내용**(블록 진척률 → 실적 확정 기준). 판별 단계 · 모듈별 규칙 자리 · 임계값 기본 규칙은 구현했다 (2026-10-07, V15) — 실제 기준은 업무 확인 후 규칙 빈으로 바꾼다
 - 레거시 **데이터** 이관. 레거시는 스키마(DDL)만 쓴다
 
 ---
@@ -98,7 +99,7 @@ drawio 에서 HotDB 와 직접 닿는 것만 뽑는다.
 | HotDB (PostgreSQL) | Hot Data DB 서버 · RAM 32GB | — | — |
 | HotDB Provider | (drawio 에 배치 미표기) | **쓰기** | `tsdb` 만 |
 | 실적 판별 모듈 N 개 (가공 · 조립 · 의장 · 도장 …) | OT Server A (조립·도장), B (의장·가공) | tsdb **CDC 읽기**, 자기 RDB **쓰기** | `svc_<모듈>` |
-| RFC Service (O-8) — 폴링 + Embed Debezium | RFC AGENT 박스 | ① SAP 폴링 → **쓰기** (`rfc_agent`) ② RDB **CDC 읽기** → SAP (`rfc_provider`) | ① `erp` ② `svc.actual_result` |
+| RFC Service (O-8) — 폴링 + Embed Debezium | RFC AGENT 박스 | ① SAP 폴링 → **쓰기** (`rfc_agent`) ② RDB **CDC 읽기** → SAP (`rfc_service`) | ① `erp` ② `svc.actual_result` |
 | DB Agent (O-6) | DB AGENT 박스 | Oracle 폴링 → **쓰기** (`db_agent`) | `mes` · `lgs` |
 | OT API 서비스 · OT 대시보드 | — | 읽기 | 전부 |
 
@@ -259,7 +260,7 @@ tsdb.device (site, device_id) ◀── scan (scan_id) ◀── actual_result  
 | `tsdb_cdc_pub` | publication | `tsdb.device` · `tsdb.tag_catalog` + 하이퍼테이블 청크 (§05.2) |
 | `svc_cdc_pub` | publication | `svc_{asm,oft,pnt,mch}.actual_result` + `ops.cdc_heartbeat` (V6 에서 스키마 단위 → 표 단위로 좁힘) |
 | `zone_<모듈>` | 슬롯 (모듈 수만큼) | 판별 모듈이 첫 접속 때 생성 (pgoutput). 모듈을 걷어낼 때 `ops.drop_module()` 이 같이 지운다 |
-| `rfc_provider` | 슬롯 1 | RFC Service 가 생성. 모듈 전부를 이 슬롯 하나로 받는다 (include 정규식 `svc_[a-z][a-z0-9]*\.actual_result`) |
+| `rfc_service` | 슬롯 1 | RFC Service 가 생성. 모듈 전부를 이 슬롯 하나로 받는다 (include 정규식 `svc_[a-z][a-z0-9]*\.actual_result`) |
 | `ops.module` | 표 | 모듈 등록부 — 모듈 · 스키마 · 권역 코드. 판별 모듈은 기동 때 자기 등록을 확인한다 |
 | `max_slot_wal_keep_size` | 설정 | 10GB — 멈춘 소비자가 디스크를 채우지 않게 (직전 설계 유지) |
 
@@ -306,17 +307,17 @@ publication 은 권역으로 행을 거를 수 없다(청크 · 스키마 단위
 
 | 구분 | RFC Service ① (SAP → erp) | DB Agent (Oracle → mes · lgs · geo) | RFC Service ② (svc → SAP) |
 |---|---|---|---|
-| 방식 | JDBC 폴링 (`poll-core`, HANA `ngdbc`) | JDBC 폴링 (`poll-core`, `ojdbc11`) | Embedded Debezium (슬롯 `rfc_provider`) |
+| 방식 | JDBC 폴링 (`poll-core`, HANA `ngdbc`) | JDBC 폴링 (`poll-core`, `ojdbc11`) | Embedded Debezium (슬롯 `rfc_service`) |
 | 증분 기준 | 워터마크 식 — 기본 `upd_date ∥ upd_time` (작업마다 지정) | 동일 | WAL LSN |
 | 쓰기 | 배치 UPSERT (대상 PK). PK 없는 표는 `mode: replace` | 동일 | `RfcSender` — `jdbc`(SAP Z 표 INSERT) · `dry-run`, JCo 는 추가 예정 |
 | 상태 | 레거시 DB `ops.poll_state` (작업별 워터마크 · 마지막 성공 · 오류) | 동일 | 오프셋 파일 + `ops.rfc_sent`(실적 · 판정당 한 번) |
-| 계정 | `rfc_agent` (레거시 DB erp 만) | `db_agent` (레거시 DB mes · lgs · geo 만) | `rfc_provider` |
+| 계정 | `rfc_agent` (레거시 DB erp 만) | `db_agent` (레거시 DB mes · lgs · geo 만) | `rfc_service` |
 | 로컬 원천 | SAP 대역 `hotdb-sap-sim` (PostgreSQL, `erpsrc.*`) | Oracle 대역 `hotdb-oracle-sim` (FREEPDB1 — 소유자 `MES` · `LGS` · `GEO`, 읽기 계정 `LEGACY_READER`) | 같은 SAP 대역의 `erpsrc.zhotdb_actual_result` |
 | 운영 원천 | `SAP_URL=jdbc:sap://<host>:<port>/?currentschema=<스키마>` | `ORACLE_URL` · `ORACLE_SCHEMA` | 같은 HANA 의 Z 표 |
 
 - 워터마크는 모든 행을 쓴 뒤에만 저장한다. 같은 워터마크 값의 행은 매번 다시 읽는다(`>=`) — 같은 초에 바뀐 행을 놓치지 않으려고. UPSERT 라 결과는 같다
 - 컬럼은 원천 · 대상 양쪽에 있는 것만 옮긴다. 한쪽 표에 컬럼이 늘어도 코드는 그대로다
-- 작업은 RFC Service 3개(erp) + DB Agent 64개(Oracle 사본 mes 60 · lgs 3 · geo 1 전부 — `poll-jobs.yml` 은 `scripts/gen-sample-legacy.py` 생성). PK 없는 24표는 `mode: replace`. Oracle 대역은 소유자 MES · LGS · GEO 아래 같은 64표를 두고 읽기 계정 LEGACY_READER 가 읽는다 (FREEPDB1 에 다른 사용자는 두지 않는다). 실제 원천 표의 워터마크 컬럼 · 주기는 §10 Q8
+- 작업은 RFC Service 114개(SAP 사본 erp 전부, PK 없는 28표는 replace) + DB Agent 64개(Oracle 사본 mes 60 · lgs 3 · geo 1 전부 — `poll-jobs.yml` 은 `scripts/gen-sample-legacy.py` 생성). PK 없는 24표는 `mode: replace`. Oracle 대역은 소유자 MES · LGS · GEO 아래 같은 64표를 두고 읽기 계정 LEGACY_READER 가 읽는다 (FREEPDB1 에 다른 사용자는 두지 않는다). 실제 원천 표의 워터마크 컬럼 · 주기는 §10 Q8
 
 ## 07. 테스트 (R5)
 
@@ -365,8 +366,8 @@ Prometheus + Grafana. 대시보드는 HotDB · CDC 소비자 · 레거시 유입
 | 단계 | 내용 | 산출물 | 완료 기준 |
 |---|---|---|---|
 | **1. HotDB** ✅ | Flyway 마이그레이션(스키마 · 계정 · publication) · 레거시 DDL 생성 · 발행기 · 스키마 테스트 · CDC 스파이크 · 모니터링 | `src/hotdb/db` · `app/hotdb-migrate` · `app/field-simulator` · `monitoring` | 완료 2026-10-06 |
-| **2. 판별 모듈 CDC** (진행) | `cdc-core` + 판별 모듈 N 개(등록부 · 관계형 RDB) · E2E · 장애 — **완료**. 서버 to 서버 부하 측정 · 실적 판별 로직 — 남음 | `app/cdc-core` · `app/zone-service` · V7 | §07 합격 기준 |
-| **3. 레거시** ✅ (대역) | RFC Service(SAP 폴링 + 2단 CDC → SAP Z 표) · DB Agent(Oracle 폴링) — 로컬 대역으로 통합 테스트 통과. 운영 SAP · Oracle 접속, JCo, 실제 레거시 표 작업 목록 — 남음 | `app/poll-core` · `app/rfc-provider` · `app/db-agent` · V8 | 증분 누락 0 |
+| **2. 판별 모듈 CDC** (진행) | `cdc-core` + 판별 모듈 N 개(등록부 · 관계형 RDB) · E2E · 장애 — **완료**. 판별 단계(PENDING → CONFIRMED · REJECTED, 모듈별 규칙 빈 · 임계값 기본 규칙) — **완료**. 서버 to 서버 부하 측정 · 실제 판별 기준 — 남음 | `app/cdc-core` · `app/zone-service` · V7 | §07 합격 기준 |
+| **3. 레거시** ✅ (대역) | RFC Service(SAP 폴링 + 2단 CDC → SAP Z 표) · DB Agent(Oracle 폴링) — 로컬 대역으로 통합 테스트 통과. 운영 SAP · Oracle 접속, JCo, 실제 레거시 표 작업 목록 — 남음 | `app/poll-core` · `app/rfc-service` · `app/db-agent` · V8 | 증분 누락 0 |
 
 ---
 
@@ -379,8 +380,8 @@ Prometheus + Grafana. 대시보드는 HotDB · CDC 소비자 · 레거시 유입
 | ~~Q3~~ | 레거시 스키마 이름 | **확정: 시험용으로 지어낸 표** (`erp` · `mes` · `lgs`) — 실제 이름 · 값은 저장소에 두지 않는다 | 보안 |
 | Q4 | 서버 to 서버 테스트 장비 — 실서버 전 단계에 쓸 두 번째 호스트 | 확인 필요 | R1-b 일정 |
 | Q5 | 도장(PLC) · 가공 필드 정의 | 정의서 전까지 모듈은 떠 있고 LiDAR 모양 대역 장비로만 확인 (`up.ps1 -AllZones`) | svc_pnt · svc_mch 라우트 |
-| Q6 | tsdb 보존 기간 · 압축 지연 | 보존 90일, 압축 7일 후 | 디스크 · B2 |
+| ~~Q6~~ | tsdb 보존 기간 · 압축 지연 | **확정: 압축 7일 뒤 · 보존 90일** (2026-10-07, V13 — V12 의 보존 7일 · 압축 안 함을 되돌림) | 디스크 · B2 |
 | Q7 | RFC 함수 호출(JCo) — S-user 로 sapjco3 확보 여부와 호출할 RFC 함수(Z 모듈) | 확보 전까지 JDBC 로 Z 표 INSERT | `RfcSender` 구현 하나 |
 | Q8 | 실제 레거시 폴링 범위 — 표별 워터마크 컬럼 · 주기 · PK 없는 표 처리 | PK 와 변경 일시 컬럼이 있는 표부터, PK 없는 큰 표는 replace 대신 원천 뷰로 키를 만든다 | 작업 목록 · 원천 부하 |
-| Q9 | 모듈마다 판별 규칙 · 라우트가 다른가 | 같은 라우트로 시작, 다르면 `application-<모듈>.yml` 에 그 모듈 라우트만 | 판별 로직 (S7) |
-| Q10 | 판별 모듈 앞에 "순차적으로 적재를 위한 큐" (그림 메모) — 무엇의 순서를 지키려는가 | 지금 모듈 안에서는 이미 순차 (슬롯 하나 · 엔진 단일 스레드 · WAL 순서대로 배치 커밋). 큐가 필요한 경우는 ① 한 모듈을 여러 인스턴스로 늘릴 때(장비 단위 순서 보장) ② 판별 로직이 느려 CDC 를 막을 때(받기 · 판별 분리) — 어느 쪽인지 확인 후 설계 | 모듈 구조 · 슬롯 수 · Kafka 미사용 결정과 충돌 여부 |
+| Q9 | 모듈마다 판별 규칙 · 라우트가 다른가 | 같은 라우트 · 임계값 규칙으로 시작. 라우트가 다르면 `application-<모듈>.yml`, 규칙이 다르면 `@Profile("<모듈>")` 규칙 빈 | 판별 기준 (S7) |
+| Q10 | 판별 모듈 앞에 "순차적으로 적재를 위한 큐" (그림 메모) — 무엇의 순서를 지키려는가 | 지금 모듈 안에서는 이미 순차 (슬롯 하나 · 엔진 단일 스레드 · WAL 순서대로 배치 커밋). 큐가 필요한 경우는 ① 한 모듈을 여러 인스턴스로 늘릴 때(장비 단위 순서 보장) ② 판별 로직이 느려 CDC 를 막을 때(받기 · 판별 분리 — 2026-10-07 판별 단계를 별도 스레드로 분리해 해소) — 어느 쪽인지 확인 후 설계 | 모듈 구조 · 슬롯 수 · Kafka 미사용 결정과 충돌 여부 |
