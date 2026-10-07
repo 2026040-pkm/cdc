@@ -113,7 +113,6 @@ class ZoneCdcE2eIT {
             assertThat(s.get("last_event_type")).isEqualTo("COMPLETE");
             assertThat(s.get("completed_at")).isNotNull();
             assertThat(((java.sql.Timestamp) s.get("first_event_at")).toInstant()).isEqualTo(T0.toInstant());
-            assertThat(db.one("SELECT judged_status FROM svc.actual_result WHERE module = 'asm' AND scan_id = ?", scan)).isEqualTo("PENDING");
             assertThat(db.count("SELECT count(*) FROM svc.scan WHERE module = 'oft' AND scan_id = ?", scan)).isZero();
         }
     }

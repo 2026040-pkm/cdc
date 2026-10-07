@@ -10,7 +10,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * 실적 판별 모듈 — tsdb 필드 데이터를 CDC 로 받아 자기 모듈 RDB(svc_*)에 저장한다.
  *
- * <p>코드는 cdc-core 가 다 들고 있고, 이 서비스는 설정(application.yml 의 hotdb.routes)만 가진다.
+ * <p>CDC 반영 코드는 cdc-core 가 다 들고 있고, 이 서비스는 설정(application.yml 의 hotdb.routes)과
+ * 실적 판별 단계({@link dev.hotdb.zone.judge.JudgementWorker})를 가진다.
  * 모듈은 실행 시 ZONE 환경변수(mch · asm · oft · pnt …)로 고른다 — 같은 이미지를 모듈 수만큼 띄운다.
  * 모듈은 DB 의 ops.module 에 등록돼 있어야 한다 (ops.provision_module).
  */

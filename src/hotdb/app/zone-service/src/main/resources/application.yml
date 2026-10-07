@@ -10,6 +10,10 @@
 # 스키마가 바뀌면:
 #   1) db/migration 에 V 파일을 더하고   2) 아래 hotdb.routes 의 columns 를 고친다.
 #   코드는 손대지 않는다. 기동 시 라우트를 실제 표와 대조해서 어긋나면 전부 모아 보여 주고 멈춘다.
+#
+# 실적 판별 (hotdb.judge): 라우트는 actual_result 를 PENDING 으로 넣기만 하고, 판별 단계(다른 스레드)가
+#   PENDING 을 집어 CONFIRMED · REJECTED 로 바꾼다. 모듈마다 규칙이 다르면 @Profile("<zone>") 인
+#   JudgementRule 빈을 dev.hotdb.zone.judge 에 두고, 없으면 아래 임계값 규칙을 쓴다.
 # ─────────────────────────────────────────────────────────────────────────────
 spring:
   application:
@@ -65,7 +69,18 @@ hotdb:
     snapshot-mode: no_data
     offset-file: ${CDC_OFFSET_DIR:./data}/offsets-zone-${ZONE:asm}.dat
     max-batch-size: ${CDC_MAX_BATCH_SIZE:2048}
+    # 적체 때 프로세스 메모리 상한 — 큐가 차면 엔진이 슬롯 읽기를 멈추고(backpressure) 밀린 것은 원천 WAL 에 남는다
+    max-queue-size: ${CDC_MAX_QUEUE_SIZE:8192}
+    max-queue-size-bytes: ${CDC_MAX_QUEUE_BYTES:67108864}   # 64MB (힙 -Xmx256m 의 1/4 안쪽)
     strict-source: true
+
+  judge:
+    enabled: ${JUDGE_ENABLED:true}
+    interval-ms: 1000
+    batch-size: 200
+    threshold:                      # 모듈 규칙 빈이 없을 때 — 둘 다 넘어야 CONFIRMED, 아니면 REJECTED
+      min-progress-rate: 100        # block_progress_rate (0~100)
+      min-match-confidence: 0.9     # match_confidence (0~1)
 
   # tag_key → 장비 · 권역. 이력에는 tag_key 만 있어서 권역을 거르려면 이게 필요하다.
   lookups:
@@ -168,7 +183,7 @@ hotdb:
         match_confidence: row.match_confidence
         reference_cad_id: row.reference_cad_id
         model_version: row.model_version
-        judged_status: "'PENDING' | keep"   # 판별 로직(2단계)이 바꾼 값을 재전송이 되돌리지 않게
+        judged_status: "'PENDING' | keep"   # 판별 단계(hotdb.judge)가 바꾼 값을 재전송이 되돌리지 않게
         src_received_at: row.received_at
         applied_at: $now
 
