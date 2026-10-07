@@ -755,7 +755,7 @@
             "type": "prometheus",
             "uid": "hotdb-prom"
           },
-          "expr": "sum(hotdb:container_cpu_cores{name=\"hotdb-rfc-provider\"})",
+          "expr": "sum(hotdb:container_cpu_cores{name=\"hotdb-rfc-service\"})",
           "legendFormat": "RFC Service"
         },
         {
@@ -832,7 +832,7 @@
             "type": "prometheus",
             "uid": "hotdb-prom"
           },
-          "expr": "sum(hotdb:container_mem_bytes{name=~\"hotdb-(rfc-provider|db-agent)\"})",
+          "expr": "sum(hotdb:container_mem_bytes{name=~\"hotdb-(rfc-service|db-agent)\"})",
           "legendFormat": "RFC · DB Agent"
         },
         {

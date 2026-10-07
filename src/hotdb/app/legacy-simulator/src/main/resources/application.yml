@@ -35,7 +35,7 @@ hotdb:
       user: ${SAP_USER:sapsim}
       password: ${SAP_PASSWORD:sapsim}
       schema: ${SAP_SCHEMA:erpsrc}
-      tables: ${LSIM_SAP_TABLES:item,part,order_line}
+      tables: ${LSIM_SAP_TABLES:}           # 비우면 스키마의 표 전부 (Z 표 제외) — 레거시 사본 114표
     # Oracle 대역 — DB Agent 가 폴링하는 소유자 MES · LGS · GEO 의 표 전부. 소유자 셋에 다 쓰려고 관리자 계정으로 붙는다
     oracle:
       url: ${ORACLE_URL:jdbc:oracle:thin:@//localhost:59521/FREEPDB1}

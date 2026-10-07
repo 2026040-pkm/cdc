@@ -40,8 +40,11 @@ class OraclePollIT {
             await().atMost(WAIT).until(() -> count(hot, "SELECT count(*) FROM lgs.tracking WHERE object_id = ?", id) == 1);
 
             // 같은 행을 원천에서 고치면 다음 주기에 덮인다 (워터마크가 더 커짐)
-            LocalDateTime later = now.plusSeconds(1);
+            // 고친 시각은 접속한 뒤, 고치기 직전에 정하고 몇 초 앞으로 둔다. 레거시 발행기가 원천을 계속 "지금" 으로 고쳐
+            // 워터마크가 앞서 가므로, 시각을 먼저 정하고 접속하는 사이에 폴링이 더 늦은 행을 읽으면 이 행이 워터마크 밑으로 빠진다
+            LocalDateTime later;
             try (Connection ora = DriverManager.getConnection(ORACLE, "lgs", "lgs")) {
+                later = LocalDateTime.now().plusSeconds(5);
                 exec(ora, "UPDATE tracking SET \"UPD_DATE\" = ?, \"UPD_TIME\" = ? WHERE \"OBJECT_ID\" = ?",
                         later.format(D), later.format(T), id);
             }

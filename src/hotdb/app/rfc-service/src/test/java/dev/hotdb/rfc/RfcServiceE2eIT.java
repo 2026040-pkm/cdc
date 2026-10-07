@@ -15,13 +15,13 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
- * CDC 두 번: tsdb INSERT → 권역 서비스 → svc.actual_result → RFC Provider → ops.rfc_sent.
+ * CDC 두 번: tsdb INSERT → 권역 서비스 → svc.actual_result → RFC Service → ops.rfc_sent.
  *
- * <p>기동 중인 스택(HotDB + zone-asm + rfc-provider)이 필요하다. IT- 장비 · 선체를 실행마다 새로 쓴다.
+ * <p>기동 중인 스택(HotDB + zone-asm + rfc-service)이 필요하다. IT- 장비 · 선체를 실행마다 새로 쓴다.
  */
 @EnabledIfSystemProperty(named = "hotdb.it", matches = "true")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class RfcProviderE2eIT {
+class RfcServiceE2eIT {
 
     static final Duration WAIT = Duration.ofSeconds(30);
     static final String RUN = UUID.randomUUID().toString().substring(0, 8);
@@ -87,7 +87,7 @@ class RfcProviderE2eIT {
     @Order(3)
     void dead_letter_가_없다() throws SQLException {
         try (Db db = Db.as("postgres")) {
-            assertThat(db.count("SELECT count(*) FROM ops.cdc_dead_letter WHERE pipeline = 'rfc-provider' "
+            assertThat(db.count("SELECT count(*) FROM ops.cdc_dead_letter WHERE pipeline = 'rfc-service' "
                     + "AND payload::text LIKE ?", "%" + HULL + "%")).isZero();
         }
     }

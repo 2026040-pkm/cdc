@@ -109,7 +109,7 @@ public class HotdbCdcAutoConfiguration {
 
     /**
      * 사람이 RETRY_REQUESTED 로 표시한 dead letter 를 다시 반영한다. 라우트 반영기를 쓰는 서비스만 —
-     * 싱크를 직접 둔 서비스(RFC Provider)는 dead letter 의 뜻이 달라(SAP 거절) 그 서비스가 다룬다.
+     * 싱크를 직접 둔 서비스(RFC Service)는 dead letter 의 뜻이 달라(SAP 거절) 그 서비스가 다룬다.
      */
     @Bean
     @ConditionalOnProperty(name = "hotdb.cdc.dead-letter.reprocess-enabled", havingValue = "true", matchIfMissing = true)

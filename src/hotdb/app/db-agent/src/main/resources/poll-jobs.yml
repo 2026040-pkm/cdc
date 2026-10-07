@@ -1,5 +1,5 @@
-# DB Agent 작업 목록 — scripts/gen-sample-legacy.py 가 만든다. 손으로 고치지 않는다 (application.yml 이 import)
-# 원천: Oracle 사용자(스키마)마다 표 — 소유자 이름은 ORACLE_SCHEMA_<스키마> 로 바꾼다
+# 폴링 작업 목록 — scripts/gen-sample-legacy.py 가 만든다. 손으로 고치지 않는다 (application.yml 이 import)
+# 원천: DB Agent — Oracle 사용자(스키마)마다 표. 소유자 이름은 ORACLE_SCHEMA_<스키마> 로 바꾼다
 # PK 있는 표: incremental (upd_date || upd_time) · PK 없는 표: replace (매 주기 지우고 다시, 한 트랜잭션)
 # 표 64개 = mes 60 · lgs 3 · geo 1
 hotdb:

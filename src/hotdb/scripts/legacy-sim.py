@@ -25,10 +25,10 @@ ROOT = Path(__file__).resolve().parent.parent
 DDL = ROOT / "db" / "legacy-db" / "V2__sample_tables.sql"
 SAP_SCHEMA = "erpsrc"   # SAP 대역의 원천 스키마 (RFC Service 의 SAP_SCHEMA 기본값)
 
-# 원천 → 대역 표. RFC Service 의 application.yml · DB Agent 의 poll-jobs.yml 작업 목록과 맞춘다
-SAP_TABLES = ["erp.item", "erp.part", "erp.order_line"]
+# 원천 → 대역 표. 레거시 사본 표 전부 — RFC Service · DB Agent 의 poll-jobs.yml 작업 목록과 같다
 ORACLE_SCHEMAS = ["mes", "lgs", "geo"]
-ORACLE_POLLED = ["mes.work_log", "mes.alarm", "lgs.shipment", "lgs.tracking"]   # 통합 테스트가 쓰는 표 — 행을 많이
+SAP_POLLED = ["erp.item", "erp.part", "erp.order_line"]                          # 통합 테스트가 쓰는 표 — 행을 많이
+ORACLE_POLLED = ["mes.work_log", "mes.alarm", "lgs.shipment", "lgs.tracking"]
 OTHER_ROWS = 50                                                                  # 나머지 표의 행 수
 
 
@@ -36,6 +36,7 @@ def tables(schema):
     return [f"{schema}.{t}" for t in re.findall(rf"CREATE TABLE IF NOT EXISTS {schema}\.(\w+) \(", DDL.read_text(encoding="utf-8"))]
 
 
+SAP_TABLES = tables("erp")
 ORACLE_TABLES = [q for s in ORACLE_SCHEMAS for q in tables(s)]
 
 
@@ -98,13 +99,18 @@ SQLPLUS_SYS = ["sqlplus", "-s", "system/hotdb_sim_sys@//localhost:1521/FREEPDB1"
 
 def sap_setup(n):
     out = [f"CREATE SCHEMA IF NOT EXISTS {SAP_SCHEMA};"]
+    total = 0
     for q in SAP_TABLES:
         table, cols, pk = ddl(q)
         out.append(f"DROP TABLE IF EXISTS {SAP_SCHEMA}.{table};")
-        body = ",\n  ".join(f"{c} {t}" for c, t, _ in cols)
-        out.append(f"CREATE TABLE {SAP_SCHEMA}.{table} (\n  {body},\n  PRIMARY KEY ({', '.join(pk)})\n);")
+        body = ",\n  ".join(f"{c} {t}" + (" NOT NULL" if nn else "") for c, t, nn in cols)
+        if pk:
+            body += f",\n  PRIMARY KEY ({', '.join(pk)})"
+        out.append(f"CREATE TABLE {SAP_SCHEMA}.{table} (\n  {body}\n);")
         names = ", ".join(c for c, _, _ in cols)
-        vals = ",\n".join("(" + ", ".join(lit(v) for v in r) + ")" for r in rows(cols, pk, n))
+        data = list(rows(cols, pk, n if q in SAP_POLLED else OTHER_ROWS))
+        total += len(data)
+        vals = ",\n".join("(" + ", ".join(lit(v) for v in r) + ")" for r in data)
         out.append(f"INSERT INTO {SAP_SCHEMA}.{table} ({names}) VALUES\n{vals};")
     # RFC Service 가 쓰는 SAP 쪽 "RDB field data" 표. PK = 실적 키 + 판정 상태 (SAP 쪽 멱등 키)
     out.append(f"""
@@ -115,7 +121,8 @@ CREATE TABLE {SAP_SCHEMA}.zhotdb_actual_result (
   match_confidence double precision, sent_at timestamp NOT NULL,
   PRIMARY KEY (zone, hull_no, block_id, scan_id, judged_status));""")
     run("hotdb-sap-sim", PSQL, "\n".join(out))
-    print(f"sap-sim: {', '.join(SAP_TABLES)} 각 {n}행 · {SAP_SCHEMA}.zhotdb_actual_result")
+    print(f"sap-sim: {SAP_SCHEMA} 표 {len(SAP_TABLES)}개 · {total:,}행 (통합 테스트 표 {len(SAP_POLLED)}개는 {n}행, "
+          f"나머지 {OTHER_ROWS}행) · {SAP_SCHEMA}.zhotdb_actual_result")
 
 
 ORA_TYPE = {"text": "VARCHAR2(400)", "numeric": "NUMBER", "date": "DATE"}
@@ -187,8 +194,9 @@ def mutate(k):
     sap = []
     for q in SAP_TABLES:
         table, cols, pk = ddl(q)
-        val_col = next(c for c, ty, _ in cols if c not in pk and ty == "text" and c not in ("upd_date", "upd_time"))
-        sap.append(f"UPDATE {SAP_SCHEMA}.{table} SET upd_date = '{d}', upd_time = '{t}', {val_col} = 'CHG-{t}' "
+        val_col = next((c for c, ty, _ in cols if c not in pk and ty == "text" and c not in ("upd_date", "upd_time")), None)
+        chg = f", {val_col} = 'CHG-{t}'" if val_col else ""
+        sap.append(f"UPDATE {SAP_SCHEMA}.{table} SET upd_date = '{d}', upd_time = '{t}'{chg} "
                    f"WHERE ctid IN (SELECT ctid FROM {SAP_SCHEMA}.{table} ORDER BY random() LIMIT {k});")
     run("hotdb-sap-sim", PSQL, "\n".join(sap))
     ora = ["SET FEEDBACK OFF", "WHENEVER SQLERROR EXIT FAILURE"]

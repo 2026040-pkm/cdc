@@ -10,7 +10,7 @@ services:
     depends_on: *after-migrate
   zone-mch:
     depends_on: *after-migrate
-  rfc-provider:
+  rfc-service:
     environment:
       RFC_SENDER: jdbc
     depends_on:

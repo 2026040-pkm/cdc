@@ -13,9 +13,9 @@ scrape_configs:
     file_sd_configs: [{ files: [/etc/prometheus/targets/zone-service.json], refresh_interval: 30s }]
 
   # 2단 CDC: svc_* 실적 → SAP
-  - job_name: rfc-provider
+  - job_name: rfc-service
     metrics_path: /actuator/prometheus
-    file_sd_configs: [{ files: [/etc/prometheus/targets/rfc-provider.json], refresh_interval: 30s }]
+    file_sd_configs: [{ files: [/etc/prometheus/targets/rfc-service.json], refresh_interval: 30s }]
 
   - job_name: db-agent
     metrics_path: /actuator/prometheus

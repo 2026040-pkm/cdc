@@ -23,7 +23,7 @@ files=(-f compose.zone.yml -f compose.rfc.yml -f compose.agent.yml -f compose.si
 [ $local_db = 1 ] && files=(-f compose.db.yml "${files[@]}")
 [ "${LSIM_LOCAL:-0}" = 1 ] && files+=(-f compose.legacy-sim.yml)
 # podman-exporter 는 docker 에서 못 쓴다 (podman 소켓). 나머지만.
-services=(zone-asm zone-oft zone-pnt zone-mch rfc-provider db-agent field-simulator prometheus grafana node-exporter cadvisor)
+services=(zone-asm zone-oft zone-pnt zone-mch rfc-service db-agent field-simulator prometheus grafana node-exporter cadvisor)
 monitoring=(prometheus grafana node-exporter cadvisor)
 build=1; legacy=1
 while [ $# -gt 0 ]; do
@@ -38,7 +38,7 @@ while [ $# -gt 0 ]; do
 done
 [ "${LSIM_LOCAL:-0}" = 1 ] && services+=(legacy-simulator)
 if [ $legacy = 0 ]; then
-  services=("${services[@]/rfc-provider}"); services=("${services[@]/db-agent}"); services=("${services[@]/legacy-simulator}")
+  services=("${services[@]/rfc-service}"); services=("${services[@]/db-agent}"); services=("${services[@]/legacy-simulator}")
 elif [ -z "${LEGACY_HOST:-}" ]; then
   echo ".env 에 LEGACY_HOST 가 없습니다 — 레거시 서버가 아직 없으면 --no-legacy 로 띄우세요"; exit 1
 fi
@@ -59,22 +59,23 @@ if [ $build = 1 ]; then
   echo "gradle bootJar ($JAVA_HOME) ..."
   (cd app && "$gradle" bootJar --no-daemon -q)
   echo "docker compose build ..."
-  docker compose "${files[@]}" build zone-asm rfc-provider db-agent field-simulator
+  docker compose "${files[@]}" build zone-asm rfc-service db-agent field-simulator
 fi
 
 # ── 2. Prometheus 대상 — 서버 주소를 적는다 (Prometheus 가 30초마다 다시 읽는다) ──
 t=monitoring/prometheus/targets
-if [ $local_db = 1 ]; then hotdb_exp="hotdb-exporter:9187"; hotdb_node=""; hotdb_cad=""
-else hotdb_exp="${HOTDB_HOST}:${HOTDB_EXPORTER_PORT:-59487}"
+# hotdb_db=1 — Hot DB 데이터 디스크가 있는 서버. 슬롯 WAL 이 디스크를 먼저 채우는지(장기 다운 허용 한계) 이 서버 디스크로 본다
+if [ $local_db = 1 ]; then hotdb_exp="hotdb-exporter:9187"; hotdb_node=""; hotdb_cad=""; svc_db=', "hotdb_db": "1"'
+else hotdb_exp="${HOTDB_HOST}:${HOTDB_EXPORTER_PORT:-59487}"; svc_db=""
      hotdb_node=",
-  { \"targets\": [\"${HOTDB_HOST}:${NODE_EXPORTER_PORT:-59489}\"], \"labels\": { \"server\": \"hotdb\" } }"
+  { \"targets\": [\"${HOTDB_HOST}:${NODE_EXPORTER_PORT:-59489}\"], \"labels\": { \"server\": \"hotdb\", \"hotdb_db\": \"1\" } }"
      hotdb_cad=",
   { \"targets\": [\"${HOTDB_HOST}:${CADVISOR_PORT:-59492}\"], \"labels\": { \"server\": \"hotdb\" } }"; fi
 cat > $t/hotdb.json <<EOF
 [ { "targets": ["${hotdb_exp}"], "labels": { "server": "hotdb" } } ]
 EOF
 cat > $t/node.json <<EOF
-[ { "targets": ["node-exporter:9100"], "labels": { "server": "services" } }${hotdb_node} ]
+[ { "targets": ["node-exporter:9100"], "labels": { "server": "services"${svc_db} } }${hotdb_node} ]
 EOF
 legacy_cadvisor=""
 [ -n "${LEGACY_HOST:-}" ] && legacy_cadvisor=",
@@ -93,7 +94,7 @@ EOF
 [ { "targets": ["${lsim_target}"], "labels": { "server": "${lsim_server}" } } ]
 EOF
   cat > $t/node.json <<EOF
-[ { "targets": ["node-exporter:9100"], "labels": { "server": "services" } }${hotdb_node},
+[ { "targets": ["node-exporter:9100"], "labels": { "server": "services"${svc_db} } }${hotdb_node},
   { "targets": ["${LEGACY_HOST}:${NODE_EXPORTER_PORT:-59489}"], "labels": { "server": "legacy" } } ]
 EOF
 fi

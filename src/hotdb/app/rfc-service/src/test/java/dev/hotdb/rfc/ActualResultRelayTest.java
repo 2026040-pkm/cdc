@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 class ActualResultRelayTest {
 
-    final ActualResultRelay relay = new ActualResultRelay("rfc-provider", new RfcProperties(0, 0, "dry-run", null), null, null,
+    final ActualResultRelay relay = new ActualResultRelay("rfc-service", new RfcProperties(0, 0, "dry-run", null), null, null,
             new DryRunRfcSender(), new SimpleMeterRegistry());
 
     @Test

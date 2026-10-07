@@ -134,13 +134,13 @@ y += 4
 series("CPU — 누가 쓰나 (코어)", [
     ('sum(hotdb:container_cpu_cores{name="hotdb-pg"})', "HotDB (PostgreSQL)"),
     ('sum(hotdb:container_cpu_cores{name=~"hotdb-zone-.*"})', "판별 모듈 합"),
-    ('sum(hotdb:container_cpu_cores{name="hotdb-rfc-provider"})', "RFC Service"),
+    ('sum(hotdb:container_cpu_cores{name="hotdb-rfc-service"})', "RFC Service"),
     ('sum(hotdb:container_cpu_cores{name="hotdb-db-agent"})', "DB Agent")], 0, y, 12, 8, unit="short",
     desc="HotDB 만 오르면 DB 쪽(디코딩 · 쓰기), 모듈만 오르면 소비자 쪽(해석 · 반영) 부하")
 series("메모리 — 누가 쓰나", [
     ('sum(hotdb:container_mem_bytes{name="hotdb-pg"})', "HotDB (캐시 포함)"),
     ('sum(hotdb:container_mem_bytes{name=~"hotdb-zone-.*"})', "판별 모듈 합"),
-    ('sum(hotdb:container_mem_bytes{name=~"hotdb-(rfc-provider|db-agent)"})', "RFC · DB Agent"),
+    ('sum(hotdb:container_mem_bytes{name=~"hotdb-(rfc-service|db-agent)"})', "RFC · DB Agent"),
     ("max(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)", "서버 사용 중")], 12, y, 12, 8,
     unit="bytes", desc="PostgreSQL 은 페이지 캐시까지 잡혀 높게 보인다 — 계속 오르기만 하는지가 중요")
 y += 8

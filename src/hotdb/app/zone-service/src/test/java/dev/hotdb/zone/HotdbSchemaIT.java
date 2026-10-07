@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
- * 마이그레이션 결과 검증 — 표 · publication · 압축 정책 · 계정 경계.
+ * 마이그레이션 결과 검증 — 표 · publication · 보존 정책 · 계정 경계.
  * 기동 중인 HotDB 가 필요하다:  gradlew :zone-service:test -Dhotdb.it=true
  */
 @EnabledIfSystemProperty(named = "hotdb.it", matches = "true")
@@ -40,15 +40,18 @@ class HotdbSchemaIT {
     }
 
     @Test
-    void 압축은_7일_뒤에_건다_CDC_소비자가_읽기_전에_압축되지_않게() throws SQLException {
+    void tsdb_는_7일_뒤_압축_90일_뒤_삭제한다() throws SQLException {
+        // V13: 압축은 7일 뒤 — CDC 소비자가 읽기 전에 압축되지 않게. 보존 90일
         try (Db db = Db.as("postgres")) {
             List<Map<String, Object>> jobs = db.rows("""
-                    SELECT hypertable_name, config->>'compress_after' AS after
+                    SELECT hypertable_name, proc_name,
+                           coalesce(config->>'compress_after', config->>'drop_after') AS after
                       FROM timescaledb_information.jobs
-                     WHERE proc_name = 'policy_compression' AND hypertable_schema = 'tsdb'
+                     WHERE hypertable_schema = 'tsdb' AND proc_name IN ('policy_retention', 'policy_compression')
                     """);
-            assertThat(jobs).hasSize(3);
-            jobs.forEach(j -> assertThat(j.get("after")).as("%s", j.get("hypertable_name")).isEqualTo("7 days"));
+            assertThat(jobs).hasSize(6);
+            jobs.forEach(j -> assertThat(j.get("after")).as("%s %s", j.get("hypertable_name"), j.get("proc_name"))
+                    .isEqualTo(j.get("proc_name").equals("policy_compression") ? "7 days" : "90 days"));
         }
     }
 
@@ -67,7 +70,7 @@ class HotdbSchemaIT {
             // 읽기는 된다
             assertThat(asm.count("SELECT count(*) FROM tsdb.tag_catalog")).isGreaterThanOrEqualTo(0);
         }
-        try (Db rfc = Db.as("rfc_provider")) {
+        try (Db rfc = Db.as("rfc_service")) {
             assertThat(rfc.count("SELECT count(DISTINCT module) FROM svc.device_status_current"))
                     .as("RFC Service 는 모든 모듈을 읽는다").isGreaterThanOrEqualTo(2);
         }

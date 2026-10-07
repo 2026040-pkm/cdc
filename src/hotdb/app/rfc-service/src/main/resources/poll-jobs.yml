@@ -1,0 +1,464 @@
+# 폴링 작업 목록 — scripts/gen-sample-legacy.py 가 만든다. 손으로 고치지 않는다 (application.yml 이 import)
+# 원천: RFC Service — SAP 원천 스키마 하나 (SAP_SCHEMA, 로컬은 erpsrc)
+# PK 있는 표: incremental (upd_date || upd_time) · PK 없는 표: replace (매 주기 지우고 다시, 한 트랜잭션)
+# 표 114개 = erp 114
+hotdb:
+  poll:
+    jobs:
+      - target: erp.account_cfg
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.account_cfg
+        watermark: upd_date || upd_time
+      - target: erp.account_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.account_if
+        watermark: upd_date || upd_time
+      - target: erp.account_log
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.account_log
+        watermark: upd_date || upd_time
+      - target: erp.account_master
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.account_master
+        watermark: upd_date || upd_time
+      - target: erp.account_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.account_rslt
+        watermark: upd_date || upd_time
+      - target: erp.asset_cfg
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.asset_cfg
+        watermark: upd_date || upd_time
+      - target: erp.asset_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.asset_hist
+        watermark: upd_date || upd_time
+      - target: erp.asset_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.asset_if
+        mode: replace
+      - target: erp.asset_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.asset_stat
+        watermark: upd_date || upd_time
+      - target: erp.batch_log
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.batch_log
+        watermark: upd_date || upd_time
+      - target: erp.batch_req
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.batch_req
+        watermark: upd_date || upd_time
+      - target: erp.batch_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.batch_stat
+        watermark: upd_date || upd_time
+      - target: erp.budget_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.budget_hist
+        mode: replace
+      - target: erp.budget_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.budget_if
+        watermark: upd_date || upd_time
+      - target: erp.budget_log
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.budget_log
+        watermark: upd_date || upd_time
+      - target: erp.budget_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.budget_rslt
+        watermark: upd_date || upd_time
+      - target: erp.budget_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.budget_stat
+        watermark: upd_date || upd_time
+      - target: erp.contract_detail
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.contract_detail
+        watermark: upd_date || upd_time
+      - target: erp.contract_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.contract_map
+        watermark: upd_date || upd_time
+      - target: erp.contract_master
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.contract_master
+        watermark: upd_date || upd_time
+      - target: erp.contract_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.contract_stat
+        watermark: upd_date || upd_time
+      - target: erp.cost_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.cost_hist
+        watermark: upd_date || upd_time
+      - target: erp.cost_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.cost_if
+        mode: replace
+      - target: erp.cost_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.cost_stat
+        watermark: upd_date || upd_time
+      - target: erp.customer_cfg
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.customer_cfg
+        watermark: upd_date || upd_time
+      - target: erp.customer_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.customer_map
+        watermark: upd_date || upd_time
+      - target: erp.customer_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.customer_rslt
+        watermark: upd_date || upd_time
+      - target: erp.delivery_cfg
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.delivery_cfg
+        watermark: upd_date || upd_time
+      - target: erp.delivery_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.delivery_if
+        watermark: upd_date || upd_time
+      - target: erp.delivery_log
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.delivery_log
+        mode: replace
+      - target: erp.document_detail
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.document_detail
+        watermark: upd_date || upd_time
+      - target: erp.document_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.document_rslt
+        watermark: upd_date || upd_time
+      - target: erp.employee_cfg
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.employee_cfg
+        watermark: upd_date || upd_time
+      - target: erp.employee_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.employee_hist
+        mode: replace
+      - target: erp.employee_master
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.employee_master
+        watermark: upd_date || upd_time
+      - target: erp.employee_req
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.employee_req
+        mode: replace
+      - target: erp.equipment_detail
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.equipment_detail
+        watermark: upd_date || upd_time
+      - target: erp.equipment_master
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.equipment_master
+        mode: replace
+      - target: erp.equipment_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.equipment_rslt
+        mode: replace
+      - target: erp.equipment_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.equipment_stat
+        watermark: upd_date || upd_time
+      - target: erp.invoice_detail
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.invoice_detail
+        watermark: upd_date || upd_time
+      - target: erp.invoice_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.invoice_hist
+        watermark: upd_date || upd_time
+      - target: erp.invoice_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.invoice_if
+        mode: replace
+      - target: erp.invoice_log
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.invoice_log
+        watermark: upd_date || upd_time
+      - target: erp.invoice_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.invoice_map
+        watermark: upd_date || upd_time
+      - target: erp.invoice_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.invoice_rslt
+        watermark: upd_date || upd_time
+      - target: erp.invoice_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.invoice_stat
+        watermark: upd_date || upd_time
+      - target: erp.item
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.item
+        watermark: upd_date || upd_time
+      - target: erp.ledger_cfg
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.ledger_cfg
+        mode: replace
+      - target: erp.ledger_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.ledger_if
+        watermark: upd_date || upd_time
+      - target: erp.ledger_log
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.ledger_log
+        mode: replace
+      - target: erp.ledger_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.ledger_map
+        watermark: upd_date || upd_time
+      - target: erp.ledger_req
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.ledger_req
+        watermark: upd_date || upd_time
+      - target: erp.ledger_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.ledger_stat
+        mode: replace
+      - target: erp.material_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.material_map
+        mode: replace
+      - target: erp.material_req
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.material_req
+        mode: replace
+      - target: erp.material_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.material_stat
+        watermark: upd_date || upd_time
+      - target: erp.order_line
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.order_line
+        watermark: upd_date || upd_time
+        interval-ms: ${POLL_FAST_INTERVAL_MS:10000}
+      - target: erp.part
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.part
+        watermark: upd_date || upd_time
+      - target: erp.payment_cfg
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.payment_cfg
+        mode: replace
+      - target: erp.payment_detail
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.payment_detail
+        watermark: upd_date || upd_time
+      - target: erp.payment_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.payment_if
+        watermark: upd_date || upd_time
+      - target: erp.payment_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.payment_map
+        watermark: upd_date || upd_time
+      - target: erp.payment_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.payment_rslt
+        mode: replace
+      - target: erp.plan_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.plan_hist
+        watermark: upd_date || upd_time
+      - target: erp.plan_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.plan_map
+        watermark: upd_date || upd_time
+      - target: erp.plan_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.plan_stat
+        watermark: upd_date || upd_time
+      - target: erp.price_req
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.price_req
+        watermark: upd_date || upd_time
+      - target: erp.price_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.price_stat
+        watermark: upd_date || upd_time
+      - target: erp.project_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.project_hist
+        watermark: upd_date || upd_time
+      - target: erp.project_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.project_map
+        watermark: upd_date || upd_time
+      - target: erp.purchase_log
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.purchase_log
+        mode: replace
+      - target: erp.purchase_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.purchase_map
+        watermark: upd_date || upd_time
+      - target: erp.purchase_master
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.purchase_master
+        watermark: upd_date || upd_time
+      - target: erp.purchase_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.purchase_rslt
+        mode: replace
+      - target: erp.purchase_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.purchase_stat
+        watermark: upd_date || upd_time
+      - target: erp.quality_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.quality_if
+        mode: replace
+      - target: erp.quality_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.quality_map
+        watermark: upd_date || upd_time
+      - target: erp.quality_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.quality_stat
+        watermark: upd_date || upd_time
+      - target: erp.receipt_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.receipt_map
+        watermark: upd_date || upd_time
+      - target: erp.route_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.route_map
+        watermark: upd_date || upd_time
+      - target: erp.schedule_cfg
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.schedule_cfg
+        watermark: upd_date || upd_time
+      - target: erp.schedule_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.schedule_map
+        watermark: upd_date || upd_time
+      - target: erp.schedule_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.schedule_stat
+        mode: replace
+      - target: erp.stock_cfg
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.stock_cfg
+        watermark: upd_date || upd_time
+      - target: erp.stock_detail
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.stock_detail
+        watermark: upd_date || upd_time
+      - target: erp.stock_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.stock_if
+        watermark: upd_date || upd_time
+      - target: erp.stock_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.stock_map
+        watermark: upd_date || upd_time
+      - target: erp.stock_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.stock_rslt
+        mode: replace
+      - target: erp.supplier_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.supplier_hist
+        watermark: upd_date || upd_time
+      - target: erp.supplier_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.supplier_map
+        watermark: upd_date || upd_time
+      - target: erp.supplier_master
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.supplier_master
+        watermark: upd_date || upd_time
+      - target: erp.supplier_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.supplier_rslt
+        watermark: upd_date || upd_time
+      - target: erp.task_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.task_hist
+        mode: replace
+      - target: erp.task_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.task_map
+        mode: replace
+      - target: erp.task_master
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.task_master
+        watermark: upd_date || upd_time
+      - target: erp.unit_detail
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.unit_detail
+        watermark: upd_date || upd_time
+      - target: erp.unit_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.unit_if
+        watermark: upd_date || upd_time
+      - target: erp.unit_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.unit_map
+        mode: replace
+      - target: erp.unit_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.unit_stat
+        watermark: upd_date || upd_time
+      - target: erp.vendor_detail
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.vendor_detail
+        mode: replace
+      - target: erp.vendor_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.vendor_hist
+        watermark: upd_date || upd_time
+      - target: erp.vendor_log
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.vendor_log
+        watermark: upd_date || upd_time
+      - target: erp.vendor_map
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.vendor_map
+        mode: replace
+      - target: erp.vendor_req
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.vendor_req
+        mode: replace
+      - target: erp.vendor_stat
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.vendor_stat
+        watermark: upd_date || upd_time
+      - target: erp.voucher_if
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.voucher_if
+        watermark: upd_date || upd_time
+      - target: erp.voucher_log
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.voucher_log
+        watermark: upd_date || upd_time
+      - target: erp.voucher_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.voucher_rslt
+        watermark: upd_date || upd_time
+      - target: erp.warehouse_detail
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.warehouse_detail
+        mode: replace
+      - target: erp.warehouse_hist
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.warehouse_hist
+        watermark: upd_date || upd_time
+      - target: erp.warehouse_log
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.warehouse_log
+        watermark: upd_date || upd_time
+      - target: erp.warehouse_master
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.warehouse_master
+        watermark: upd_date || upd_time
+      - target: erp.warehouse_rslt
+        source: sap
+        from: ${SAP_SCHEMA:erpsrc}.warehouse_rslt
+        watermark: upd_date || upd_time

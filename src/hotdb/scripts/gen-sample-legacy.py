@@ -14,8 +14,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "db" / "legacy-db" / "V2__sample_tables.sql"
-JOBS = ROOT / "app" / "db-agent" / "src" / "main" / "resources" / "poll-jobs.yml"   # DB Agent 작업 목록 (Oracle 사본 전부)
-FAST = {"lgs.tracking"}   # 자주 바뀌는 표 — 10초 주기
+RES = "src/main/resources/poll-jobs.yml"
+# 폴링 작업 목록 — 레거시 사본 표 전부. 쓰는 계정 → (작업 파일, 원천 이름, 원천 스키마 식, 설명)
+JOBS = {
+    "db_agent": (ROOT / "app" / "db-agent" / RES, "oracle", lambda s: f"${{ORACLE_SCHEMA_{s.upper()}:{s}}}",
+                 "DB Agent — Oracle 사용자(스키마)마다 표. 소유자 이름은 ORACLE_SCHEMA_<스키마> 로 바꾼다"),
+    "rfc_agent": (ROOT / "app" / "rfc-service" / RES, "sap", lambda s: "${SAP_SCHEMA:erpsrc}",
+                  "RFC Service — SAP 원천 스키마 하나 (SAP_SCHEMA, 로컬은 erpsrc)"),
+}
+FAST = {"lgs.tracking", "erp.order_line"}   # 자주 바뀌는 표 — 10초 주기
 
 # 스키마 → 규모 (실제 레거시의 집계 숫자만). pk = {PK 컬럼 수: 표 수}
 PROFILE = {
@@ -150,25 +157,27 @@ def build():
     OUT.write_text("\n".join(sql), encoding="utf-8")
     for s, (t, k, c) in stats.items():
         print(f"{s}: 표 {t} · PK 있는 표 {k} · 컬럼 {c}")
-    write_jobs([m for m in made if PROFILE[m[0]]["writer"] == "db_agent"])
+    for writer in JOBS:
+        write_jobs(writer, [m for m in made if PROFILE[m[0]]["writer"] == writer])
 
 
-def write_jobs(made):
-    """Oracle 사본 표 전부 → DB Agent 작업. PK 있는 표는 워터마크 증분, 없는 표는 replace(지우고 다시)"""
+def write_jobs(writer, made):
+    """사본 표 전부 → 폴링 작업. PK 있는 표는 워터마크 증분, 없는 표는 replace(지우고 다시)"""
+    path, source, src_schema, desc = JOBS[writer]
     counts = " · ".join(f"{s} {sum(1 for m in made if m[0] == s)}" for s in dict.fromkeys(m[0] for m in made))
-    out = ["# DB Agent 작업 목록 — scripts/gen-sample-legacy.py 가 만든다. 손으로 고치지 않는다 (application.yml 이 import)",
-           "# 원천: Oracle 사용자(스키마)마다 표 — 소유자 이름은 ORACLE_SCHEMA_<스키마> 로 바꾼다",
+    out = ["# 폴링 작업 목록 — scripts/gen-sample-legacy.py 가 만든다. 손으로 고치지 않는다 (application.yml 이 import)",
+           f"# 원천: {desc}",
            "# PK 있는 표: incremental (upd_date || upd_time) · PK 없는 표: replace (매 주기 지우고 다시, 한 트랜잭션)",
            f"# 표 {len(made)}개 = {counts}",
            "hotdb:", "  poll:", "    jobs:"]
     for s, t, pk in made:
         q = f"{s}.{t}"
-        out += [f"      - target: {q}", "        source: oracle", f"        from: ${{ORACLE_SCHEMA_{s.upper()}:{s}}}.{t}"]
+        out += [f"      - target: {q}", f"        source: {source}", f"        from: {src_schema(s)}.{t}"]
         out += ["        watermark: upd_date || upd_time"] if pk else ["        mode: replace"]
         if q in FAST:
             out.append("        interval-ms: ${POLL_FAST_INTERVAL_MS:10000}")
-    JOBS.write_text("\n".join(out) + "\n", encoding="utf-8")
-    print(f"DB Agent 작업 {len(made)}개 → {JOBS.relative_to(ROOT)} (replace {sum(1 for m in made if not m[2])}개)")
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
+    print(f"{writer} 작업 {len(made)}개 → {path.relative_to(ROOT)} (replace {sum(1 for m in made if not m[2])}개)")
 
 
 if __name__ == "__main__":

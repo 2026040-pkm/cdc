@@ -1,21 +1,23 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # RFC Service (O-8) — 두 방향
 #   ① SAP 폴링 → 레거시 DB erp           (poll-core, 계정 rfc_agent)
-#   ② svc.actual_result(CDC) → SAP (2단 CDC, 계정 rfc_provider)
+#   ② svc.actual_result(CDC) → SAP (2단 CDC, 계정 rfc_service)
 #
 #   1단: tsdb ─(slot zone_<모듈>, tsdb_cdc_pub)─▶ 판별 모듈 ─▶ svc (module 컬럼)
-#   2단: svc ─(slot rfc_provider, svc_cdc_pub)─▶ 이 서비스 ─▶ SAP
+#   2단: svc ─(slot rfc_service, svc_cdc_pub)─▶ 이 서비스 ─▶ SAP
 #
 # 판별 모듈 전부를 슬롯 하나로 받는다. svc_cdc_pub 에는 실적 표만 실려 있다 (V6).
 # SAP 송신은 아직 dry-run — 보낸 기록(ops.rfc_sent)과 지표는 실제와 똑같이 쌓인다.
 # ─────────────────────────────────────────────────────────────────────────────
 spring:
   application:
-    name: rfc-provider
+    name: rfc-service
+  config:
+    import: classpath:poll-jobs.yml
   datasource:
-    url: jdbc:postgresql://${HOTDB_HOST:localhost}:${HOTDB_PORT:59433}/${HOTDB_DB:hotdb}?ApplicationName=rfc-provider
-    username: ${HOTDB_USER:rfc_provider}
-    password: ${HOTDB_PASSWORD:rfc_provider}
+    url: jdbc:postgresql://${HOTDB_HOST:localhost}:${HOTDB_PORT:59433}/${HOTDB_DB:hotdb}?ApplicationName=rfc-service
+    username: ${HOTDB_USER:rfc_service}
+    password: ${HOTDB_PASSWORD:rfc_service}
     hikari:
       maximum-pool-size: 2
 
@@ -32,26 +34,29 @@ management:
       show-details: always
   metrics:
     tags:
-      pipeline: rfc-provider
+      pipeline: rfc-service
 
 hotdb:
   cdc:
-    pipeline: rfc-provider
+    pipeline: rfc-service
     source:
       host: ${HOTDB_HOST:localhost}
       port: ${HOTDB_PORT:59433}
       database: ${HOTDB_DB:hotdb}
-      user: ${HOTDB_USER:rfc_provider}
-      password: ${HOTDB_PASSWORD:rfc_provider}
-    slot: rfc_provider
+      user: ${HOTDB_USER:rfc_service}
+      password: ${HOTDB_PASSWORD:rfc_service}
+    slot: rfc_service
     publication: svc_cdc_pub
     include-tables:
       - ops\.cdc_heartbeat
       - svc\.actual_result      # 판별 모듈 전부 한 표 (module 컬럼) — 모듈이 늘어도 그대로
     # svc 는 작다. 처음 붙을 때 이미 있는 실적도 보낸다 — 이미 보낸 것은 ops.rfc_sent 가 거른다
     snapshot-mode: initial
-    offset-file: ${CDC_OFFSET_DIR:./data}/offsets-rfc-provider.dat
+    offset-file: ${CDC_OFFSET_DIR:./data}/offsets-rfc-service.dat
     max-batch-size: 512
+    # 적체 때 프로세스 메모리 상한 — 큐가 차면 엔진이 슬롯 읽기를 멈추고(backpressure) 밀린 것은 원천 WAL 에 남는다
+    max-queue-size: ${CDC_MAX_QUEUE_SIZE:8192}
+    max-queue-size-bytes: ${CDC_MAX_QUEUE_BYTES:33554432}   # 32MB (힙 -Xmx192m 의 1/4 안쪽)
 
   rfc:
     max-retries: 5
@@ -70,6 +75,7 @@ hotdb:
   poll:
     agent: rfc-service
     default-interval-ms: ${POLL_INTERVAL_MS:60000}
+    threads: ${POLL_THREADS:4}
     target:   # 레거시 DB 의 erp — rfc_agent 만 쓴다 (Hot DB 와 분리된 별도 DB)
       url: jdbc:postgresql://${LEGACY_HOST:localhost}:${LEGACY_PORT:59435}/${LEGACY_DB:legacy}?ApplicationName=rfc-service-poll&reWriteBatchedInserts=true
       user: ${HOTDB_POLL_USER:rfc_agent}
@@ -79,20 +85,7 @@ hotdb:
         url: ${SAP_URL:jdbc:postgresql://localhost:59434/sapsim}
         user: ${SAP_USER:sapsim}
         password: ${SAP_PASSWORD:sapsim}
-    jobs:
-      - target: erp.item                 # 품목 마스터
-        source: sap
-        from: ${SAP_SCHEMA:erpsrc}.item
-        watermark: upd_date || upd_time
-      - target: erp.part                 # 부품 마스터
-        source: sap
-        from: ${SAP_SCHEMA:erpsrc}.part
-        watermark: upd_date || upd_time
-      - target: erp.order_line           # 주문 행 (자주 바뀐다)
-        source: sap
-        from: ${SAP_SCHEMA:erpsrc}.order_line
-        watermark: upd_date || upd_time
-        interval-ms: ${POLL_FAST_INTERVAL_MS:10000}
+    # 작업 목록은 poll-jobs.yml — scripts/gen-sample-legacy.py 가 SAP 사본 표 전부(114)로 만든다
 
 logging:
   level:

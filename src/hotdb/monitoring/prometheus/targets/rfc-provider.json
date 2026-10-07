@@ -1,3 +1,0 @@
-[
-  { "targets": ["rfc-provider:8080"], "labels": { "server": "local" } }
-]

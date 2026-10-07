@@ -14,7 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * SAP 레거시 표를 폴링해 레거시 DB erp 에 쓴다 (poll-core — 설정 hotdb.poll).
  *
  * <pre>
- * Provider → [tsdb] ─CDC─▶ 판별 모듈 → [svc] ─CDC─▶ RFC Provider → SAP
+ * Provider → [tsdb] ─CDC─▶ 판별 모듈 → [svc] ─CDC─▶ RFC Service → SAP
  * </pre>
  *
  * <p>엔진 · 디코딩은 cdc-core 를 그대로 쓰고, 반영 대상만 표가 아니라 {@link ActualResultRelay} 로 바꾼다.
@@ -22,10 +22,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootApplication
 @EnableConfigurationProperties(RfcProperties.class)
-public class RfcProviderApplication {
+public class RfcServiceApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(RfcProviderApplication.class, args);
+        SpringApplication.run(RfcServiceApplication.class, args);
     }
 
     /** SAP 송신 방식 — hotdb.rfc.sender. 나머지(CDC · 중복 차단 · 재시도)는 방식과 상관없이 같다. */
