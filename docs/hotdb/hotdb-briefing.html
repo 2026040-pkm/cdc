@@ -781,7 +781,7 @@ html.flow-locked, html.flow-locked body{ overflow:hidden }
           <div class="stack">
             <div class="card"><p class="card__t">Hot DB 의 네 칸 = 스키마</p><p class="card__d">Legacy RDB sap = <span class="mono">erp</span> · oracle = <span class="mono">mes · lgs · geo</span> · TSDB = <span class="mono">tsdb</span> · RDB field data = <span class="mono">svc_&lt;모듈&gt;</span></p></div>
             <div class="card"><p class="card__t">판별 모듈은 다수</p><p class="card__d">가공 · 조립 · 의장 · 도장 네 장은 같은 이미지를 모듈 이름만 바꿔 띄운 것입니다.</p></div>
-            <div class="note note--info"><p class="note__t">"순차 적재 큐" 메모</p>모듈 안은 이미 순차(슬롯 하나 · WAL 순서). 무엇의 순서인지 확인 후 설계 — 마지막 장 Q10.</div>
+            <div class="note note--info"><p class="note__t">"순차 적재 큐" 메모 — 큐 없이 간다 (2026-10-07 확정)</p>모듈 안은 이미 순차(슬롯 하나 · 단일 스레드 · WAL 순서)이고 슬롯이 내구성 큐 역할을 한다. 별도 큐는 두지 않는다. 한 모듈을 여러 인스턴스로 늘리거나 받기 · 판별을 분리해야 할 때만 다시 본다 (BRD Q10)</div>
             <div class="note note--warn"><p class="note__t">바깥</p>HotDB Provider · 레거시 DB 는 만들지 않습니다. 로컬에서는 대역으로 대신합니다.</div>
           </div>
         </div>
@@ -1071,7 +1071,7 @@ tsdb.device ◀── scan ◀── actual_result
               <tr><td>Q7</td><td>JCo — S-user 로 커넥터 확보 · 호출할 RFC 함수</td><td>확보 전까지 JDBC 로 Z 표</td><td>SAP 정식 송신</td></tr>
               <tr><td>Q8</td><td>실제 레거시 표 폴링 범위 · PK 없는 표 처리</td><td>PK · 수정일시 있는 표부터</td><td>운영 원천 연결</td></tr>
               <tr><td>Q9</td><td>모듈마다 판별 규칙이 다른가</td><td>같은 라우트로 시작</td><td>실적 판별 로직</td></tr>
-              <tr><td>Q10</td><td>모듈 앞 "순차 적재 큐" (그림 메모) — 무엇의 순서?</td><td>모듈 안은 이미 순차 · 확장 · 분리 중 확인</td><td>모듈 수평 확장</td></tr>
+              <tr><td><s>Q10</s></td><td>모듈 앞 "순차 적재 큐" (그림 메모) — 무엇의 순서?</td><td><b>확정: 큐 없이 간다</b> (2026-10-07). 모듈 안은 이미 순차 · 슬롯이 큐 역할. 수평 확장 · 받기/판별 분리 때 재검토</td><td>모듈 수평 확장</td></tr>
             </tbody>
           </table>
         </div>

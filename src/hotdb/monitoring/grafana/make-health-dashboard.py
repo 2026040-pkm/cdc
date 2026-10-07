@@ -125,7 +125,7 @@ stat("서버 메모리 사용", [("max(hotdb:host_mem_ratio)", "")], 4, y, 4, 4,
 stat("CDC 반영 지연 p99", [("max(hotdb_zone_apply_lag_p99_seconds)", "")], 8, y, 4, 4, unit="s", thr=LAG, decimals=2,
      desc="tsdb 수신 → 모듈 RDB 반영 (DB 시계). 2초 주의 · 5초 이슈")
 stat("슬롯이 붙잡은 WAL", [("max(hotdb_slot_retained_bytes)", "")], 12, y, 4, 4, unit="bytes", thr=WAL,
-     desc="가장 뒤처진 CDC 소비자 때문에 지우지 못한 WAL. 10GB 에서 슬롯 무효화")
+     desc="가장 뒤처진 CDC 소비자 때문에 지우지 못한 WAL. 20GB 에서 슬롯 무효화")
 stat("WAL 생성", [("sum(rate(hotdb_wal_written_bytes[1m]))", "")], 16, y, 4, 4, unit="Bps",
      desc="HotDB 가 쓰는 양. 적재량 · UPSERT 에 비례 — CDC 소비자가 읽어야 할 양")
 stat("tsdb 적재", [("sum(rate(hotdb_hypertable_inserted_rows[1m]))", "")], 20, y, 4, 4, unit="short", decimals=0,
@@ -166,6 +166,69 @@ series("들어오는 양 — 원인 쪽", [
     desc="CPU · 지연이 오를 때 여기도 같이 올랐으면 '양이 늘어서', 그대로면 다른 원인")
 y += 8
 
+# ── 2-1. 판별 모듈 4개 — WAL 을 받고 있나 ─────────────────────────────────
+CDC_STATE = [{"type": "value", "options": {
+    "0": {"text": "STOPPED", "color": "red", "index": 0}, "1": {"text": "STARTING", "color": "yellow", "index": 1},
+    "2": {"text": "RUNNING", "color": "green", "index": 2}, "3": {"text": "FAILED", "color": "red", "index": 3},
+    "4": {"text": "HALTED", "color": "red", "index": 4}}}]
+SLOT_ON = [{"type": "value", "options": {"1": {"text": "연결", "color": "green", "index": 0},
+                                         "0": {"text": "끊김", "color": "red", "index": 1}}}]
+GREEN = {"mode": "absolute", "steps": [{"color": "green", "value": None}]}
+LAGB = {"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "yellow", "value": 64e6},
+                                      {"color": "red", "value": 1e9}]}
+AGE = {"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "yellow", "value": 30},
+                                     {"color": "red", "value": 120}]}
+ZONE = 'pipeline=~"zone-.*"'
+ZSLOT = 'slot_name=~"zone_.*"'
+row("②-1 판별 모듈 4개 — 각자 WAL 을 받고 있나", y)
+y += 1
+stat("모듈 상태", [(f"hotdb_cdc_state{{{ZONE}}}", "{{zone}}")], 0, y, 6, 4, mappings=CDC_STATE, thr=GREEN,
+     text="value_and_name", desc="서비스 안 CDC 엔진 상태. RUNNING 이 아니면 그 모듈의 /actuator/health 에 failure")
+stat("슬롯 연결", [(f"hotdb_slot_active{{{ZSLOT}}}", "{{slot_name}}")], 6, y, 6, 4, mappings=SLOT_ON, thr=GREEN,
+     text="value_and_name", desc="Hot DB 쪽에서 본 것 — 소비자가 슬롯에 붙어 있으면 연결. 끊기면 WAL 이 쌓이기 시작")
+stat("미확인 WAL", [(f"hotdb_slot_confirmed_lag_bytes{{{ZSLOT}}}", "{{slot_name}}")], 12, y, 6, 4, unit="bytes",
+     thr=LAGB, text="value_and_name", desc="그 모듈이 아직 처리 확인을 안 한 WAL. 64MB 주의 · 1GB 이슈 — 커지면 그 모듈이 밀리는 중")
+stat("마지막 배치 이후", [(f"hotdb_cdc_last_batch_age_seconds{{{ZONE}}}", "{{zone}}")], 18, y, 6, 4, unit="s",
+     thr=AGE, decimals=0, text="value_and_name", desc="마지막으로 배치를 반영한 지 몇 초. heartbeat 가 10초마다 오므로 평소 0~15초")
+y += 4
+CORES = {"mode": "absolute", "steps": [{"color": "green", "value": None}, {"color": "yellow", "value": 1},
+                                       {"color": "red", "value": 2}]}
+stat("Hot DB CPU (코어)", [('sum(hotdb:container_cpu_cores{name="hotdb-pg"})', "")], 0, y, 4, 4, decimals=2, thr=CORES,
+     desc="hotdb-pg 컨테이너가 쓰는 코어 수. 슬롯 5개의 WAL 디코딩 + 쓰기. 1코어 주의 · 2코어 이슈 (서버 코어 수에 맞춰 조정)")
+stat("Hot DB 메모리", [('sum(hotdb:container_mem_bytes{name="hotdb-pg"})', "")], 4, y, 4, 4, unit="bytes",
+     desc="hotdb-pg 컨테이너 메모리 (shared_buffers + 페이지 캐시 포함). 계속 오르기만 하는지가 중요")
+stat("모듈 CPU (코어)", [('hotdb:container_cpu_cores{name=~"hotdb-zone-.*"}', "{{name}}")], 8, y, 8, 4, decimals=2,
+     thr=CORES, text="value_and_name", desc="모듈 하나가 1코어를 넘게 쓰면 밀린 것을 따라잡는 중이거나 그 권역 양이 많은 것")
+stat("모듈 메모리", [('hotdb:container_mem_bytes{name=~"hotdb-zone-.*"}', "{{name}}")], 16, y, 8, 4, unit="bytes",
+     text="value_and_name", desc="JVM 힙 상한 256MB + 메타스페이스 · 스레드. 600MB 를 넘어 계속 오르면 누수 의심")
+y += 4
+series("CPU — Hot DB 와 모듈 각각 (코어)", [
+    ('sum(hotdb:container_cpu_cores{name="hotdb-pg"})', "Hot DB"),
+    ('hotdb:container_cpu_cores{name=~"hotdb-zone-.*"}', "{{name}}")], 0, y, 12, 8, thr=CORES,
+    desc="Hot DB 만 오르면 디코딩 · 쓰기 부하, 모듈 하나만 오르면 그 모듈이 따라잡는 중")
+series("메모리 — Hot DB 와 모듈 각각", [
+    ('sum(hotdb:container_mem_bytes{name="hotdb-pg"})', "Hot DB"),
+    ('hotdb:container_mem_bytes{name=~"hotdb-zone-.*"}', "{{name}}")], 12, y, 12, 8, unit="bytes",
+    desc="Hot DB 는 캐시까지 잡혀 높다. 모듈은 평평해야 정상")
+y += 8
+timeline("모듈 상태 이력 — 언제 멈췄나", [
+    (f"(hotdb_cdc_state{{{ZONE}}} == bool 1) + 2 * ((hotdb_cdc_state{{{ZONE}}} != bool 2) * (hotdb_cdc_state{{{ZONE}}} != bool 1))",
+     "{{zone}}")], 0, y, 12, 6, desc="초록 RUNNING · 노랑 STARTING · 빨강 STOPPED / FAILED / HALTED (또는 지표 없음 = 서비스 down)")
+timeline("슬롯 연결 이력 — 언제 끊겼나", [(f"(1 - hotdb_slot_active{{{ZSLOT}}}) * 2", "{{slot_name}}")], 12, y, 12, 6,
+         desc="빨강 구간 = 소비자가 슬롯에서 떨어져 있던 시간. 그동안의 WAL 은 재접속 뒤 이어 받는다")
+y += 6
+series("수신 이벤트/초 — 모듈별", [(f"sum by (zone) (rate(hotdb_cdc_events_total{{{ZONE}}}[1m]))", "{{zone}}")],
+       0, y, 12, 8, desc="네 모듈이 같은 값이어야 정상 — 각자 tsdb 전체 WAL 을 받는다. 하나만 낮으면 그 모듈이 밀리는 중")
+series("반영 행/초 — 모듈별 (자기 권역만)", [
+    (f"sum by (zone) (rate(hotdb_cdc_route_applied_total{{{ZONE}}}[1m]))", "{{zone}}")], 12, y, 12, 8,
+    desc="받은 것 중 자기 권역 것만 쓴다. 장비 수에 비례 (조립 210 · 의장 140 · 도장 30 · 가공 30)")
+y += 8
+series("미확인 WAL 추이 — 슬롯별", [(f"hotdb_slot_confirmed_lag_bytes{{{ZSLOT}}}", "{{slot_name}}")], 0, y, 12, 8,
+       unit="bytes", thr=LAGB, desc="톱니 모양으로 0 근처가 정상. 한 슬롯만 계속 오르면 그 모듈을 본다")
+series("반영 지연 p99 — 모듈별 (DB 시계)", [("max by (zone) (hotdb_zone_apply_lag_p99_seconds)", "{{zone}}")],
+       12, y, 12, 8, unit="s", thr=LAG, desc="tsdb 수신 → 그 모듈 RDB 반영. 2초 주의 · 5초 이슈")
+y += 8
+
 # ── 3. 읽는 법 ───────────────────────────────────────────────────────────
 row("③ 읽는 법", y)
 y += 1
@@ -176,7 +239,7 @@ text("증상 → 원인", """
 | CPU 오름 + 적재량도 오름, 지연 그대로 | 양이 늘었지만 따라가는 중 | CPU 가 80% 를 넘는 배속이 한계 |
 | HotDB CPU 오름 + 슬롯 미확인 WAL 은 0 | WAL 디코딩 부하 (슬롯 수만큼 전체 WAL 을 읽음) | 슬롯 수 · BRD Q2 |
 | 지연 오름 + 한 슬롯의 미확인 WAL 증가 | 그 소비자(모듈 · RFC)가 못 따라감 · 멈춤 | 서비스 응답 · 그 서비스 로그 |
-| 슬롯 WAL 이 계속 쌓임 + 서비스 down | 소비자 정지 — 살리면 따라잡음 | 10GB 전에 복구 |
+| 슬롯 WAL 이 계속 쌓임 + 서비스 down | 소비자 정지 — 살리면 따라잡음 | 20GB 전에 복구 (②-1 에서 어느 모듈인지) |
 | dead letter 증가 | 데이터 · 스키마가 안 맞아 반영 실패 | `ops.cdc_dead_letter.error` — 고친 뒤 `status = 'RETRY_REQUESTED'` 로 재처리 |
 | CDC 정지 · 캡처 갭 | 소비자가 스스로 멈춤 (표 · 권한 문제, 대부분 실패, 되받을 수 없는 구간) | 그 서비스 `/actuator/health` 의 failure |
 | 메모리만 계속 오름 | 캐시라면 정상, JVM 이면 누수 의심 | 컨테이너별 메모리 |
