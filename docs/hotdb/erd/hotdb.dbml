@@ -1,0 +1,562 @@
+Project hotdb {
+  database_type: "PostgreSQL"
+  Note: "내업 Hot DB 논리 모델 v9 (Confluence 334201522)"
+}
+
+TableGroup M_기준정보 {
+  m_hull
+  m_block
+  m_location
+  m_lot
+  m_device
+  m_signal_def
+  m_file_store
+  m_cad_file
+  m_code
+}
+
+TableGroup L_레거시_참조 {
+  l_daily_plan
+  l_work_unit
+  l_wo_daily
+  l_assy_node
+  l_cut_part
+  l_outfit_item
+  l_paint_element
+  l_bts_move
+}
+
+TableGroup S_스캔_인식 {
+  s_scan_session
+  s_scan_detection
+}
+
+TableGroup T_시계열 {
+  "ts.device_signal"
+  "ts.sensor_event"
+}
+
+TableGroup P_실적 {
+  p_progress
+  p_progress_block
+  p_item_state
+  p_action
+}
+
+Table m_hull [note: '호선 1척'] {
+  hull_no text [note: '호선 번호(PROJ_NO) (예: 5486)']
+  ship_type text [note: '선종 (예: 상선)']
+  status text [note: '건조 상태 (예: 건조 완료)']
+  in_scope bool [note: '현재 기준점 포함 여부 (예: false)']
+  indexes {
+    (hull_no) [pk]
+  }
+}
+
+Table m_block [note: '호선 × 블록 1개(대조 블록 기준). 위치는 BTS 지번과 센서 인식 두 축'] {
+  hull_no text [note: '호선 (예: 5486)']
+  block_no text [note: '블록 번호(3자리) (예: 731)']
+  block_type text [note: '평·곡·특수 등 (예: 평블록(PBS))']
+  weight_t numeric [note: '블록 중량']
+  current_trade_stage text [note: '현재 공종·단계(가공/조립/의장 S·C·A·B/도장) (예: 조립 G9 → 의장 A)']
+  bts_lot text [note: 'BTS 기준 현재 지번(구역 수준) (예: (표본에 5486 운반 없음))']
+  bts_at timestamptz [note: 'BTS 마지막 운반 시각']
+  sensed_location_id text [note: '센서가 인식한 구역(ZONE) (예: PBS‖5)']
+  sensed_x numeric [note: '구역 안 인식 좌표 X']
+  sensed_y numeric [note: '구역 안 인식 좌표 Y']
+  sensed_at timestamptz [note: '마지막 인식 시각 (예: ☆ 2022-08-16 09:31)']
+  indexes {
+    (hull_no, block_no) [pk]
+  }
+}
+
+Table m_location [note: '위치 1개 — 공장(SHOP) > 구역(ZONE) > 정반(JIG)'] {
+  location_id text [note: 'SHOP: 공장코드 / ZONE: 공장‖구역 / JIG: 정반코드 (예: PBS / PBS‖5 / P502)']
+  level text [note: 'SHOP / ZONE / JIG (예: SHOP / ZONE / JIG)']
+  parent_id text [note: '상위 위치(ZONE→SHOP, JIG→ZONE) (예: PBS / PBS‖5)']
+  code text [note: '공장코드·BAY/쉘터 번호·정반코드 (예: PBS / 5 / P502)']
+  name text [note: '명칭 (예: PBS(조립1) / 5-BAY / 5BAY 남,소조 취부/용접)']
+  zone_type text [note: 'ZONE일 때 BAY / SHELTER (예: BAY)']
+  lot_code text [note: '대표 지번(ZONE, 도장은 1:1)']
+  geom geometry [note: '좌표 폴리곤(ZONE만) (예: ☆ 제공 예정 폴리곤)']
+  sensing_unit bool [note: '장비·블록 위치 기준 구역 여부(ZONE) (예: true)']
+  attrs jsonb [note: '레벨별 속성(SHOP: 사내외·공종 플래그 / JIG: 유형·작업센터·작업조·협력사) (예: {in_out:C, use_assy:true} / {work_cntr:P22A0_01, weg_code:22AE, vendor_flag:false})']
+  valid_from date [note: '유효 시작']
+  valid_to date [note: '유효 종료']
+  indexes {
+    (location_id) [pk]
+  }
+}
+
+Table m_lot [note: 'BTS 지번 1개(야드 지번)'] {
+  lot_code text [note: '지번(= BTS LANDNO) (예: 3D1B01)']
+  middle_lot text [note: '중지번(공장·구역 단위) (예: 3D1B)']
+  lot_name text [note: '명칭 (예: 3DS 1-BAY 동쪽-01)']
+  use_type text [note: '용도(조립공장·도장공장·의장공장·적치장 …) (예: 조립공장)']
+  process_type text [note: '공정(조립·도장·의장·가공·PE) (예: 조립)']
+  indoor bool [note: '옥내 여부 (예: true)']
+  area_m2 numeric [note: '면적 (예: 3238)']
+  geom geometry [note: '폴리곤 좌표']
+  location_id text [note: '대응 구역(ZONE, 이름 기준 매핑) (예: 3DS‖1 (이름 기준 매핑))']
+  indexes {
+    (lot_code) [pk]
+  }
+}
+
+Table m_device [note: '장비 개체 1대 + 현재 상태'] {
+  device_id text [note: '장비 ID(설비관리번호) (예: LD-PBS-5-03)']
+  class_code text [note: '유형 코드(DEVICE_CLASS) (예: LIDAR)']
+  category text [note: 'SENSOR / ACTUATOR / COMPUTE / UTILITY (예: SENSOR)']
+  parent_device_id text [note: '상위 장비(팬틸트→라이다→엣지 PC) (예: EPC-PBS-5-01)']
+  location_id text [note: '소속 구역(ZONE) (예: PBS‖5)']
+  x numeric [note: '좌표 X (예: ☆ 123.4)']
+  y numeric [note: '좌표 Y (예: ☆ 56.7)']
+  z numeric [note: '설치 높이 (예: ☆ 8.0)']
+  heading numeric [note: '방향각']
+  tilt numeric [note: '기울기']
+  attrs jsonb [note: '유형별 속성(model·ip·fov_deg …)']
+  last_seen timestamptz [note: '마지막 신호 시각(집계)']
+  online bool [note: '온라인 여부(집계) (예: true)']
+  fault bool [note: '고장 여부(집계) (예: false)']
+  fault_code text [note: '현재 고장 코드']
+  last_signals jsonb [note: '최근 신호 값 {signal_code: {value, time}}']
+  valid_from date [note: '설치일']
+  valid_to date [note: '철거일']
+  indexes {
+    (device_id) [pk]
+  }
+}
+
+Table m_signal_def [note: '장비 유형 × 신호 1개 — 신호 사전·수집 경로·고장 규칙'] {
+  class_code text [note: '장비 유형(\'*\' = 모든 장비 공통) (예: * / LIDAR / DEHUMID)']
+  signal_code text [note: '신호 코드 (예: heartbeat / scan_state / humidity)']
+  device_id text [note: '특정 장비 예외일 때만(없으면 null)']
+  name text [note: '신호 이름']
+  data_type text [note: 'num / bool / text / enum (예: bool / enum / num)']
+  unit text [note: '단위 (예: %RH)']
+  enum_values "text[]" [note: '열거값 (예: [IDLE,SCANNING,ERROR])']
+  sample_period_s int [note: '수집 주기(초) (예: 10)']
+  adapter text [note: '수집 경로(MQTT·Modbus·OPC-UA·REST·ISL TagId) (예: MQTT / Modbus)']
+  address_template text [note: '주소 규칙({device_id}.{topic} 등) (예: ot/sensor/{device_id}/state)']
+  normal_min numeric [note: '정상 하한 (예: 0)']
+  normal_max numeric [note: '정상 상한 (예: 60)']
+  fault_rule_type text [note: 'HEARTBEAT_TIMEOUT / FAULT_CODE / RANGE / ENUM / COMPOSITE (예: HEARTBEAT_TIMEOUT / ENUM / RANGE)']
+  fault_params jsonb [note: '규칙 인자 (예: {timeout_s:60} / {fault_values:[ERROR]})']
+  severity text [note: '심각도 (예: HIGH)']
+  valid_from date [note: '유효 시작']
+  valid_to date [note: '유효 종료']
+  indexes {
+    (class_code, signal_code, device_id) [pk]
+  }
+}
+
+Table m_file_store [note: '파일 저장소 1개(NAS 마운트·기본 경로)'] {
+  store_id text [note: '저장소 ID (예: NAS_RAW)']
+  store_type text [note: 'RAW_PCD / ARTIFACT / CAD / IMAGE (예: RAW_PCD)']
+  base_uri text [note: '기본 경로 (예: nfs://nas01/ot/raw)']
+  path_rule text [note: '하위 경로 규칙({shop}/{zone}/{yyyymmdd}/{scan_id}) (예: {shop}/{zone}/{yyyymmdd}/{scan_id})']
+  retention_days int [note: '보존 일수 (예: 31)']
+  owner text [note: '관리 주체']
+  indexes {
+    (store_id) [pk]
+  }
+}
+
+Table m_cad_file [note: '경량 CAD 파일 1개'] {
+  cad_file_id text [note: 'CAD 파일 ID (예: CAD-5486-731-BK1A-A)']
+  hull_no text [note: '호선 (예: 5486)']
+  block_no text [note: '블록 (예: 731)']
+  cad_level text [note: 'PART·ASSY / OUTFIT_BLOCK·OUTFIT_MODULE·OUTFIT_ITEM (예: PART)']
+  item_id text [note: '대응 번호(조립 PART_NO) (예: 5486-731-BK1A-A)']
+  store_id text [note: '저장소 (예: NAS_CAD)']
+  file_uri text [note: '파일 경로(저장소 기준 상대) (예: 5486/731/BK1A-A.glb)']
+  fmt text [note: '3DP / FBX / GLB / OBJ (예: GLB)']
+  rev_no text [note: '리비전 (예: 01)']
+  received_at timestamptz [note: '수신 시각']
+  source_system text [note: '제공 경로(3DP·DAVIEW·WSD)']
+  valid bool [note: '유효 여부']
+  indexes {
+    (cad_file_id) [pk]
+  }
+}
+
+Table m_code [note: '코드 1개(코드 그룹 × 코드), 절점 정의 포함 · 레거시 복제'] {
+  code_group text [note: 'TRADE / MP / STAGE / WSTG / ZONE / DEVICE_CLASS / CHECKPOINT (예: TRADE / WSTG / CHECKPOINT)']
+  code text [note: '코드 값(절점이면 공종‖단계‖순서) (예: S / S6 / C‖J‖07)']
+  name text [note: '명칭 (예: 조립 / 중조(S6) / 절단 완료(장비))']
+  in_scope bool [note: '내업 범위 여부 (예: true)']
+  seq int [note: '순서(절점·Stage) (예: 7)']
+  parent_code text [note: '상위 코드(절점의 공종·단계) (예: C‖J)']
+  attrs jsonb [note: '절점: judge_source·judge_rule·pct_at_cp / 송선: next_wstg (예: {next_wstg:G9} / {judge_source:LEGACY, judge_rule:\'YPWC310M.CUT_MFG_FD 또는 YDEH060M.CUT_MFG_FD 입력\'})']
+  valid_from date [note: '유효 시작']
+  valid_to date [note: '유효 종료']
+  indexes {
+    (code_group, code) [pk]
+  }
+}
+
+Table l_daily_plan [note: '작업일 × 공종 × 앵커 1개 — 일일 작업계획'] {
+  plan_date date [note: '작업일 (예: 2022-08-16)']
+  trade text [note: '공종 (예: S)']
+  anchor_type text [note: 'WSTG / GDO / PAINT_ORDER / DWG (예: WSTG)']
+  anchor_id text [note: '앵커 ID (예: 5486‖731‖S6G9)']
+  hull_no text [note: '호선']
+  block_no text [note: '블록']
+  location_id text [note: '작업 공장·구역·정반 (예: P502)']
+  org_code text [note: '작업 조직']
+  priority int [note: '우선순위 (예: 1)']
+  wo_list "text[]" [note: '연결된 W/O (예: [5486S731A000S6FG9A, …WG9A, …GG9A])']
+  source_system text [note: '출처 화면·표 (예: ☆ 조립 일일계획(미확인))']
+  loaded_at timestamptz [note: '적재 시각']
+  indexes {
+    (plan_date, trade, anchor_type, anchor_id) [pk]
+  }
+}
+
+Table l_work_unit [note: '작업 단위 1개 — 액티비티 > 오더·공정 > W/O(±1개월 기준점)'] {
+  unit_id text [note: 'ACTIVITY: ZZACT / ORDER: AUFNR‖VORNR / WO: WORK_ORD_NO (예: 5486S731A000 / 000017254767‖0010 / 5486S731A000S6FG9A)']
+  level text [note: 'ACTIVITY / ORDER / WO (예: ACTIVITY / ORDER / WO)']
+  parent_id text [note: '상위 단위(WO→ORDER→ACTIVITY) (예: 5486S731A200 / 000017254767‖0010)']
+  act_no text [note: '액티비티(W/O 앞 12자리 = GDO) (예: 5486S731A000 / 5486S731A200 / 5486W731GAG9 (GDO))']
+  hull_no text [note: '호선']
+  block_no text [note: '블록']
+  trade text [note: '공종 (예: S / W / P)']
+  mp text [note: '공정 (예: G)']
+  stage text [note: 'Stage (예: B / A)']
+  wstg_code text [note: '송선(조립) (예: S6G9)']
+  location_id text [note: '공장·정반 (예: PBS / P502)']
+  plan_mh numeric [note: '계획시수(212) 또는 표준시수(411 STD_MH) (예: 425.7 h / STD_MH(분) / 666)']
+  acc_rate numeric [note: '누계 진도율(W/O) (예: 100)']
+  plan_sd date [note: '계획 착수 (예: 2022-07-19 / 2022-08-08 / 2022-09-01)']
+  plan_fd date [note: '계획 완료 (예: 2022-08-26 / 2022-08-10 / 2022-09-07)']
+  actl_sd date [note: '실적 착수 (예: 2022-08-11 / 2022-09-09)']
+  actl_fd date [note: '실적 완료(마감 입력일) (예: 2022-08-16 / 2022-09-13)']
+  attrs jsonb [note: 'W/O: 협력사·CARRYOVER / ORDER: 작업센터·DO 묶음 (예: {work_cntr:P62B0_01, oper_desc:\'블록도장(도장)\'})']
+  mnt_ts timestamptz [note: '수정일시(워터마크)']
+  indexes {
+    (unit_id) [pk]
+  }
+}
+
+Table l_wo_daily [note: 'W/O × 실적일 × 작업 조직 1행 — 413 일자 시수 실적'] {
+  wo_no text [note: 'W/O 번호(WO 레벨) (예: 5486W731GAG9001000)']
+  actl_date date [note: '실적일 (예: 2022-09-09 / 2022-09-12 / 2022-09-13)']
+  org_code text [note: '작업 조직 (예: ADA1)']
+  daily_rate numeric [note: '입력 진도율 (예: 30 / 40)']
+  daily_mh numeric [note: '상응 시수 (예: 747 / 996)']
+  rgsr_ts timestamptz [note: '등록일시(워터마크) (예: 2022-09-14)']
+  indexes {
+    (wo_no, actl_date, org_code) [pk]
+  }
+}
+
+Table l_assy_node [note: '블록 조립 하이러키 노드 1개(블록·조립품·부재)'] {
+  hull_no text [note: '호선']
+  block_no text [note: '블록']
+  node_id text [note: '조립품 번호 또는 부재 번호 (예: 5486-731 / 5486-731-BK1A / 5486-731-BK1A-A)']
+  node_level text [note: 'BLOCK / 대조 / 중조 / 소조 / COMP / T-BAR / PART (예: BLOCK / 소조 / PART)']
+  node_kind text [note: 'ASSY / PART / STD (PART_NO_INDC) (예: ASSY / PART)']
+  parent_node_id text [note: '상위 노드 (예: 5486-731-…(S6 조립품) / 5486-731-BK1A)']
+  wstg_code text [note: '이 노드가 만들어지는 송선(WSTG) (예: G9 / C1)']
+  next_wstg text [note: '다음 송선 (예: S6)']
+  shape_group text [note: '동일 형상 그룹(카운팅 단위)']
+  qty int [note: '같은 형상 개수(목표) (예: 1)']
+  weight_kg numeric [note: '중량 (예: 49,138 / 76.4)']
+  cad_file_id text [note: '대응 CAD (예: CAD-5486-731-BK1A-A)']
+  plan_sd date [note: '월간계획 착수(210V)']
+  indexes {
+    (hull_no, block_no, node_id) [pk]
+  }
+}
+
+Table l_cut_part [note: '가공 부재(절단 조각) 1개와 그 도면'] {
+  part_no text [note: '부재 번호(CHAR22) (예: 5486-731-000-K1 / 5486-731-000-B1)']
+  hull_no text [note: '호선']
+  block_no text [note: '블록']
+  dwg_no text [note: '절단 도면(가공 앵커) (예: (310M 연결 확인 필요))']
+  cut_plan_date date [note: '절단 계획일(310M)']
+  cut_bay text [note: '절단 BAY']
+  cut_lot text [note: '동일 형상 절단 LOT']
+  dest_wstg text [note: '배송지 송선 (예: G9)']
+  bend_flag bool [note: '곡가공 대상(510M) (예: false / true (F))']
+  cut_done_ts timestamptz [note: '절단 완료 (예: 2022-08-15 / (미입력))']
+  group_ts timestamptz [note: '모듬 등록']
+  sort_ts timestamptz [note: '부재 선별']
+  issue_ts timestamptz [note: '부재 불출(조립 투입) (예: 2022-08-15)']
+  inbound_ts timestamptz [note: '사외 절단 부재 반입(301M)']
+  cut_site text [note: '사내 / 사외 절단 (예: 사내)']
+  indexes {
+    (part_no) [pk]
+  }
+}
+
+Table l_outfit_item [note: '의장 품목 1개(RSNUM‖RSPOS)'] {
+  rsnum text [note: '예약 번호 (예: 0113910599)']
+  rspos text [note: '예약 항목 (예: 0069)']
+  act_no text [note: 'GDO(ZZACT) (예: 5486W731GAG9)']
+  hull_no text [note: '호선']
+  block_no text [note: '블록']
+  stage text [note: 'Stage (예: A)']
+  wstg_code text [note: '송선(S·C·A) (예: G9)']
+  matnr text [note: '품목 번호 (예: 5486TFTHR400A731)']
+  class_code text [note: '분류 코드(지지류/본체) (예: TFTHR(지지류))']
+  do_no text [note: 'DO 묶음(POTX1) (예: 5486W731AF2ZG9Z)']
+  req_qty numeric [note: '소요 수량 (예: 1)']
+  inst_qty numeric [note: '완설 수량 (예: 1)']
+  inst_date date [note: '설치 입력일(W033) (예: 2022-09-21)']
+  issue_ts timestamptz [note: '불출 시각(031·072)']
+  cad_file_id text [note: '대응 CAD']
+  aedat date [note: '수정일(워터마크)']
+  indexes {
+    (rsnum, rspos) [pk]
+  }
+}
+
+Table l_paint_element [note: '도장 W/O × 요소 1개(보조)'] {
+  wo_no text [note: '도장 W/O']
+  elem_id text [note: '요소 ID']
+  elem_type text [note: '블라스팅·스프레이 n차·FINAL']
+  seq int [note: '수순']
+  done_date date [note: '완료일']
+  indexes {
+    (wo_no, elem_id) [pk]
+  }
+}
+
+Table l_bts_move [note: '블록 운반 1건(반입·반출)'] {
+  hull_no text [note: '호선 (예: 4506)']
+  block_no text [note: '블록 (예: 297)']
+  move_ts timestamptz [note: '운반 시각 (예: (요청일 미입력))']
+  from_lot text [note: '출발 지번']
+  to_lot text [note: '도착 지번 (예: 1DS202)']
+  move_type text [note: '반입/반출 (예: 반입)']
+  indexes {
+    (hull_no, block_no, move_ts) [pk]
+  }
+}
+
+Table s_scan_session [note: '스캔 회차 1회(같은 scan_id 메시지들의 헤더)'] {
+  scan_id text [note: '스캔 ID (예: S-20220816-PBS5-0931)']
+  location_id text [note: '구역(ZONE) (예: PBS‖5)']
+  scan_ts timestamptz [note: '스캔 시각 (예: 2022-08-16 09:31)']
+  device_ids "text[]" [note: '참여 라이다 (예: [LD-PBS-5-03, LD-PBS-5-04])']
+  raw_store_id text [note: '원시 PCD 저장소']
+  raw_dir text [note: '원시 PCD 디렉터리 (예: PBS/5/20220816/S-…-0931)']
+  artifact_store_id text [note: '산출물 저장소']
+  artifact_dir text [note: '산출물 디렉터리']
+  artifacts jsonb [note: '[{type, uri, checksum}]']
+  model_ver text [note: '추론 모델 버전']
+  first_msg_ts timestamptz [note: '첫 메시지 수신']
+  last_msg_ts timestamptz [note: '마지막 메시지 수신']
+  detection_cnt int [note: '받은 인식 객체 수 (예: 2)']
+  expected_cnt int [note: '예고된 객체 수 (예: (종료 메시지 없음))']
+  status text [note: 'OPEN / CLOSED / FAILED (예: OPEN → CLOSED(유예 10분))']
+  indexes {
+    (scan_id) [pk]
+  }
+}
+
+Table s_scan_detection [note: '인식 객체 1개 = 실적 메시지 1건'] {
+  scan_id text [note: '스캔 회차 (예: S-20220816-PBS5-0931)']
+  object_key text [note: '객체 키(object_id, 없으면 수신 순번) (예: 5486-731-BL34A / 5486-731-BL34B)']
+  event_id text [note: '원문 메시지 ID, 1:1 (예: E-…-001 / E-…-002)']
+  received_ts timestamptz [note: '수신 시각']
+  object_type text [note: 'BLOCK / ASSY / PART / OUTFIT_ITEM / UNKNOWN (예: ASSY)']
+  hull_no text [note: '인식된 호선 (예: 5486)']
+  block_no text [note: '인식된 블록 (예: 731)']
+  item_id text [note: '조립품·부재·품목 ID(object_type에 따라 l_assy_node / l_cut_part / l_outfit_item) (예: 5486-731-BL34A / 5486-731-BL34B)']
+  anchor_type text [note: 'WSTG / GDO / DWG / PAINT_ORDER (예: WSTG)']
+  anchor_id text [note: '매칭된 앵커 (예: 5486‖731‖S6G9)']
+  cad_file_id text [note: '매칭에 쓴 CAD (예: CAD-5486-731-BL34A)']
+  match_conf numeric [note: 'CAD 매칭 신뢰도(0~1) (예: 0.91 / 0.87)']
+  pose jsonb [note: '{x,y,z,yaw} 또는 {matrix} (예: {x:12.3, y:4.1, yaw:92})']
+  bbox jsonb [note: '{l,w,h}']
+  progress_est numeric [note: '필드 추정 진행률 (예: 0.80 / 0.55)']
+  count_est int [note: '인식 개수 (예: 1)']
+  presence bool [note: '존재 여부(반출 판정)']
+  stage_hint text [note: '필드 스테이지']
+  event_type text [note: 'START / PROGRESS / COMPLETE']
+  segment_uri text [note: '객체 세그먼트 PCD 경로']
+  model_ver text [note: '모델 버전']
+  ocr_text text [note: 'OCR 판독 문자']
+  judged bool [note: '판별 반영 여부 (예: true)']
+  judged_ts timestamptz [note: '판별 시각']
+  progress_ref text [note: '반영된 p_progress 키(hull‖block‖anchor_type‖anchor_id) (예: 5486‖731‖WSTG‖5486‖731‖S6G9)']
+  indexes {
+    (scan_id, object_key) [pk]
+  }
+}
+
+Table "ts.device_signal" [note: '장비 × 신호 × 시각 1점(하이퍼테이블)'] {
+  time timestamptz [note: '시각(파티션 키) (예: 2022-08-16 09:30:00 / 2022-08-16 09:40:12)']
+  device_id text [note: '장비(segmentby) (예: LD-PBS-5-03)']
+  signal_code text [note: '신호 코드(사건이면 규칙 코드) (예: scan_state / heartbeat)']
+  kind text [note: 'SIGNAL / EVENT (예: SIGNAL / EVENT)']
+  value_num numeric [note: '숫자 값']
+  value_text text [note: '문자 값(ONLINE·OFFLINE·FAULT_ON …) (예: SCANNING / OFFLINE)']
+  quality text [note: '품질']
+  indexes {
+    (time, device_id, signal_code) [pk]
+  }
+}
+
+Table "ts.sensor_event" [note: '실적 메시지 원문 1건(하이퍼테이블)'] {
+  time timestamptz [note: '발생 시각(occurred_at) (예: 2022-08-16 09:33:10)']
+  event_id text [note: '메시지 ID (예: E-…-001)']
+  scan_id text [note: '스캔 회차 (예: S-20220816-PBS5-0931)']
+  object_key text [note: '객체 키 (예: 5486-731-BL34A)']
+  zone text [note: '권역 (예: ASSEMBLY)']
+  stage text [note: '스테이지 (예: FITTING)']
+  location_id text [note: '구역 (예: PBS‖5)']
+  hull_no text [note: '호선 (예: 5486)']
+  block_no text [note: '블록 (예: 731)']
+  object_type text [note: 'BLOCK / ASSY / PART / OUTFIT_ITEM (예: ASSY)']
+  event_type text [note: 'START / PROGRESS / COMPLETE (예: PROGRESS)']
+  source_system text [note: '발생 시스템']
+  idempotency_key text [note: 'scan_id‖object_key‖occurred_at (예: S-…-0931‖5486-731-BL34A‖20220816093310)']
+  raw_payload jsonb [note: '원문']
+  indexes {
+    (time, event_id) [pk]
+  }
+}
+
+Table p_progress [note: '앵커 × 기준일 1행 · 레거시 복제'] {
+  hull_no text [note: '호선']
+  block_no text [note: '블록']
+  anchor_type text [note: 'DWG / WSTG / GDO / PAINT_ORDER (예: WSTG / GDO / PAINT_ORDER)']
+  anchor_id text [note: '앵커 ID (예: 5486‖731‖S6G9 / 5486W731GAG9 / 5486‖731‖P)']
+  as_of date [note: '기준일 (예: 2022-08-16 / 2022-09-21 / 2022-09-30)']
+  state text [note: 'notDue / inProgress / done / confirmed (예: inProgress / done)']
+  auto_pct numeric [note: '자동 산출 퍼센트 (예: ☆ 64.3 (인식 9 ÷ 목표 14) / 78.1 (설치 25 ÷ 소요 32, W033) / (표본에 413 없음) = Σ413 ÷ (570+666))']
+  pct_basis text [note: 'COUNT / INSTALL / MH / DWG (예: COUNT / INSTALL / MH)']
+  legacy_pct numeric [note: '레거시 진도율(비교값) (예: 100 (W/O ACCM_PRGS_RATE, 완료 08-16) / 100 (W/O 413 누계 30+40+30) / 100 (W/O 완료 09-27·09-30))']
+  gap_pct numeric [note: '자동 − 레거시 (예: −35.7 / −21.9)']
+  planned_qty numeric [note: '목표 (예: 14 (050M S6→G9 조립품) / 32 / 1,236 MH)']
+  done_qty numeric [note: '달성 (예: ☆ 9 / 25)']
+  last_cp text [note: '마지막 도달 절점(CHECKPOINT) (예: C‖J‖10 부재 불출)']
+  cp_history jsonb [note: '[{cp, reached_at, source, ref, conf, confirmed}] (예: [{cp:C‖J‖07 절단 완료, reached_at:2022-08-15, source:LEGACY, ref:YDEH060M.CUT_MFG_FD}, {cp:C‖J‖10, reached_at:2022-08-15, ref:CUT_ISS_FD}])']
+  evidence jsonb [note: '근거 요약 (예: [{scan_id:S-…-0931, object_key:5486-731-BL34A}, …])']
+  location_id text [note: '수행 공장·구역·정반 (예: P502 / PBS / NO2)']
+  first_detect_ts timestamptz [note: '첫 인식']
+  last_detect_ts timestamptz [note: '마지막 인식']
+  confirmed_by text [note: '확정 Key-In']
+  indexes {
+    (hull_no, block_no, anchor_type, anchor_id, as_of) [pk]
+  }
+}
+
+Table p_progress_block [note: '블록 × 공종 × 단계 × 기준일 롤업 · 레거시 복제'] {
+  hull_no text [note: '호선 (예: 5486)']
+  block_no text [note: '블록 (예: 731)']
+  trade text [note: '공종 (예: S / W)']
+  stage text [note: '단계 (예: B / A)']
+  as_of date [note: '기준일 (예: 2022-08-16 / 2022-09-21)']
+  auto_pct numeric [note: '자동 실적률 (예: ☆ 71.2 (송선 11개 STD_MH 가중) / 78.1)']
+  legacy_pct numeric [note: '레거시 실적률 (예: 100)']
+  weight_basis text [note: '가중 기준 (예: W/O STD_MH / W/O 시수)']
+  anchor_cnt int [note: '앵커 수 (예: 11 / 1)']
+  open_action_cnt int [note: '미해결 알림 수 (예: 1)']
+  bts_lot text [note: 'BTS 위치']
+  sensed_location_id text [note: '센서 인식 구역 (예: PBS‖5)']
+  indexes {
+    (hull_no, block_no, trade, stage, as_of) [pk]
+  }
+}
+
+Table p_item_state [note: '조립품·부재·의장 품목 1개의 현재 상태 · 레거시 복제'] {
+  hull_no text [note: '호선']
+  block_no text [note: '블록']
+  item_type text [note: 'ASSY / PART / OUTFIT_ITEM (예: ASSY / OUTFIT_ITEM)']
+  item_id text [note: 'node_id 또는 RSNUM+RSPOS (예: 5486-731-BL34A / 0113910599‖0069)']
+  anchor_id text [note: '소속 앵커 (예: 5486‖731‖S6G9 / 5486W731GAG9)']
+  state text [note: 'notDue / issued / detected / installed / carried (예: detected / installed)']
+  detect_ts timestamptz [note: '센서 인식 시각 (예: ☆ 2022-08-16 09:33)']
+  legacy_ts timestamptz [note: '레거시 입력 시각 (예: 2022-09-21)']
+  scan_id text [note: '인식 회차 (예: S-…-0931)']
+  detection_seq int [note: '인식 객체 (예: 5486-731-BL34A)']
+  indexes {
+    (hull_no, block_no, item_type, item_id) [pk]
+  }
+}
+
+Table p_action [note: '알림 1건 또는 Key-In 1건 · 레거시 복제'] {
+  action_id bigint [note: 'ID (예: 1001 / 1002)']
+  action_type text [note: 'EXCEPTION / KEYIN (예: EXCEPTION / KEYIN)']
+  hull_no text [note: '호선']
+  block_no text [note: '블록']
+  anchor_id text [note: '앵커 (예: 5486W731GAG9)']
+  sub_type text [note: 'UNMATCHED·ORDER_REVERSED·GAP·NO_PLAN / PCT·CHECKPOINT·CORRECTION (예: GAP / CORRECTION)']
+  detail text [note: '내용 (예: W/O 누계 100%(09-13)인데 품목 설치 25/32 — 7개 미설치 / 미설치 7개는 A Stage 이월(carried) 처리)']
+  value_pct numeric [note: '입력 퍼센트(Key-In)']
+  cp_code text [note: '확정 절점(Key-In)']
+  reason_code text [note: '사유']
+  user_id text [note: '입력·처리자 (예: 관리자)']
+  raised_at timestamptz [note: '발생·입력 시각 (예: 2022-09-21)']
+  status text [note: 'OPEN·RESOLVED / 입력·임시저장·확정 (예: OPEN / 확정)']
+  resolved_by bigint [note: '해결한 Key-In ID']
+  resolved_at timestamptz [note: '해결 시각']
+  indexes {
+    (action_id) [pk]
+  }
+}
+
+Ref: m_block.hull_no > m_hull.hull_no
+Ref: m_block.bts_lot > m_lot.lot_code
+Ref: m_block.sensed_location_id > m_location.location_id
+Ref: m_location.parent_id > m_location.location_id
+Ref: m_location.lot_code > m_lot.lot_code
+Ref: m_lot.location_id > m_location.location_id
+Ref: m_device.class_code > m_code.code
+Ref: m_device.parent_device_id > m_device.device_id
+Ref: m_device.location_id > m_location.location_id
+Ref: m_signal_def.class_code > m_code.code
+Ref: m_signal_def.device_id > m_device.device_id
+Ref: m_cad_file.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: m_cad_file.store_id > m_file_store.store_id
+Ref: l_daily_plan.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: l_daily_plan.location_id > m_location.location_id
+Ref: l_work_unit.parent_id > l_work_unit.unit_id
+Ref: l_work_unit.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: l_work_unit.location_id > m_location.location_id
+Ref: l_wo_daily.wo_no > l_work_unit.unit_id
+Ref: l_assy_node.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: l_assy_node.(hull_no, block_no, parent_node_id) > l_assy_node.(hull_no, block_no, node_id)
+Ref: l_assy_node.wstg_code > m_code.code
+Ref: l_assy_node.cad_file_id > m_cad_file.cad_file_id
+Ref: l_cut_part.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: l_outfit_item.act_no > l_work_unit.act_no
+Ref: l_outfit_item.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: l_outfit_item.cad_file_id > m_cad_file.cad_file_id
+Ref: l_paint_element.wo_no > l_work_unit.unit_id
+Ref: l_bts_move.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: l_bts_move.from_lot > m_lot.lot_code
+Ref: l_bts_move.to_lot > m_lot.lot_code
+Ref: s_scan_session.location_id > m_location.location_id
+Ref: s_scan_session.raw_store_id > m_file_store.store_id
+Ref: s_scan_session.artifact_store_id > m_file_store.store_id
+Ref: s_scan_detection.scan_id > s_scan_session.scan_id
+Ref: s_scan_detection.event_id > "ts.sensor_event".event_id
+Ref: s_scan_detection.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: s_scan_detection.item_id > l_assy_node.node_id
+Ref: s_scan_detection.anchor_id > p_progress.anchor_id
+Ref: s_scan_detection.cad_file_id > m_cad_file.cad_file_id
+Ref: "ts.device_signal".device_id > m_device.device_id
+Ref: "ts.device_signal".signal_code > m_signal_def.signal_code
+Ref: "ts.sensor_event".scan_id > s_scan_session.scan_id
+Ref: "ts.sensor_event".location_id > m_location.location_id
+Ref: "ts.sensor_event".(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: p_progress.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: p_progress.last_cp > m_code.code
+Ref: p_progress.location_id > m_location.location_id
+Ref: p_progress.confirmed_by > p_action.action_id
+Ref: p_progress_block.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: p_progress_block.bts_lot > m_lot.lot_code
+Ref: p_progress_block.sensed_location_id > m_location.location_id
+Ref: p_item_state.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: p_item_state.anchor_id > p_progress.anchor_id
+Ref: p_item_state.scan_id > s_scan_session.scan_id
+Ref: p_item_state.detection_seq > s_scan_detection.object_key
+Ref: p_action.(hull_no, block_no) > m_block.(hull_no, block_no)
+Ref: p_action.anchor_id > p_progress.anchor_id
+Ref: p_action.cp_code > m_code.code
+Ref: p_action.resolved_by > p_action.action_id

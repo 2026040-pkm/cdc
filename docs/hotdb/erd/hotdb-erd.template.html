@@ -1,0 +1,592 @@
+<title>Hot DB ERD v9</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* 레이아웃: 요약 → 예시 따라가기 → 데이터 흐름 순서(레거시 → 기준정보 → 스캔·시계열 → 실적)로 열을 세운 ERD 캔버스 → 영역별 표 카드 */
+:root {
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --canvas: #f4f1ed;
+  --line: #e7e2dc;
+  --wire: #b9b0a6;
+  --fg: #1f1b17;
+  --muted: #6d655d;
+  --accent: #e8641b;
+  --accent-soft: #fdeee3;
+  --pk: #b8470c;
+  --fk: #2d6aa8;
+  --fk-soft: #e6eff8;
+  --ex: #2f6b3a;
+  --ex-soft: #e9f3ea;
+  --a-L: #3b78c2;
+  --a-M: #e8641b;
+  --a-S: #23905a;
+  --a-T: #6f7d93;
+  --a-P: #c8364a;
+  --font-sans: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --s1: 12px; --s2: 13.5px; --s3: 15px; --s4: 19px; --s5: 28px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171412; --surface: #221e1b; --canvas: #1b1816; --line: #36302b; --wire: #5c544c; --fg: #efe9e3; --muted: #a39a91;
+    --accent: #ff8a45; --accent-soft: #3a2518; --pk: #ffa36b; --fk: #7fb2e6; --fk-soft: #1d2b3a; --ex: #9fd4a6; --ex-soft: #1f3123;
+    --a-L: #6fa6e8; --a-M: #ff8a45; --a-S: #58c48a; --a-T: #9aa7bd; --a-P: #ee6b7d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171412; --surface: #221e1b; --canvas: #1b1816; --line: #36302b; --wire: #5c544c; --fg: #efe9e3; --muted: #a39a91;
+  --accent: #ff8a45; --accent-soft: #3a2518; --pk: #ffa36b; --fk: #7fb2e6; --fk-soft: #1d2b3a; --ex: #9fd4a6; --ex-soft: #1f3123;
+  --a-L: #6fa6e8; --a-M: #ff8a45; --a-S: #58c48a; --a-T: #9aa7bd; --a-P: #ee6b7d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font: 400 var(--s3)/1.6 var(--font-sans);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1320px; margin: 0 auto; }
+code { font-family: var(--font-mono); font-size: 0.92em; }
+button { font-family: inherit; }
+
+.top { padding-block: 40px 20px; display: grid; gap: 14px; }
+.eyebrow { font-size: var(--s1); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+h1 { margin: 0; font-size: var(--s5); line-height: 1.25; font-weight: 700; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 72ch; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 6px 0 0; padding: 0; list-style: none; }
+.stats li { display: grid; }
+.stats b { font: 600 var(--s4)/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+.stats span { font-size: var(--s1); color: var(--muted); }
+
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  border-bottom: 1px solid var(--line); padding-block: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+}
+.chip {
+  display: inline-flex; gap: 6px; align-items: baseline; padding: 5px 11px; border: 1px solid var(--line);
+  border-radius: 999px; color: var(--fg); text-decoration: none; font-size: var(--s2); background: var(--surface);
+}
+.chip b { color: var(--accent); font-family: var(--font-mono); }
+.chip span { color: var(--muted); font-family: var(--font-mono); font-size: var(--s1); }
+.chip:hover, .chip:focus-visible { border-color: var(--accent); outline: none; }
+.search { margin-left: auto; min-width: 0; flex: 0 1 260px; }
+.search input {
+  width: 100%; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+  color: var(--fg); font: inherit; font-size: var(--s2);
+}
+.search input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.area { padding-top: 36px; scroll-margin-top: 64px; }
+.area-head { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: baseline; margin-bottom: 14px; }
+.area-head .tag {
+  grid-row: span 2; font: 600 var(--s4)/1 var(--font-mono); color: var(--accent); background: var(--accent-soft);
+  padding: 8px 10px; border-radius: 6px; align-self: start;
+}
+.area-head h2 { margin: 0; font-size: var(--s4); text-wrap: balance; }
+.area-head p { margin: 0; color: var(--muted); font-size: var(--s2); max-width: 90ch; }
+
+/* ── ERD 캔버스 ───────────────────────────────── */
+.erd-tools { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-bottom: 8px; }
+.zoom { display: flex; gap: 6px; align-items: center; }
+.zoom button, .drawer button {
+  font: 500 var(--s2)/1 var(--font-sans); padding: 6px 10px; min-width: 34px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--surface); color: var(--fg); cursor: pointer;
+}
+.zoom button:hover, .drawer button:hover { border-color: var(--accent); }
+.zoom button:focus-visible, .drawer button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.zoom .lvl { font: 500 var(--s1) var(--font-mono); color: var(--muted); min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--s1); color: var(--muted); align-items: center; }
+.legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.legend svg { vertical-align: middle; margin-right: 4px; }
+
+.erd-shell.full {
+  position: fixed; inset: 0; z-index: 20; background: var(--bg); display: flex; flex-direction: column;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.erd-view {
+  position: relative; overflow: auto; height: min(78vh, 900px); border: 1px solid var(--line); border-radius: 10px;
+  background-color: var(--canvas);
+  background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 18px 18px;
+  cursor: grab; touch-action: pan-x pan-y;
+}
+.erd-shell.full .erd-view { flex: 1; height: auto; }
+.erd-view.dragging { cursor: grabbing; user-select: none; }
+.erd-sizer { position: relative; }
+.erd-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.erd-canvas svg.wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.lane-label {
+  position: absolute; top: 18px; font: 600 13px/1.2 var(--font-sans); color: var(--muted); letter-spacing: 0.02em;
+}
+.lane-label b { font-family: var(--font-mono); margin-right: 6px; }
+.lane-label small { display: block; font-weight: 400; font-size: 11.5px; }
+
+.wire { fill: none; stroke: var(--wire); stroke-width: 1.4; transition: opacity .15s, stroke .15s; }
+.wire.logical { stroke-dasharray: 5 4; }
+.wire-head { fill: var(--wire); transition: opacity .15s; }
+.focusing .wire, .focusing .wire-head { opacity: 0.07; }
+.focusing .wire.on, .focusing .wire-head.on { opacity: 1; }
+.wire.on { stroke-width: 2.2; }
+.wire.on.out { stroke: var(--accent); }
+.wire-head.on.out { fill: var(--accent); }
+.wire.on.in { stroke: var(--fk); }
+.wire-head.on.in { fill: var(--fk); }
+
+.ebox {
+  position: absolute; width: 270px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06); cursor: pointer; transition: opacity .15s, box-shadow .15s, border-color .15s;
+  font-size: 12px; line-height: 1.35; overflow: hidden;
+}
+.ebox:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ebox .eh { display: flex; align-items: baseline; gap: 8px; padding: 7px 10px 6px; border-top: 4px solid var(--ac); }
+.ebox .eh code { font-size: 13px; font-weight: 600; }
+.ebox .eh span { margin-left: auto; font: 600 10.5px/1 var(--font-mono); color: var(--ac); }
+/* 높이를 글꼴과 무관하게 고정해 선 위치가 어긋나지 않게 한다 */
+.ebox .eh { height: 30px; }
+.ebox .ed { padding: 0 10px; height: 22px; line-height: 18px; color: var(--muted); font-size: 11.5px; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ebox .er { display: grid; grid-template-columns: 26px 1fr auto; gap: 6px; align-items: center; padding: 0 10px; height: 23px; }
+.ebox .more { height: 24px; }
+.ebox .er + .er { border-top: 1px dotted var(--line); }
+.ebox .er .kb { font: 600 9.5px/1 var(--font-mono); padding: 2px 3px; border-radius: 3px; text-align: center; }
+.ebox .er .kb.pk { color: var(--pk); background: var(--accent-soft); }
+.ebox .er .kb.fk { color: var(--fk); background: var(--fk-soft); }
+.ebox .er code { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ebox .er .to { font: 400 10.5px var(--font-mono); color: var(--muted); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.ebox .er.hit { background: var(--accent-soft); }
+.ebox .more { padding: 4px 10px 6px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); }
+.focusing .ebox { opacity: 0.28; }
+.focusing .ebox.on { opacity: 1; }
+.ebox.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.ebox.nb-out { border-color: var(--accent); }
+.ebox.nb-in { border-color: var(--fk); }
+
+.drawer {
+  position: fixed; z-index: 30; right: 0; top: 0; bottom: 0; width: min(460px, 100%); background: var(--surface);
+  border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.12); overflow-y: auto;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) max(18px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) 18px;
+}
+.drawer h3 { margin: 0; font-size: var(--s4); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.drawer h3 .atag { font: 600 var(--s1) var(--font-mono); color: var(--ac); }
+.drawer .dhead { display: flex; gap: 10px; align-items: start; justify-content: space-between; }
+.drawer .dd { color: var(--muted); font-size: var(--s2); margin: 4px 0 12px; }
+.drawer h4 { margin: 16px 0 6px; font-size: var(--s1); color: var(--muted); font-weight: 600; letter-spacing: 0.04em; }
+.drawer .links { display: flex; flex-wrap: wrap; gap: 6px; }
+.drawer .links button { font: 400 var(--s1) var(--font-mono); padding: 4px 8px; }
+.drawer .links button.o { color: var(--accent); }
+.drawer .links button.i { color: var(--fk); }
+.drawer table { font-size: var(--s1); }
+.drawer .gocard { display: inline-block; margin-top: 14px; color: var(--fk); font-size: var(--s2); }
+
+/* ── 표 카드 ───────────────────────────────── */
+.cards { display: grid; gap: 22px; margin-top: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 600px), 1fr)); }
+.tbl { min-width: 0; border-top: 2px solid var(--fg); padding-top: 10px; scroll-margin-top: 72px; }
+.tbl h3 { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: var(--s3); }
+.tbl h3 code { font-size: var(--s3); font-weight: 500; }
+.tbl h3 .pk { font: 400 var(--s1) var(--font-mono); color: var(--muted); }
+.tbl h3 .show { margin-left: auto; font-size: var(--s1); color: var(--fk); background: none; border: 0; cursor: pointer; padding: 0; }
+.desc { margin: 2px 0 8px; color: var(--muted); font-size: var(--s2); }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: var(--s1); }
+th { text-align: left; font-weight: 500; color: var(--muted); border-bottom: 1px solid var(--line); padding: 4px 8px 4px 0; white-space: nowrap; }
+td { border-bottom: 1px solid var(--line); padding: 5px 8px 5px 0; vertical-align: top; }
+td.cn code { font-size: var(--s1); font-weight: 500; white-space: nowrap; }
+td.ty { font-family: var(--font-mono); color: var(--muted); white-space: nowrap; }
+td.ky { white-space: nowrap; }
+.rf code { color: var(--fk); white-space: nowrap; }
+.cm .rf { margin-top: 2px; }
+td.ex { min-width: 140px; }
+.k { display: inline-block; font: 600 10.5px/1 var(--font-mono); padding: 3px 5px; border-radius: 4px; margin-right: 3px; }
+.k-pk { color: var(--pk); background: var(--accent-soft); }
+.k-fk { color: var(--fk); background: var(--fk-soft); }
+.ev {
+  display: inline-block; margin: 0 4px 3px 0; padding: 1px 6px; border-radius: 4px; background: var(--ex-soft);
+  color: var(--ex); font: 400 11.5px/1.5 var(--font-mono); word-break: break-all;
+}
+.rows { margin-top: 10px; }
+.rows summary { cursor: pointer; font-size: var(--s1); color: var(--muted); padding-block: 4px; }
+.rows summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.extable th { font-size: 11px; }
+.extable td { font-family: var(--font-mono); font-size: 11.5px; white-space: nowrap; color: var(--ex); }
+.noex { margin: 8px 0 0; font-size: var(--s1); color: var(--muted); }
+.empty { color: var(--muted); font-size: var(--s2); padding-top: 12px; }
+
+/* ── 예시 따라가기 ───────────────────────────── */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; }
+.step { display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding-bottom: 22px; }
+.step:not(:last-child) .step-body { border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+.step-no {
+  font: 600 var(--s3)/1 var(--font-mono); color: var(--surface); background: var(--accent); width: 30px; height: 30px;
+  border-radius: 50%; display: grid; place-items: center;
+}
+.step-body { min-width: 0; }
+.step-body h3 { margin: 2px 0 2px; font-size: var(--s3); }
+.step-body p { margin: 0 0 8px; color: var(--muted); font-size: var(--s2); max-width: 75ch; }
+.step-body ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.step-body li { display: grid; grid-template-columns: minmax(130px, 170px) 1fr; gap: 10px; font-size: var(--s2); border-bottom: 1px dashed var(--line); padding-bottom: 4px; }
+.step-body li a { color: var(--fk); text-decoration: none; }
+.step-body li a:hover, .step-body li a:focus-visible { text-decoration: underline; }
+
+footer { margin-top: 48px; color: var(--muted); font-size: var(--s1); border-top: 1px solid var(--line); padding-top: 14px; }
+@media (max-width: 640px) { .search { flex-basis: 100%; margin-left: 0; } .step-body li { grid-template-columns: 1fr; gap: 0; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+@media (prefers-reduced-motion: reduce) { .wire, .wire-head, .ebox { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">내업 공정실적 · Hot DB 논리 모델 v9</div>
+    <h1>Hot DB ERD</h1>
+    <p class="lede">Confluence <em>[공통] 내업 Hot DB 논리 모델 — 테이블 상세</em>(2026-10-08, 55번 v9)의 열·키·참조 대상과 예시 값을 그대로 옮겼다. 초록 칸은 원문 예시 값(★ 4호선 표본 실측, ☆ 가정값). hot 스키마 23표, ts 스키마(TimescaleDB 하이퍼테이블) 2표.</p>
+    <ul class="stats">
+      <li><b>{{TABLES}}</b><span>테이블</span></li>
+      <li><b>{{COLS}}</b><span>열</span></li>
+      <li><b>{{RELS}}</b><span>참조 관계</span></li>
+      <li><b>{{FKS}}</b><span>실제 FK 제약</span></li>
+    </ul>
+  </header>
+
+  <nav class="bar" aria-label="영역">
+    {{NAV}}
+    <label class="search"><input id="q" type="search" placeholder="표·열 이름 검색 (예: anchor_id)" aria-label="표·열 검색"></label>
+  </nav>
+
+  {{STORY}}
+
+  <section id="erd" class="area">
+    <header class="area-head"><span class="tag">ERD</span>
+      <h2>데이터가 흐르는 순서로 놓은 관계도</h2>
+      <p>왼쪽 레거시에서 들어와 가운데 기준정보에 기대고, 오른쪽 실적으로 나간다. 상자에는 키 열(PK·FK)만 보인다. 표에 마우스를 올리면 그 표의 관계만 남고, 누르면 오른쪽에 전체 열과 예시 값이 열린다.</p>
+    </header>
+    <div class="erd-shell" id="erd-shell">
+      <div class="erd-tools">
+        <div class="zoom">
+          <button type="button" data-z="out" aria-label="축소">−</button>
+          <span class="lvl" id="zlvl">100%</span>
+          <button type="button" data-z="in" aria-label="확대">+</button>
+          <button type="button" data-z="fit">화면 맞춤</button>
+          <button type="button" data-z="full" id="zfull">전체 화면</button>
+        </div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--a-L)"></i>L 레거시 참조</span>
+          <span><i class="sw" style="background:var(--a-M)"></i>M 기준정보</span>
+          <span><i class="sw" style="background:var(--a-S)"></i>S 스캔·인식</span>
+          <span><i class="sw" style="background:var(--a-T)"></i>T 시계열</span>
+          <span><i class="sw" style="background:var(--a-P)"></i>P 실적</span>
+          <span><svg width="30" height="8" aria-hidden="true"><path d="M1 4H24" stroke="var(--accent)" stroke-width="2" fill="none"/><path d="M23 0L30 4L23 8Z" fill="var(--accent)"/></svg>이 표가 참조하는 표</span>
+          <span><svg width="30" height="8" aria-hidden="true"><path d="M1 4H24" stroke="var(--fk)" stroke-width="2" fill="none"/><path d="M23 0L30 4L23 8Z" fill="var(--fk)"/></svg>이 표를 참조하는 표</span>
+          <span><svg width="30" height="8" aria-hidden="true"><path d="M1 4H29" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 3" fill="none"/></svg>FK 제약 없는 논리 참조</span>
+        </div>
+      </div>
+      <div class="erd-view" id="erd-view" tabindex="0" aria-label="ERD 캔버스. 끌어서 이동, Ctrl+휠로 확대">
+        <div class="erd-sizer" id="erd-sizer"><div class="erd-canvas" id="erd-canvas"></div></div>
+      </div>
+    </div>
+  </section>
+
+  {{SECTIONS}}
+  <p class="empty" id="none" hidden>검색어와 맞는 표가 없습니다.</p>
+
+  <footer>원본: hc-support Confluence advancedre 333448233 · 334201522 · 생성 스크립트 docs/hotdb/erd/gen_erd.py (같은 폴더에 hotdb.sql · hotdb.dbml · hotdb.erd.json)</footer>
+</div>
+
+<aside class="drawer" id="drawer" hidden aria-live="polite"></aside>
+
+<script type="application/json" id="erd-data">{{DATA}}</script>
+<script>
+(function () {
+  var D = JSON.parse(document.getElementById('erd-data').textContent);
+  var T = {}; D.tables.forEach(function (t) { T[t.name] = t; });
+  var AREA = D.areas;
+
+  // 열(레인) 배치: 데이터 흐름 순서. 같은 레인 안 순서는 연결이 가까운 표끼리
+  var LANES = [
+    { key: 'L', title: '레거시 참조', sub: '±1개월 기준점, 하루 1회', names: ['l_daily_plan', 'l_work_unit', 'l_wo_daily', 'l_paint_element', 'l_outfit_item', 'l_assy_node', 'l_cut_part', 'l_bts_move'] },
+    { key: 'M', title: '기준정보', sub: '모든 영역이 참조', names: ['m_hull', 'm_block', 'm_lot', 'm_location', 'm_code', 'm_cad_file', 'm_file_store', 'm_device', 'm_signal_def'] },
+    { key: 'S', title: '스캔·인식 / 시계열', sub: '센서 메시지마다', names: ['ts.sensor_event', 's_scan_session', 's_scan_detection', 'ts.device_signal'] },
+    { key: 'P', title: '실적', sub: '판별 서비스 출력 · 레거시 복제', names: ['p_progress', 'p_item_state', 'p_action', 'p_progress_block'] }
+  ];
+  var BOXW = 270, GAPX = 210, PADX = 90, PADY = 70, GAPY = 26;
+  var laneOf = {};
+  LANES.forEach(function (l, i) { l.names.forEach(function (n) { laneOf[n] = i; }); });
+
+  var canvas = document.getElementById('erd-canvas');
+  var sizer = document.getElementById('erd-sizer');
+  var view = document.getElementById('erd-view');
+  var NS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'wires');
+  canvas.appendChild(svg);
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function shortRef(ref) { return ref ? ref.split('.').slice(0, -1).join('.') : ''; }
+
+  // 상자 그리기
+  var boxes = {};
+  LANES.forEach(function (lane, li) {
+    var lab = document.createElement('div');
+    lab.className = 'lane-label';
+    lab.style.left = (PADX + li * (BOXW + GAPX)) + 'px';
+    lab.innerHTML = '<b style="color:var(--a-' + lane.key + ')">' + (lane.key === 'S' ? 'S·T' : lane.key) + '</b>' + esc(lane.title) + '<small>' + esc(lane.sub) + '</small>';
+    canvas.appendChild(lab);
+    lane.names.forEach(function (n) {
+      var t = T[n];
+      var keyCols = t.cols.filter(function (c) { return c.pk || c.fk; });
+      var el = document.createElement('div');
+      el.className = 'ebox';
+      el.tabIndex = 0;
+      el.setAttribute('role', 'button');
+      el.setAttribute('aria-label', n + ' 상세 보기');
+      el.dataset.t = n;
+      el.style.setProperty('--ac', 'var(--a-' + t.area + ')');
+      var h = '<div class="eh"><code>' + esc(n) + '</code><span>' + t.area + '</span></div>' +
+        '<div class="ed" title="' + esc(t.desc) + '">' + esc(t.desc) + '</div>';
+      keyCols.forEach(function (c) {
+        var kb = c.pk ? '<span class="kb pk">PK</span>' : '<span class="kb fk">FK</span>';
+        var to = c.fk ? '→ ' + esc(shortRef(c.ref)) : esc(c.type);
+        h += '<div class="er" data-c="' + esc(c.name) + '">' + kb + '<code>' + esc(c.name) + '</code><span class="to">' + to + '</span></div>';
+      });
+      var rest = t.cols.length - keyCols.length;
+      if (rest > 0) h += '<div class="more">+ 일반 열 ' + rest + '개 · 눌러서 보기</div>';
+      el.innerHTML = h;
+      canvas.appendChild(el);
+      boxes[n] = el;
+    });
+  });
+
+  // 위치 계산
+  var W = 0, H = 0;
+  LANES.forEach(function (lane, li) {
+    var y = PADY;
+    var x = PADX + li * (BOXW + GAPX);
+    lane.names.forEach(function (n) {
+      var el = boxes[n];
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      y += el.offsetHeight + GAPY;
+    });
+    H = Math.max(H, y + PADY);
+    W = Math.max(W, x + BOXW + PADX);
+  });
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+
+  // 선 그리기: FK 열 → 참조 대상 PK 열
+  function anchor(name, col) {
+    var el = boxes[name];
+    var row = col && el.querySelector('.er[data-c="' + col + '"]');
+    var y = el.offsetTop + (row ? row.offsetTop + row.offsetHeight / 2 : 18);
+    return { l: el.offsetLeft, r: el.offsetLeft + BOXW, y: y, row: row };
+  }
+  var wires = [];
+  D.rels.forEach(function (r) {
+    var s = anchor(r.src, r.src_cols[r.src_cols.length - 1]);
+    var t = anchor(r.tgt, r.tgt_cols[r.tgt_cols.length - 1]);
+    var ls = laneOf[r.src], lt = laneOf[r.tgt];
+    var d, hx, hy = t.y, dir;
+    if (r.src === r.tgt || ls === lt) {
+      // 같은 레인: 맨 왼쪽 레인은 왼쪽으로, 나머지는 오른쪽으로 휘어 돈다
+      var left = ls === 0;
+      var sx = left ? s.l : s.r, tx = left ? t.l : t.r;
+      var bulge = Math.min(140, 34 + Math.abs(t.y - s.y) * 0.18) * (left ? -1 : 1);
+      dir = left ? 1 : -1;
+      hx = tx;
+      d = 'M' + sx + ' ' + s.y + ' C' + (sx + bulge) + ' ' + s.y + ' ' + (tx + bulge) + ' ' + t.y + ' ' + (tx + (left ? -8 : 8)) + ' ' + t.y;
+    } else {
+      var fwd = lt > ls;
+      var sx2 = fwd ? s.r : s.l, tx2 = fwd ? t.l : t.r;
+      var c = Math.max(70, Math.abs(tx2 - sx2) * 0.45);
+      dir = fwd ? 1 : -1;
+      hx = tx2;
+      d = 'M' + sx2 + ' ' + s.y + ' C' + (sx2 + c * dir) + ' ' + s.y + ' ' + (tx2 - c * dir) + ' ' + t.y + ' ' + (tx2 - 8 * dir) + ' ' + t.y;
+    }
+    var p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('class', 'wire' + (r.enforced ? '' : ' logical'));
+    var head = document.createElementNS(NS, 'path');
+    head.setAttribute('d', 'M' + (hx - 9 * dir) + ' ' + (hy - 4.5) + ' L' + hx + ' ' + hy + ' L' + (hx - 9 * dir) + ' ' + (hy + 4.5) + 'Z');
+    head.setAttribute('class', 'wire-head');
+    svg.appendChild(p);
+    svg.appendChild(head);
+    wires.push({ r: r, p: p, head: head, srow: s.row, trow: t.row });
+  });
+
+  // 강조
+  var pinned = null;
+  function focus(n) {
+    canvas.classList.toggle('focusing', !!n);
+    Object.keys(boxes).forEach(function (k) { boxes[k].classList.remove('on', 'sel', 'nb-out', 'nb-in'); });
+    canvas.querySelectorAll('.er.hit').forEach(function (e) { e.classList.remove('hit'); });
+    wires.forEach(function (w) {
+      var out = n && w.r.src === n, inn = n && w.r.tgt === n;
+      var cls = out ? ' out' : inn ? ' in' : '';
+      w.p.setAttribute('class', 'wire' + (w.r.enforced ? '' : ' logical') + ((out || inn) ? ' on' + cls : ''));
+      w.head.setAttribute('class', 'wire-head' + ((out || inn) ? ' on' + cls : ''));
+      if (out || inn) {
+        // 강조된 선을 맨 위로
+        svg.appendChild(w.p); svg.appendChild(w.head);
+        boxes[w.r.src].classList.add('on'); boxes[w.r.tgt].classList.add('on');
+        if (out && w.r.tgt !== n) boxes[w.r.tgt].classList.add('nb-out');
+        if (inn && w.r.src !== n) boxes[w.r.src].classList.add('nb-in');
+        if (w.srow) w.srow.classList.add('hit');
+        if (w.trow) w.trow.classList.add('hit');
+      }
+    });
+    if (n) boxes[n].classList.add('on', 'sel');
+  }
+
+  // 상세 패널
+  var drawer = document.getElementById('drawer');
+  function exVals(t, col) {
+    var e = t.example; if (!e) return [];
+    var i = e.head.indexOf(col); if (i < 0) return [];
+    var out = [];
+    e.rows.forEach(function (r) { var v = (r[i] || '').trim(); if (v && out.indexOf(v) < 0) out.push(v); });
+    return out.slice(0, 3);
+  }
+  function openDrawer(n) {
+    var t = T[n];
+    var outs = [], ins = [];
+    D.rels.forEach(function (r) {
+      if (r.src === n && r.tgt !== n && outs.indexOf(r.tgt) < 0) outs.push(r.tgt);
+      if (r.tgt === n && r.src !== n && ins.indexOf(r.src) < 0) ins.push(r.src);
+    });
+    var rows = t.cols.map(function (c) {
+      var k = (c.pk ? '<span class="k k-pk">PK</span>' : '') + (c.fk ? '<span class="k k-fk">FK</span>' : '');
+      var ex = exVals(t, c.name).map(function (v) { return '<span class="ev">' + esc(v) + '</span>'; }).join('');
+      return '<tr><td class="cn"><code>' + esc(c.name) + '</code><div class="ty" style="font-family:var(--font-mono);color:var(--muted)">' + esc(c.type) + '</div></td>' +
+        '<td class="ky">' + k + '</td><td class="cm">' + esc(c.comment) + (c.ref ? '<div class="rf">→ <code>' + esc(c.ref) + '</code></div>' : '') + ex + '</td></tr>';
+    }).join('');
+    function btns(list, cls) {
+      return list.length ? list.map(function (x) { return '<button type="button" class="' + cls + '" data-go="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') : '<span class="dd">없음</span>';
+    }
+    drawer.style.setProperty('--ac', 'var(--a-' + t.area + ')');
+    drawer.innerHTML =
+      '<div class="dhead"><h3><code>' + esc(n) + '</code><span class="atag">' + t.area + ' ' + esc(AREA[t.area]) + '</span></h3>' +
+      '<button type="button" data-close>닫기</button></div>' +
+      '<p class="dd">' + esc(t.desc) + '</p>' +
+      '<h4>이 표가 참조하는 표 →</h4><div class="links">' + btns(outs, 'o') + '</div>' +
+      '<h4>← 이 표를 참조하는 표</h4><div class="links">' + btns(ins, 'i') + '</div>' +
+      '<h4>열 ' + t.cols.length + '개 · 초록 칸은 예시 값</h4>' +
+      '<table><tbody>' + rows + '</tbody></table>' +
+      (t.example ? '<p class="dd" style="margin-top:10px">' + esc(t.example.note) + '</p>' : '') +
+      '<a class="gocard" href="#t-' + n.replace('.', '_') + '">표 카드에서 예시 행 전체 보기</a>';
+    drawer.hidden = false;
+  }
+  function closeDrawer() { drawer.hidden = true; pinned = null; focus(null); }
+  drawer.addEventListener('click', function (ev) {
+    if (ev.target.closest('[data-close]')) return closeDrawer();
+    var go = ev.target.closest('[data-go]');
+    if (go) { select(go.getAttribute('data-go'), true); return; }
+    if (ev.target.closest('.gocard')) { closeDrawer(); if (shell.classList.contains('full')) toggleFull(false); }
+  });
+  function select(n, center) {
+    pinned = n; focus(n); openDrawer(n);
+    if (center) {
+      var el = boxes[n];
+      view.scrollLeft = (el.offsetLeft + BOXW / 2) * z - view.clientWidth / 2;
+      view.scrollTop = (el.offsetTop + 40) * z - view.clientHeight / 3;
+    }
+  }
+
+  var moved = false;
+  Object.keys(boxes).forEach(function (n) {
+    var el = boxes[n];
+    el.addEventListener('mouseenter', function () { if (!pinned) focus(n); });
+    el.addEventListener('mouseleave', function () { if (!pinned) focus(null); });
+    el.addEventListener('click', function () { if (moved) return; pinned === n ? closeDrawer() : select(n, false); });
+    el.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); select(n, false); } });
+  });
+
+  // 확대·이동
+  var z = 1, shell = document.getElementById('erd-shell'), lvl = document.getElementById('zlvl'), fullBtn = document.getElementById('zfull');
+  function apply(nz, cx, cy) {
+    nz = Math.min(2.5, Math.max(0.2, nz));
+    if (cx == null) { cx = view.clientWidth / 2; cy = view.clientHeight / 2; }
+    var px = (view.scrollLeft + cx) / z, py = (view.scrollTop + cy) / z;
+    z = nz;
+    canvas.style.transform = 'scale(' + z + ')';
+    sizer.style.width = (W * z) + 'px';
+    sizer.style.height = (H * z) + 'px';
+    view.scrollLeft = px * z - cx;
+    view.scrollTop = py * z - cy;
+    lvl.textContent = Math.round(z * 100) + '%';
+  }
+  function fit() { apply(Math.min((view.clientWidth - 8) / W, 1), 0, 0); view.scrollLeft = 0; view.scrollTop = 0; }
+  function toggleFull(on) {
+    shell.classList.toggle('full', on);
+    fullBtn.textContent = on ? '닫기' : '전체 화면';
+    document.documentElement.style.overflow = on ? 'hidden' : '';
+    fit();
+  }
+  shell.querySelector('.zoom').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (!b) return;
+    var k = b.getAttribute('data-z');
+    if (k === 'in') apply(z * 1.25);
+    else if (k === 'out') apply(z / 1.25);
+    else if (k === 'fit') fit();
+    else if (k === 'full') toggleFull(!shell.classList.contains('full'));
+  });
+  view.addEventListener('wheel', function (ev) {
+    if (!(ev.ctrlKey || ev.metaKey)) return;
+    ev.preventDefault();
+    var r = view.getBoundingClientRect();
+    apply(z * (ev.deltaY < 0 ? 1.12 : 1 / 1.12), ev.clientX - r.left, ev.clientY - r.top);
+  }, { passive: false });
+  var drag = null;
+  view.addEventListener('pointerdown', function (ev) {
+    if (ev.button !== 0 || ev.pointerType === 'touch') return;
+    drag = { x: ev.clientX, y: ev.clientY, l: view.scrollLeft, t: view.scrollTop };
+    moved = false;
+  });
+  window.addEventListener('pointermove', function (ev) {
+    if (!drag) return;
+    var dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+    if (!moved && Math.abs(dx) + Math.abs(dy) > 5) { moved = true; view.classList.add('dragging'); }
+    if (moved) { view.scrollLeft = drag.l - dx; view.scrollTop = drag.t - dy; }
+  });
+  window.addEventListener('pointerup', function () {
+    drag = null; view.classList.remove('dragging');
+    setTimeout(function () { moved = false; }, 0);
+  });
+  view.addEventListener('click', function (ev) { if (!moved && !ev.target.closest('.ebox') && pinned) closeDrawer(); });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    if (!drawer.hidden) closeDrawer();
+    else if (shell.classList.contains('full')) toggleFull(false);
+  });
+  // 카드의 "관계도에서 보기"
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-show]'); if (!b) return;
+    document.getElementById('erd').scrollIntoView();
+    select(b.getAttribute('data-show'), true);
+  });
+
+  fit();
+})();
+
+/* 표 카드 검색 */
+(function () {
+  var q = document.getElementById('q');
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.tbl'));
+  var none = document.getElementById('none');
+  q.addEventListener('input', function () {
+    var v = q.value.trim().toLowerCase();
+    var shown = 0;
+    cards.forEach(function (c) {
+      var hit = !v || c.getAttribute('data-search').toLowerCase().indexOf(v) >= 0;
+      c.hidden = !hit;
+      if (hit) shown++;
+      Array.prototype.forEach.call(c.querySelectorAll('table.cols tbody tr'), function (tr) {
+        tr.style.background = v && hit && tr.textContent.toLowerCase().indexOf(v) >= 0 ? 'var(--accent-soft)' : '';
+      });
+    });
+    none.hidden = shown > 0;
+  });
+})();
+</script>
