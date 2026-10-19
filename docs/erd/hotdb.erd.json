@@ -1,0 +1,6064 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dineug/erd-editor/main/json-schema/schema.json",
+  "version": "3.0.0",
+  "settings": {
+    "width": 4000,
+    "height": 4000,
+    "scrollTop": 0,
+    "scrollLeft": 0,
+    "zoomLevel": 0.6,
+    "show": 295,
+    "database": 16,
+    "databaseName": "hotdb-가공",
+    "canvasType": "ERD",
+    "language": 16,
+    "tableNameCase": 1,
+    "columnNameCase": 1,
+    "bracketType": 1,
+    "relationshipDataTypeSync": false,
+    "relationshipOptimization": false,
+    "columnOrder": [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32,
+      64
+    ],
+    "maxWidthComment": 260
+  },
+  "doc": {
+    "tableIds": [
+      "tbl_gp_ypwg411m",
+      "tbl_gp_zcot001",
+      "tbl_gp_ypwc310m",
+      "tbl_gp_zppt005",
+      "tbl_gp_ypwg211m",
+      "tbl_am_sty01h",
+      "tbl_gp_ypwc111m",
+      "tbl_gp_ypwc140m",
+      "tbl_gp_zppt005_1",
+      "tbl_gp_ydeh060m",
+      "tbl_gp_zqmt071",
+      "tbl_gp_ypwc510m",
+      "tbl_gp_ypwc821m",
+      "tbl_gp_ypwc823m",
+      "tbl_gp_ypdg002m",
+      "tbl_gp_ypdg100m",
+      "tbl_gp_ycps301m",
+      "tbl_hot_m_hull",
+      "tbl_hot_m_block",
+      "tbl_hot_m_code",
+      "tbl_hot_l_work_unit",
+      "tbl_hot_l_cut_dwg",
+      "tbl_hot_l_cut_part",
+      "tbl_hot_v_anchor",
+      "tbl_hot_p_progress"
+    ],
+    "relationshipIds": [
+      "rel_000",
+      "rel_001",
+      "rel_002",
+      "rel_003",
+      "rel_004",
+      "rel_005",
+      "rel_006",
+      "rel_007",
+      "rel_008",
+      "rel_009",
+      "rel_010",
+      "rel_011",
+      "rel_012",
+      "rel_013",
+      "rel_014",
+      "rel_015",
+      "rel_016",
+      "rel_017",
+      "rel_018",
+      "rel_019",
+      "rel_020",
+      "rel_021",
+      "rel_022",
+      "rel_023",
+      "rel_024",
+      "rel_025",
+      "rel_026",
+      "rel_027",
+      "rel_028",
+      "rel_029",
+      "rel_030",
+      "rel_031",
+      "rel_032",
+      "rel_033",
+      "rel_034",
+      "rel_035",
+      "rel_036",
+      "rel_037",
+      "rel_038",
+      "rel_039",
+      "rel_040",
+      "rel_041",
+      "rel_042",
+      "rel_043",
+      "rel_044",
+      "rel_045",
+      "rel_046",
+      "rel_047",
+      "rel_048",
+      "rel_049",
+      "rel_050",
+      "rel_051",
+      "rel_052",
+      "rel_053",
+      "rel_054",
+      "rel_055",
+      "rel_056",
+      "rel_057",
+      "rel_058",
+      "rel_059",
+      "rel_060",
+      "rel_061",
+      "rel_062",
+      "rel_063",
+      "rel_064",
+      "rel_065",
+      "rel_066",
+      "rel_067",
+      "rel_068",
+      "rel_069",
+      "rel_070",
+      "rel_071",
+      "rel_072",
+      "rel_073",
+      "rel_074",
+      "rel_075",
+      "rel_076",
+      "rel_077",
+      "rel_078",
+      "rel_079",
+      "rel_080",
+      "rel_081",
+      "rel_082",
+      "rel_083",
+      "rel_084",
+      "rel_085",
+      "rel_086",
+      "rel_087",
+      "rel_088",
+      "rel_089",
+      "rel_090",
+      "rel_091",
+      "rel_092",
+      "rel_093",
+      "rel_094",
+      "rel_095",
+      "rel_096",
+      "rel_097",
+      "rel_098",
+      "rel_099",
+      "rel_100",
+      "rel_101",
+      "rel_102",
+      "rel_103",
+      "rel_104",
+      "rel_105",
+      "rel_106",
+      "rel_107"
+    ],
+    "indexIds": [],
+    "memoIds": [],
+    "tableGroupIds": [
+      "grp_leg",
+      "grp_hot"
+    ]
+  },
+  "collections": {
+    "tableEntities": {
+      "tbl_gp_ypwg411m": {
+        "id": "tbl_gp_ypwg411m",
+        "name": "gp.ypwg411m",
+        "comment": "작업오더(W/O) 마스터 · 186,789행",
+        "columnIds": [
+          "col_gp_ypwg411m__proj_no",
+          "col_gp_ypwg411m__blk_zone_no",
+          "col_gp_ypwg411m__work_ord_no",
+          "col_gp_ypwg411m__flag",
+          "col_gp_ypwg411m__mp",
+          "col_gp_ypwg411m__std_mh",
+          "col_gp_ypwg411m__accm_prgs_rate",
+          "col_gp_ypwg411m__wo_pln_sd",
+          "col_gp_ypwg411m__wo_pln_fd",
+          "col_gp_ypwg411m__wo_actl_sd",
+          "col_gp_ypwg411m__wo_actl_fd",
+          "col_gp_ypwg411m__assy_shop",
+          "col_gp_ypwg411m__jig_code",
+          "col_gp_ypwg411m__subc_work_indc",
+          "col_gp_ypwg411m__vndr_ogan_code",
+          "col_gp_ypwg411m__mnt_date",
+          "col_gp_ypwg411m__mnt_time"
+        ],
+        "seqColumnIds": [
+          "col_gp_ypwg411m__proj_no",
+          "col_gp_ypwg411m__blk_zone_no",
+          "col_gp_ypwg411m__work_ord_no",
+          "col_gp_ypwg411m__flag",
+          "col_gp_ypwg411m__mp",
+          "col_gp_ypwg411m__std_mh",
+          "col_gp_ypwg411m__accm_prgs_rate",
+          "col_gp_ypwg411m__wo_pln_sd",
+          "col_gp_ypwg411m__wo_pln_fd",
+          "col_gp_ypwg411m__wo_actl_sd",
+          "col_gp_ypwg411m__wo_actl_fd",
+          "col_gp_ypwg411m__assy_shop",
+          "col_gp_ypwg411m__jig_code",
+          "col_gp_ypwg411m__subc_work_indc",
+          "col_gp_ypwg411m__vndr_ogan_code",
+          "col_gp_ypwg411m__mnt_date",
+          "col_gp_ypwg411m__mnt_time"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 50,
+          "y": 90,
+          "zIndex": 2,
+          "widthName": 85,
+          "widthComment": 216,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_zcot001": {
+        "id": "tbl_gp_zcot001",
+        "name": "gp.zcot001",
+        "comment": "공사 기준정보 Master · 9,000행",
+        "columnIds": [
+          "col_gp_zcot001__proj_no",
+          "col_gp_zcot001__ship_type",
+          "col_gp_zcot001__cnt_stus"
+        ],
+        "seqColumnIds": [
+          "col_gp_zcot001__proj_no",
+          "col_gp_zcot001__ship_type",
+          "col_gp_zcot001__cnt_stus"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 690,
+          "y": 90,
+          "zIndex": 3,
+          "widthName": 78,
+          "widthComment": 204,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ypwc310m": {
+        "id": "tbl_gp_ypwc310m",
+        "name": "gp.ypwc310m",
+        "comment": "도면별 절단·마킹 작업계획/진행 · 64,355행",
+        "columnIds": [
+          "col_gp_ypwc310m__dwg_no",
+          "col_gp_ypwc310m__cut_pln_date",
+          "col_gp_ypwc310m__cut_bay_no",
+          "col_gp_ypwc310m__cnf_cut_bay_no",
+          "col_gp_ypwc310m__prcs_stus_code",
+          "col_gp_ypwc310m__mark_stus_code",
+          "col_gp_ypwc310m__mark_mfg_fd",
+          "col_gp_ypwc310m__mark_mfg_time",
+          "col_gp_ypwc310m__cut_mfg_fd",
+          "col_gp_ypwc310m__cut_mfg_time",
+          "col_gp_ypwc310m__pgm_id",
+          "col_gp_ypwc310m__mnt_date",
+          "col_gp_ypwc310m__mnt_time"
+        ],
+        "seqColumnIds": [
+          "col_gp_ypwc310m__dwg_no",
+          "col_gp_ypwc310m__cut_pln_date",
+          "col_gp_ypwc310m__cut_bay_no",
+          "col_gp_ypwc310m__cnf_cut_bay_no",
+          "col_gp_ypwc310m__prcs_stus_code",
+          "col_gp_ypwc310m__mark_stus_code",
+          "col_gp_ypwc310m__mark_mfg_fd",
+          "col_gp_ypwc310m__mark_mfg_time",
+          "col_gp_ypwc310m__cut_mfg_fd",
+          "col_gp_ypwc310m__cut_mfg_time",
+          "col_gp_ypwc310m__pgm_id",
+          "col_gp_ypwc310m__mnt_date",
+          "col_gp_ypwc310m__mnt_time"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 690,
+          "y": 276,
+          "zIndex": 4,
+          "widthName": 85,
+          "widthComment": 260,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_zppt005": {
+        "id": "tbl_gp_zppt005",
+        "name": "gp.zppt005",
+        "comment": "절단도면 확정",
+        "columnIds": [
+          "col_gp_zppt005__cut_std_mh",
+          "col_gp_zppt005__mark_std_mh",
+          "col_gp_zppt005__crat_ind"
+        ],
+        "seqColumnIds": [
+          "col_gp_zppt005__cut_std_mh",
+          "col_gp_zppt005__mark_std_mh",
+          "col_gp_zppt005__crat_ind"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 50,
+          "y": 612,
+          "zIndex": 5,
+          "widthName": 78,
+          "widthComment": 87,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ypwg211m": {
+        "id": "tbl_gp_ypwg211m",
+        "name": "gp.ypwg211m",
+        "comment": "생산오더 마스터 · 88,349행",
+        "columnIds": [
+          "col_gp_ypwg211m__mat_desc1",
+          "col_gp_ypwg211m__detl_clsf_code"
+        ],
+        "seqColumnIds": [
+          "col_gp_ypwg211m__mat_desc1",
+          "col_gp_ypwg211m__detl_clsf_code"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 690,
+          "y": 702,
+          "zIndex": 6,
+          "widthName": 85,
+          "widthComment": 174,
+          "color": "#F37321"
+        }
+      },
+      "tbl_am_sty01h": {
+        "id": "tbl_am_sty01h",
+        "name": "am.sty01h",
+        "comment": "강재 정보 이력 (ProSSYS) · 9,840행",
+        "columnIds": [
+          "col_am_sty01h__acpt_date",
+          "col_am_sty01h__dwg_no",
+          "col_am_sty01h__frst_pick_actl_date_1",
+          "col_am_sty01h__scnd_pick_actl_date",
+          "col_am_sty01h__iss_actl_date"
+        ],
+        "seqColumnIds": [
+          "col_am_sty01h__acpt_date",
+          "col_am_sty01h__dwg_no",
+          "col_am_sty01h__frst_pick_actl_date_1",
+          "col_am_sty01h__scnd_pick_actl_date",
+          "col_am_sty01h__iss_actl_date"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 50,
+          "y": 798,
+          "zIndex": 7,
+          "widthName": 71,
+          "widthComment": 232,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ypwc111m": {
+        "id": "tbl_gp_ypwc111m",
+        "name": "gp.ypwc111m",
+        "comment": "강재 원자재 불출/재고 실적 · 51,614행",
+        "columnIds": [
+          "col_gp_ypwc111m__pick_fin_date",
+          "col_gp_ypwc111m__iss_dt_last"
+        ],
+        "seqColumnIds": [
+          "col_gp_ypwc111m__pick_fin_date",
+          "col_gp_ypwc111m__iss_dt_last"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 690,
+          "y": 864,
+          "zIndex": 8,
+          "widthName": 85,
+          "widthComment": 243,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ypwc140m": {
+        "id": "tbl_gp_ypwc140m",
+        "name": "gp.ypwc140m",
+        "comment": "강재 컨베이어 불출 실적 · 13,717행",
+        "columnIds": [
+          "col_gp_ypwc140m__iss_date",
+          "col_gp_ypwc140m__iss_time",
+          "col_gp_ypwc140m__mark_stus_code",
+          "col_gp_ypwc140m__auto_mark_date",
+          "col_gp_ypwc140m__auto_mark_time"
+        ],
+        "seqColumnIds": [
+          "col_gp_ypwc140m__iss_date",
+          "col_gp_ypwc140m__iss_time",
+          "col_gp_ypwc140m__mark_stus_code",
+          "col_gp_ypwc140m__auto_mark_date",
+          "col_gp_ypwc140m__auto_mark_time"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 690,
+          "y": 1026,
+          "zIndex": 9,
+          "widthName": 85,
+          "widthComment": 224,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_zppt005_1": {
+        "id": "tbl_gp_zppt005_1",
+        "name": "gp.zppt005_1",
+        "comment": "도면 결품 정보",
+        "columnIds": [
+          "col_gp_zppt005_1__aeflg"
+        ],
+        "seqColumnIds": [
+          "col_gp_zppt005_1__aeflg"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 50,
+          "y": 1032,
+          "zIndex": 10,
+          "widthName": 92,
+          "widthComment": 94,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ydeh060m": {
+        "id": "tbl_gp_ydeh060m",
+        "name": "gp.ydeh060m",
+        "comment": "부재 MASTER 정보 · 80,588행",
+        "columnIds": [
+          "col_gp_ydeh060m__part_no",
+          "col_gp_ydeh060m__proj_no",
+          "col_gp_ydeh060m__blk_no",
+          "col_gp_ydeh060m__part_wt",
+          "col_gp_ydeh060m__cut_req_qty",
+          "col_gp_ydeh060m__assy_wstg_code",
+          "col_gp_ydeh060m__next_wstg_code",
+          "col_gp_ydeh060m__cut_mfg_fd",
+          "col_gp_ydeh060m__bend_clsf_code",
+          "col_gp_ydeh060m__grnd_work_indc"
+        ],
+        "seqColumnIds": [
+          "col_gp_ydeh060m__part_no",
+          "col_gp_ydeh060m__proj_no",
+          "col_gp_ydeh060m__blk_no",
+          "col_gp_ydeh060m__part_wt",
+          "col_gp_ydeh060m__cut_req_qty",
+          "col_gp_ydeh060m__assy_wstg_code",
+          "col_gp_ydeh060m__next_wstg_code",
+          "col_gp_ydeh060m__cut_mfg_fd",
+          "col_gp_ydeh060m__bend_clsf_code",
+          "col_gp_ydeh060m__grnd_work_indc"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 50,
+          "y": 1170,
+          "zIndex": 11,
+          "widthName": 85,
+          "widthComment": 187,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_zqmt071": {
+        "id": "tbl_gp_zqmt071",
+        "name": "gp.zqmt071",
+        "comment": "도면별 부재 LIST",
+        "columnIds": [
+          "col_gp_zqmt071__(도면별 부재 LIST)"
+        ],
+        "seqColumnIds": [
+          "col_gp_zqmt071__(도면별 부재 LIST)"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 690,
+          "y": 1260,
+          "zIndex": 12,
+          "widthName": 78,
+          "widthComment": 110,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ypwc510m": {
+        "id": "tbl_gp_ypwc510m",
+        "name": "gp.ypwc510m",
+        "comment": "곡가공(벤딩) 실적 · 23,550행",
+        "columnIds": [
+          "col_gp_ypwc510m__bend_mfg_fd"
+        ],
+        "seqColumnIds": [
+          "col_gp_ypwc510m__bend_mfg_fd"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 690,
+          "y": 1398,
+          "zIndex": 13,
+          "widthName": 85,
+          "widthComment": 188,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ypwc821m": {
+        "id": "tbl_gp_ypwc821m",
+        "name": "gp.ypwc821m",
+        "comment": "사상 실적 (GRC1)",
+        "columnIds": [
+          "col_gp_ypwc821m__rgsr_date"
+        ],
+        "seqColumnIds": [
+          "col_gp_ypwc821m__rgsr_date"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 50,
+          "y": 1524,
+          "zIndex": 14,
+          "widthName": 85,
+          "widthComment": 112,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ypwc823m": {
+        "id": "tbl_gp_ypwc823m",
+        "name": "gp.ypwc823m",
+        "comment": "사상 실적 (GRC2)",
+        "columnIds": [
+          "col_gp_ypwc823m__(열 미확인)"
+        ],
+        "seqColumnIds": [
+          "col_gp_ypwc823m__(열 미확인)"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 690,
+          "y": 1536,
+          "zIndex": 15,
+          "widthName": 85,
+          "widthComment": 112,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ypdg002m": {
+        "id": "tbl_gp_ypdg002m",
+        "name": "gp.ypdg002m",
+        "comment": "부재 모듬판 마스터 · 225,471행",
+        "columnIds": [
+          "col_gp_ypdg002m__part_plat_date",
+          "col_gp_ypdg002m__part_plat_time",
+          "col_gp_ypdg002m__part_plat_status"
+        ],
+        "seqColumnIds": [
+          "col_gp_ypdg002m__part_plat_date",
+          "col_gp_ypdg002m__part_plat_time",
+          "col_gp_ypdg002m__part_plat_status"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 50,
+          "y": 1662,
+          "zIndex": 16,
+          "widthName": 85,
+          "widthComment": 200,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ypdg100m": {
+        "id": "tbl_gp_ypdg100m",
+        "name": "gp.ypdg100m",
+        "comment": "가공 부재 진행 실적 · 221,674행",
+        "columnIds": [
+          "col_gp_ypdg100m__iss_fd",
+          "col_gp_ypdg100m__part_stus_code"
+        ],
+        "seqColumnIds": [
+          "col_gp_ypdg100m__iss_fd",
+          "col_gp_ypdg100m__part_stus_code"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 690,
+          "y": 1674,
+          "zIndex": 17,
+          "widthName": 85,
+          "widthComment": 207,
+          "color": "#F37321"
+        }
+      },
+      "tbl_gp_ycps301m": {
+        "id": "tbl_gp_ycps301m",
+        "name": "gp.ycps301m",
+        "comment": "운송신청(CPS) 부재 매핑 · 294,529행",
+        "columnIds": [
+          "col_gp_ycps301m__rgsr_date",
+          "col_gp_ycps301m__ref_dcmt_type",
+          "col_gp_ycps301m__mat_code"
+        ],
+        "seqColumnIds": [
+          "col_gp_ycps301m__rgsr_date",
+          "col_gp_ycps301m__ref_dcmt_type",
+          "col_gp_ycps301m__mat_code"
+        ],
+        "groupId": "grp_leg",
+        "ui": {
+          "x": 690,
+          "y": 1836,
+          "zIndex": 18,
+          "widthName": 85,
+          "widthComment": 235,
+          "color": "#F37321"
+        }
+      },
+      "tbl_hot_m_hull": {
+        "id": "tbl_hot_m_hull",
+        "name": "hot.m_hull",
+        "comment": "호선 1척 · ZCOT001 · 월 1회",
+        "columnIds": [
+          "col_hot_m_hull__hull_no",
+          "col_hot_m_hull__ship_type",
+          "col_hot_m_hull__status"
+        ],
+        "seqColumnIds": [
+          "col_hot_m_hull__hull_no",
+          "col_hot_m_hull__ship_type",
+          "col_hot_m_hull__status"
+        ],
+        "groupId": "grp_hot",
+        "ui": {
+          "x": 1550,
+          "y": 90,
+          "zIndex": 19,
+          "widthName": 78,
+          "widthComment": 187,
+          "color": "#2F80ED"
+        }
+      },
+      "tbl_hot_m_block": {
+        "id": "tbl_hot_m_block",
+        "name": "hot.m_block",
+        "comment": "호선 × 블록 1개 · 211M·411M BLK_ZONE_NO, BTS, 센서",
+        "columnIds": [
+          "col_hot_m_block__block_no"
+        ],
+        "seqColumnIds": [
+          "col_hot_m_block__block_no"
+        ],
+        "groupId": "grp_hot",
+        "ui": {
+          "x": 2190,
+          "y": 90,
+          "zIndex": 20,
+          "widthName": 85,
+          "widthComment": 260,
+          "color": "#2F80ED"
+        }
+      },
+      "tbl_hot_m_code": {
+        "id": "tbl_hot_m_code",
+        "name": "hot.m_code",
+        "comment": "코드 그룹 × 코드 1개 · YPGS010M, ZPST0010, 절점은 자체",
+        "columnIds": [
+          "col_hot_m_code__code",
+          "col_hot_m_code__seq",
+          "col_hot_m_code__attrs"
+        ],
+        "seqColumnIds": [
+          "col_hot_m_code__code",
+          "col_hot_m_code__seq",
+          "col_hot_m_code__attrs"
+        ],
+        "groupId": "grp_hot",
+        "ui": {
+          "x": 2190,
+          "y": 228,
+          "zIndex": 21,
+          "widthName": 78,
+          "widthComment": 260,
+          "color": "#2F80ED"
+        }
+      },
+      "tbl_hot_l_work_unit": {
+        "id": "tbl_hot_l_work_unit",
+        "name": "hot.l_work_unit",
+        "comment": "작업 단위 1개 ACTIVITY > ORDER > WO · ZPST0630 / 211M·212M·ZPPT200 / 214M·411M",
+        "columnIds": [
+          "col_hot_l_work_unit__hull_no",
+          "col_hot_l_work_unit__block_no",
+          "col_hot_l_work_unit__unit_id",
+          "col_hot_l_work_unit__trade",
+          "col_hot_l_work_unit__mp",
+          "col_hot_l_work_unit__plan_mh",
+          "col_hot_l_work_unit__acc_rate",
+          "col_hot_l_work_unit__plan_sd",
+          "col_hot_l_work_unit__plan_fd",
+          "col_hot_l_work_unit__actl_sd",
+          "col_hot_l_work_unit__actl_fd",
+          "col_hot_l_work_unit__location_id",
+          "col_hot_l_work_unit__attrs",
+          "col_hot_l_work_unit__mnt_ts",
+          "col_hot_l_work_unit__ref_no",
+          "col_hot_l_work_unit__step_code",
+          "col_hot_l_work_unit__auto_dist"
+        ],
+        "seqColumnIds": [
+          "col_hot_l_work_unit__hull_no",
+          "col_hot_l_work_unit__block_no",
+          "col_hot_l_work_unit__unit_id",
+          "col_hot_l_work_unit__trade",
+          "col_hot_l_work_unit__mp",
+          "col_hot_l_work_unit__plan_mh",
+          "col_hot_l_work_unit__acc_rate",
+          "col_hot_l_work_unit__plan_sd",
+          "col_hot_l_work_unit__plan_fd",
+          "col_hot_l_work_unit__actl_sd",
+          "col_hot_l_work_unit__actl_fd",
+          "col_hot_l_work_unit__location_id",
+          "col_hot_l_work_unit__attrs",
+          "col_hot_l_work_unit__mnt_ts",
+          "col_hot_l_work_unit__ref_no",
+          "col_hot_l_work_unit__step_code",
+          "col_hot_l_work_unit__auto_dist"
+        ],
+        "groupId": "grp_hot",
+        "ui": {
+          "x": 1550,
+          "y": 276,
+          "zIndex": 22,
+          "widthName": 113,
+          "widthComment": 260,
+          "color": "#2F80ED"
+        }
+      },
+      "tbl_hot_l_cut_dwg": {
+        "id": "tbl_hot_l_cut_dwg",
+        "name": "hot.l_cut_dwg",
+        "comment": "절단 도면 1행 = 가공 앵커 · 4-1 신규",
+        "columnIds": [
+          "col_hot_l_cut_dwg__dwg_no",
+          "col_hot_l_cut_dwg__hull_no",
+          "col_hot_l_cut_dwg__block_no",
+          "col_hot_l_cut_dwg__dwg_series",
+          "col_hot_l_cut_dwg__cut_plan_date",
+          "col_hot_l_cut_dwg__cut_site",
+          "col_hot_l_cut_dwg__cut_bay",
+          "col_hot_l_cut_dwg__cut_status",
+          "col_hot_l_cut_dwg__mark_status",
+          "col_hot_l_cut_dwg__cut_std_mh",
+          "col_hot_l_cut_dwg__mark_std_mh",
+          "col_hot_l_cut_dwg__wo_std_mh",
+          "col_hot_l_cut_dwg__steel_in_ts",
+          "col_hot_l_cut_dwg__pick1_ts",
+          "col_hot_l_cut_dwg__pick2_ts",
+          "col_hot_l_cut_dwg__steel_issue_ts",
+          "col_hot_l_cut_dwg__pretreat_ts",
+          "col_hot_l_cut_dwg__mark_done_ts",
+          "col_hot_l_cut_dwg__cut_done_ts",
+          "col_hot_l_cut_dwg__cut_done_src",
+          "col_hot_l_cut_dwg__confirmed_flag",
+          "col_hot_l_cut_dwg__mnt_ts"
+        ],
+        "seqColumnIds": [
+          "col_hot_l_cut_dwg__dwg_no",
+          "col_hot_l_cut_dwg__hull_no",
+          "col_hot_l_cut_dwg__block_no",
+          "col_hot_l_cut_dwg__dwg_series",
+          "col_hot_l_cut_dwg__cut_plan_date",
+          "col_hot_l_cut_dwg__cut_site",
+          "col_hot_l_cut_dwg__cut_bay",
+          "col_hot_l_cut_dwg__cut_status",
+          "col_hot_l_cut_dwg__mark_status",
+          "col_hot_l_cut_dwg__cut_std_mh",
+          "col_hot_l_cut_dwg__mark_std_mh",
+          "col_hot_l_cut_dwg__wo_std_mh",
+          "col_hot_l_cut_dwg__steel_in_ts",
+          "col_hot_l_cut_dwg__pick1_ts",
+          "col_hot_l_cut_dwg__pick2_ts",
+          "col_hot_l_cut_dwg__steel_issue_ts",
+          "col_hot_l_cut_dwg__pretreat_ts",
+          "col_hot_l_cut_dwg__mark_done_ts",
+          "col_hot_l_cut_dwg__cut_done_ts",
+          "col_hot_l_cut_dwg__cut_done_src",
+          "col_hot_l_cut_dwg__confirmed_flag",
+          "col_hot_l_cut_dwg__mnt_ts"
+        ],
+        "groupId": "grp_hot",
+        "ui": {
+          "x": 2190,
+          "y": 414,
+          "zIndex": 23,
+          "widthName": 99,
+          "widthComment": 238,
+          "color": "#2F80ED"
+        }
+      },
+      "tbl_hot_l_cut_part": {
+        "id": "tbl_hot_l_cut_part",
+        "name": "hot.l_cut_part",
+        "comment": "가공 부재 1개 · 4-1 수정 후",
+        "columnIds": [
+          "col_hot_l_cut_part__part_no",
+          "col_hot_l_cut_part__hull_no",
+          "col_hot_l_cut_part__block_no",
+          "col_hot_l_cut_part__dwg_no",
+          "col_hot_l_cut_part__weight_kg",
+          "col_hot_l_cut_part__cut_req_qty",
+          "col_hot_l_cut_part__dest_wstg",
+          "col_hot_l_cut_part__cut_done_ts",
+          "col_hot_l_cut_part__bend_flag",
+          "col_hot_l_cut_part__bend_done_ts",
+          "col_hot_l_cut_part__grind_flag",
+          "col_hot_l_cut_part__grind_done_ts",
+          "col_hot_l_cut_part__group_ts",
+          "col_hot_l_cut_part__issue_ts",
+          "col_hot_l_cut_part__issue_src",
+          "col_hot_l_cut_part__inbound_ts"
+        ],
+        "seqColumnIds": [
+          "col_hot_l_cut_part__part_no",
+          "col_hot_l_cut_part__hull_no",
+          "col_hot_l_cut_part__block_no",
+          "col_hot_l_cut_part__dwg_no",
+          "col_hot_l_cut_part__weight_kg",
+          "col_hot_l_cut_part__cut_req_qty",
+          "col_hot_l_cut_part__dest_wstg",
+          "col_hot_l_cut_part__cut_done_ts",
+          "col_hot_l_cut_part__bend_flag",
+          "col_hot_l_cut_part__bend_done_ts",
+          "col_hot_l_cut_part__grind_flag",
+          "col_hot_l_cut_part__grind_done_ts",
+          "col_hot_l_cut_part__group_ts",
+          "col_hot_l_cut_part__issue_ts",
+          "col_hot_l_cut_part__issue_src",
+          "col_hot_l_cut_part__inbound_ts"
+        ],
+        "groupId": "grp_hot",
+        "ui": {
+          "x": 1550,
+          "y": 798,
+          "zIndex": 24,
+          "widthName": 106,
+          "widthComment": 181,
+          "color": "#2F80ED"
+        }
+      },
+      "tbl_hot_v_anchor": {
+        "id": "tbl_hot_v_anchor",
+        "name": "hot.v_anchor",
+        "comment": "권역 앵커 표 4개의 UNION 뷰 · 제안 신규",
+        "columnIds": [
+          "col_hot_v_anchor__target_qty",
+          "col_hot_v_anchor__weight_mh",
+          "col_hot_v_anchor__site"
+        ],
+        "seqColumnIds": [
+          "col_hot_v_anchor__target_qty",
+          "col_hot_v_anchor__weight_mh",
+          "col_hot_v_anchor__site"
+        ],
+        "groupId": "grp_hot",
+        "ui": {
+          "x": 2190,
+          "y": 1056,
+          "zIndex": 25,
+          "widthName": 92,
+          "widthComment": 257,
+          "color": "#2F80ED"
+        }
+      },
+      "tbl_hot_p_progress": {
+        "id": "tbl_hot_p_progress",
+        "name": "hot.p_progress",
+        "comment": "앵커 × 기준일 실적 · 판별 결과 · 레거시 복제",
+        "columnIds": [
+          "col_hot_p_progress__legacy_pct",
+          "col_hot_p_progress__cp_history",
+          "col_hot_p_progress__planned_qty",
+          "col_hot_p_progress__done_qty",
+          "col_hot_p_progress__weight_mh",
+          "col_hot_p_progress__site"
+        ],
+        "seqColumnIds": [
+          "col_hot_p_progress__legacy_pct",
+          "col_hot_p_progress__cp_history",
+          "col_hot_p_progress__planned_qty",
+          "col_hot_p_progress__done_qty",
+          "col_hot_p_progress__weight_mh",
+          "col_hot_p_progress__site"
+        ],
+        "groupId": "grp_hot",
+        "ui": {
+          "x": 2190,
+          "y": 1242,
+          "zIndex": 26,
+          "widthName": 106,
+          "widthComment": 260,
+          "color": "#2F80ED"
+        }
+      }
+    },
+    "tableColumnEntities": {
+      "col_gp_ypwg411m__proj_no": {
+        "id": "col_gp_ypwg411m__proj_no",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "proj_no",
+        "comment": "호선 번호 → l_work_unit.hull_no · 호선 번호 → m_hull.hull_no",
+        "dataType": "5486",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__blk_zone_no": {
+        "id": "col_gp_ypwg411m__blk_zone_no",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "blk_zone_no",
+        "comment": "블록 번호 → l_work_unit.block_no · 블록 번호 → m_block.block_no",
+        "dataType": "225",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__work_ord_no": {
+        "id": "col_gp_ypwg411m__work_ord_no",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "work_ord_no",
+        "comment": "W/O 번호 → l_work_unit.unit_id · W/O 단계 (마킹 · 절단 · 곡가공 · 자동분배) → l_work_unit.step_code · W/O 단계 (마킹 · 절단 · 곡가공 · 자동분배) → l_work_unit.auto_dist",
+        "dataType": "5486C225CS023PR",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__flag": {
+        "id": "col_gp_ypwg411m__flag",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "flag",
+        "comment": "공종 → l_work_unit.trade",
+        "dataType": "C",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 172,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__mp": {
+        "id": "col_gp_ypwg411m__mp",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "mp",
+        "comment": "공정 → l_work_unit.mp",
+        "dataType": "C",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 151,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__std_mh": {
+        "id": "col_gp_ypwg411m__std_mh",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "std_mh",
+        "comment": "W/O 표준시수 → l_work_unit.plan_mh · 도면별 W/O 시수 합 (가중치) → l_cut_dwg.wo_std_mh",
+        "dataType": "22.080",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__accm_prgs_rate": {
+        "id": "col_gp_ypwg411m__accm_prgs_rate",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "accm_prgs_rate",
+        "comment": "누계 진도율 → l_work_unit.acc_rate",
+        "dataType": "100.000",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 236,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__wo_pln_sd": {
+        "id": "col_gp_ypwg411m__wo_pln_sd",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "wo_pln_sd",
+        "comment": "W/O 계획 착수일 · 완료일 → l_work_unit.plan_sd",
+        "dataType": "20220723",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__wo_pln_fd": {
+        "id": "col_gp_ypwg411m__wo_pln_fd",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "wo_pln_fd",
+        "comment": "W/O 계획 착수일 · 완료일 → l_work_unit.plan_fd",
+        "dataType": "20220723",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__wo_actl_sd": {
+        "id": "col_gp_ypwg411m__wo_actl_sd",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "wo_actl_sd",
+        "comment": "W/O 실적 착수일 · 완료일 → l_work_unit.actl_sd · 부재 불출 (조립 투입) 시각 → l_cut_part.issue_ts · 부재 불출 (조립 투입) 시각 → l_cut_part.issue_src",
+        "dataType": "20220723",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__wo_actl_fd": {
+        "id": "col_gp_ypwg411m__wo_actl_fd",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "wo_actl_fd",
+        "comment": "W/O 실적 착수일 · 완료일 → l_work_unit.actl_fd",
+        "dataType": "20220723",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__assy_shop": {
+        "id": "col_gp_ypwg411m__assy_shop",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "assy_shop",
+        "comment": "작업 공장 → l_work_unit.location_id",
+        "dataType": "CTS",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 245,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__jig_code": {
+        "id": "col_gp_ypwg411m__jig_code",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "jig_code",
+        "comment": "정반 → l_work_unit.location_id",
+        "dataType": "M320 (조립 예)",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 214,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__subc_work_indc": {
+        "id": "col_gp_ypwg411m__subc_work_indc",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "subc_work_indc",
+        "comment": "협력사 여부 · 업체 → l_work_unit.attrs",
+        "dataType": "N",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__vndr_ogan_code": {
+        "id": "col_gp_ypwg411m__vndr_ogan_code",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "vndr_ogan_code",
+        "comment": "협력사 여부 · 업체 → l_work_unit.attrs",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__mnt_date": {
+        "id": "col_gp_ypwg411m__mnt_date",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "mnt_date",
+        "comment": "W/O 수정일시 → l_work_unit.mnt_ts",
+        "dataType": "20220808",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 231,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg411m__mnt_time": {
+        "id": "col_gp_ypwg411m__mnt_time",
+        "tableId": "tbl_gp_ypwg411m",
+        "name": "mnt_time",
+        "comment": "W/O 수정일시 → l_work_unit.mnt_ts",
+        "dataType": "173116",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 231,
+          "widthDataType": 113,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_zcot001__proj_no": {
+        "id": "col_gp_zcot001__proj_no",
+        "tableId": "tbl_gp_zcot001",
+        "name": "proj_no",
+        "comment": "호선 마스터 → m_hull.hull_no",
+        "dataType": "00000001",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 71,
+          "widthComment": 194,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_zcot001__ship_type": {
+        "id": "col_gp_zcot001__ship_type",
+        "tableId": "tbl_gp_zcot001",
+        "name": "ship_type",
+        "comment": "호선 마스터 → m_hull.ship_type",
+        "dataType": "B/C",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 71,
+          "widthComment": 208,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_zcot001__cnt_stus": {
+        "id": "col_gp_zcot001__cnt_stus",
+        "tableId": "tbl_gp_zcot001",
+        "name": "cnt_stus",
+        "comment": "호선 마스터 → m_hull.status",
+        "dataType": "2",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 71,
+          "widthComment": 187,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__dwg_no": {
+        "id": "col_gp_ypwc310m__dwg_no",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "dwg_no",
+        "comment": "절단 도면 번호 (앵커) → l_cut_dwg.dwg_no · 도면의 호선 · 블록 · 계열 → l_cut_dwg.hull_no · 도면의 호선 · 블록 · 계열 → l_cut_dwg.block_no · 도면의 호선 · 블록 · 계열 → l_cut_dwg.dwg_series",
+        "dataType": "5486DS914CNG01",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__cut_pln_date": {
+        "id": "col_gp_ypwc310m__cut_pln_date",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "cut_pln_date",
+        "comment": "절단 계획일 → l_cut_dwg.cut_plan_date",
+        "dataType": "20220714",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 257,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__cut_bay_no": {
+        "id": "col_gp_ypwc310m__cut_bay_no",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "cut_bay_no",
+        "comment": "절단 장소 (사내 / 사외) → l_cut_dwg.cut_site · 절단 장소 (사내 / 사외) → l_cut_dwg.cut_bay",
+        "dataType": "9",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__cnf_cut_bay_no": {
+        "id": "col_gp_ypwc310m__cnf_cut_bay_no",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "cnf_cut_bay_no",
+        "comment": "절단 장소 (사내 / 사외) → l_cut_dwg.cut_bay",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__prcs_stus_code": {
+        "id": "col_gp_ypwc310m__prcs_stus_code",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "prcs_stus_code",
+        "comment": "도면 진행 · 마킹 상태 → l_cut_dwg.cut_status",
+        "dataType": "2",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__mark_stus_code": {
+        "id": "col_gp_ypwc310m__mark_stus_code",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "mark_stus_code",
+        "comment": "도면 진행 · 마킹 상태 → l_cut_dwg.mark_status",
+        "dataType": "2",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__mark_mfg_fd": {
+        "id": "col_gp_ypwc310m__mark_mfg_fd",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "mark_mfg_fd",
+        "comment": "마킹 완료 시각 → l_cut_dwg.mark_done_ts",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__mark_mfg_time": {
+        "id": "col_gp_ypwc310m__mark_mfg_time",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "mark_mfg_time",
+        "comment": "마킹 완료 시각 → l_cut_dwg.mark_done_ts",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__cut_mfg_fd": {
+        "id": "col_gp_ypwc310m__cut_mfg_fd",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "cut_mfg_fd",
+        "comment": "절단 완료 시각 (도면) → l_cut_dwg.cut_done_ts",
+        "dataType": "20221102",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__cut_mfg_time": {
+        "id": "col_gp_ypwc310m__cut_mfg_time",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "cut_mfg_time",
+        "comment": "절단 완료 시각 (도면) → l_cut_dwg.cut_done_ts",
+        "dataType": "220038",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__pgm_id": {
+        "id": "col_gp_ypwc310m__pgm_id",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "pgm_id",
+        "comment": "절단 완료 시각 (도면) → l_cut_dwg.cut_done_src",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__mnt_date": {
+        "id": "col_gp_ypwc310m__mnt_date",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "mnt_date",
+        "comment": "도면 수정일시 → l_cut_dwg.mnt_ts",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 220,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc310m__mnt_time": {
+        "id": "col_gp_ypwc310m__mnt_time",
+        "tableId": "tbl_gp_ypwc310m",
+        "name": "mnt_time",
+        "comment": "도면 수정일시 → l_cut_dwg.mnt_ts",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 220,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_zppt005__cut_std_mh": {
+        "id": "col_gp_zppt005__cut_std_mh",
+        "tableId": "tbl_gp_zppt005",
+        "name": "cut_std_mh",
+        "comment": "도면 표준시수 → l_cut_dwg.cut_std_mh",
+        "dataType": "1.203",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 248,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_zppt005__mark_std_mh": {
+        "id": "col_gp_zppt005__mark_std_mh",
+        "tableId": "tbl_gp_zppt005",
+        "name": "mark_std_mh",
+        "comment": "도면 표준시수 → l_cut_dwg.mark_std_mh",
+        "dataType": "0.516",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 255,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_zppt005__crat_ind": {
+        "id": "col_gp_zppt005__crat_ind",
+        "tableId": "tbl_gp_zppt005",
+        "name": "crat_ind",
+        "comment": "도면 확정 · 결품 → l_cut_dwg.confirmed_flag",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg211m__mat_desc1": {
+        "id": "col_gp_ypwg211m__mat_desc1",
+        "tableId": "tbl_gp_ypwg211m",
+        "name": "mat_desc1",
+        "comment": "가공 W/O 가 속한 도면 → l_work_unit.ref_no · 부재가 속한 도면 → l_cut_part.dwg_no",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwg211m__detl_clsf_code": {
+        "id": "col_gp_ypwg211m__detl_clsf_code",
+        "tableId": "tbl_gp_ypwg211m",
+        "name": "detl_clsf_code",
+        "comment": "가공 W/O 가 속한 도면 → l_work_unit.ref_no",
+        "dataType": "C00",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_am_sty01h__acpt_date": {
+        "id": "col_am_sty01h__acpt_date",
+        "tableId": "tbl_am_sty01h",
+        "name": "acpt_date",
+        "comment": "강재 입고일 → l_cut_dwg.steel_in_ts",
+        "dataType": "2022-03-07",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 155,
+          "widthComment": 243,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_am_sty01h__dwg_no": {
+        "id": "col_am_sty01h__dwg_no",
+        "tableId": "tbl_am_sty01h",
+        "name": "dwg_no",
+        "comment": "강재 입고일 → l_cut_dwg.steel_in_ts",
+        "dataType": "5486DS111CRZ04",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 155,
+          "widthComment": 243,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_am_sty01h__frst_pick_actl_date_1": {
+        "id": "col_am_sty01h__frst_pick_actl_date_1",
+        "tableId": "tbl_am_sty01h",
+        "name": "frst_pick_actl_date_1",
+        "comment": "강재 1차 선별일 → l_cut_dwg.pick1_ts",
+        "dataType": "2022-04-20",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 155,
+          "widthComment": 248,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_am_sty01h__scnd_pick_actl_date": {
+        "id": "col_am_sty01h__scnd_pick_actl_date",
+        "tableId": "tbl_am_sty01h",
+        "name": "scnd_pick_actl_date",
+        "comment": "강재 2차 선별일 → l_cut_dwg.pick2_ts",
+        "dataType": "2022-04-27",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 155,
+          "widthComment": 248,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_am_sty01h__iss_actl_date": {
+        "id": "col_am_sty01h__iss_actl_date",
+        "tableId": "tbl_am_sty01h",
+        "name": "iss_actl_date",
+        "comment": "강재 불출일 → l_cut_dwg.steel_issue_ts",
+        "dataType": "2022-04-27",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 155,
+          "widthComment": 260,
+          "widthDataType": 106,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc111m__pick_fin_date": {
+        "id": "col_gp_ypwc111m__pick_fin_date",
+        "tableId": "tbl_gp_ypwc111m",
+        "name": "pick_fin_date",
+        "comment": "강재 2차 선별일 → l_cut_dwg.pick2_ts",
+        "dataType": "20220603",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 248,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc111m__iss_dt_last": {
+        "id": "col_gp_ypwc111m__iss_dt_last",
+        "tableId": "tbl_gp_ypwc111m",
+        "name": "iss_dt_last",
+        "comment": "강재 불출일 → l_cut_dwg.steel_issue_ts",
+        "dataType": "20220603",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc140m__iss_date": {
+        "id": "col_gp_ypwc140m__iss_date",
+        "tableId": "tbl_gp_ypwc140m",
+        "name": "iss_date",
+        "comment": "강재 불출일 → l_cut_dwg.steel_issue_ts",
+        "dataType": "20220722",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc140m__iss_time": {
+        "id": "col_gp_ypwc140m__iss_time",
+        "tableId": "tbl_gp_ypwc140m",
+        "name": "iss_time",
+        "comment": "강재 불출일 → l_cut_dwg.steel_issue_ts",
+        "dataType": "0822",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc140m__mark_stus_code": {
+        "id": "col_gp_ypwc140m__mark_stus_code",
+        "tableId": "tbl_gp_ypwc140m",
+        "name": "mark_stus_code",
+        "comment": "전처리 통과 (마킹 Y) → l_cut_dwg.pretreat_ts",
+        "dataType": "Y",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc140m__auto_mark_date": {
+        "id": "col_gp_ypwc140m__auto_mark_date",
+        "tableId": "tbl_gp_ypwc140m",
+        "name": "auto_mark_date",
+        "comment": "전처리 통과 (마킹 Y) → l_cut_dwg.pretreat_ts",
+        "dataType": "20220901",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc140m__auto_mark_time": {
+        "id": "col_gp_ypwc140m__auto_mark_time",
+        "tableId": "tbl_gp_ypwc140m",
+        "name": "auto_mark_time",
+        "comment": "전처리 통과 (마킹 Y) → l_cut_dwg.pretreat_ts",
+        "dataType": "145818",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_zppt005_1__aeflg": {
+        "id": "col_gp_zppt005_1__aeflg",
+        "tableId": "tbl_gp_zppt005_1",
+        "name": "aeflg",
+        "comment": "도면 확정 · 결품 → l_cut_dwg.confirmed_flag",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 60,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ydeh060m__part_no": {
+        "id": "col_gp_ydeh060m__part_no",
+        "tableId": "tbl_gp_ydeh060m",
+        "name": "part_no",
+        "comment": "부재 번호 → l_cut_part.part_no",
+        "dataType": "5486-731-FR64A-S11",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 210,
+          "widthDataType": 136,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ydeh060m__proj_no": {
+        "id": "col_gp_ydeh060m__proj_no",
+        "tableId": "tbl_gp_ydeh060m",
+        "name": "proj_no",
+        "comment": "부재의 호선 · 블록 → l_cut_part.hull_no",
+        "dataType": "5486",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 136,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ydeh060m__blk_no": {
+        "id": "col_gp_ydeh060m__blk_no",
+        "tableId": "tbl_gp_ydeh060m",
+        "name": "blk_no",
+        "comment": "부재의 호선 · 블록 → l_cut_part.block_no",
+        "dataType": "731",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 136,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ydeh060m__part_wt": {
+        "id": "col_gp_ydeh060m__part_wt",
+        "tableId": "tbl_gp_ydeh060m",
+        "name": "part_wt",
+        "comment": "부재 중량 · 절단 수량 → l_cut_part.weight_kg",
+        "dataType": "8.938",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 136,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ydeh060m__cut_req_qty": {
+        "id": "col_gp_ydeh060m__cut_req_qty",
+        "tableId": "tbl_gp_ydeh060m",
+        "name": "cut_req_qty",
+        "comment": "부재 중량 · 절단 수량 → l_cut_part.cut_req_qty",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 136,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ydeh060m__assy_wstg_code": {
+        "id": "col_gp_ydeh060m__assy_wstg_code",
+        "tableId": "tbl_gp_ydeh060m",
+        "name": "assy_wstg_code",
+        "comment": "부재 배송지 송선 → l_cut_part.dest_wstg",
+        "dataType": "S7",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 136,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ydeh060m__next_wstg_code": {
+        "id": "col_gp_ydeh060m__next_wstg_code",
+        "tableId": "tbl_gp_ydeh060m",
+        "name": "next_wstg_code",
+        "comment": "부재 배송지 송선 → l_cut_part.dest_wstg",
+        "dataType": "G9",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 136,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ydeh060m__cut_mfg_fd": {
+        "id": "col_gp_ydeh060m__cut_mfg_fd",
+        "tableId": "tbl_gp_ydeh060m",
+        "name": "cut_mfg_fd",
+        "comment": "부재 절단 완료 → l_cut_part.cut_done_ts",
+        "dataType": "00000000",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 136,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ydeh060m__bend_clsf_code": {
+        "id": "col_gp_ydeh060m__bend_clsf_code",
+        "tableId": "tbl_gp_ydeh060m",
+        "name": "bend_clsf_code",
+        "comment": "곡가공 대상 여부 → l_cut_part.bend_flag",
+        "dataType": "(빈값) 아님 · Q 대상",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 136,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ydeh060m__grnd_work_indc": {
+        "id": "col_gp_ydeh060m__grnd_work_indc",
+        "tableId": "tbl_gp_ydeh060m",
+        "name": "grnd_work_indc",
+        "comment": "사상 대상 · 사상 실적 → l_cut_part.grind_flag",
+        "dataType": "N",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 136,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_zqmt071__(도면별 부재 LIST)": {
+        "id": "col_gp_zqmt071__(도면별 부재 LIST)",
+        "tableId": "tbl_gp_zqmt071",
+        "name": "(도면별 부재 LIST)",
+        "comment": "부재가 속한 도면 → l_cut_part.dwg_no",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 124,
+          "widthComment": 246,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc510m__bend_mfg_fd": {
+        "id": "col_gp_ypwc510m__bend_mfg_fd",
+        "tableId": "tbl_gp_ypwc510m",
+        "name": "bend_mfg_fd",
+        "comment": "곡가공 완료일 → l_cut_part.bend_done_ts",
+        "dataType": "20220727",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc821m__rgsr_date": {
+        "id": "col_gp_ypwc821m__rgsr_date",
+        "tableId": "tbl_gp_ypwc821m",
+        "name": "rgsr_date",
+        "comment": "사상 대상 · 사상 실적 → l_cut_part.grind_done_ts",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 71,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypwc823m__(열 미확인)": {
+        "id": "col_gp_ypwc823m__(열 미확인)",
+        "tableId": "tbl_gp_ypwc823m",
+        "name": "(열 미확인)",
+        "comment": "사상 대상 · 사상 실적 → l_cut_part.grind_done_ts",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 77,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypdg002m__part_plat_date": {
+        "id": "col_gp_ypdg002m__part_plat_date",
+        "tableId": "tbl_gp_ypdg002m",
+        "name": "part_plat_date",
+        "comment": "모듬 · 선별 시각 → l_cut_part.group_ts",
+        "dataType": "20220726",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 120,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypdg002m__part_plat_time": {
+        "id": "col_gp_ypdg002m__part_plat_time",
+        "tableId": "tbl_gp_ypdg002m",
+        "name": "part_plat_time",
+        "comment": "모듬 · 선별 시각 → l_cut_part.group_ts",
+        "dataType": "0826",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 120,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypdg002m__part_plat_status": {
+        "id": "col_gp_ypdg002m__part_plat_status",
+        "tableId": "tbl_gp_ypdg002m",
+        "name": "part_plat_status",
+        "comment": "모듬 · 선별 시각 → l_cut_part.group_ts",
+        "dataType": "Z",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 120,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypdg100m__iss_fd": {
+        "id": "col_gp_ypdg100m__iss_fd",
+        "tableId": "tbl_gp_ypdg100m",
+        "name": "iss_fd",
+        "comment": "부재 불출 (조립 투입) 시각 → l_cut_part.issue_ts · 부재 불출 (조립 투입) 시각 → l_cut_part.issue_src",
+        "dataType": "20220614",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ypdg100m__part_stus_code": {
+        "id": "col_gp_ypdg100m__part_stus_code",
+        "tableId": "tbl_gp_ypdg100m",
+        "name": "part_stus_code",
+        "comment": "부재 불출 (조립 투입) 시각 → l_cut_part.issue_ts · 부재 불출 (조립 투입) 시각 → l_cut_part.issue_src",
+        "dataType": "S",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 64,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ycps301m__rgsr_date": {
+        "id": "col_gp_ycps301m__rgsr_date",
+        "tableId": "tbl_gp_ycps301m",
+        "name": "rgsr_date",
+        "comment": "사외 절단 부재 반입일 → l_cut_part.inbound_ts",
+        "dataType": "20220215",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 120,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ycps301m__ref_dcmt_type": {
+        "id": "col_gp_ycps301m__ref_dcmt_type",
+        "tableId": "tbl_gp_ycps301m",
+        "name": "ref_dcmt_type",
+        "comment": "사외 절단 부재 반입일 → l_cut_part.inbound_ts",
+        "dataType": "DC04",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 120,
+          "widthDefault": 60
+        }
+      },
+      "col_gp_ycps301m__mat_code": {
+        "id": "col_gp_ycps301m__mat_code",
+        "tableId": "tbl_gp_ycps301m",
+        "name": "mat_code",
+        "comment": "사외 절단 부재 반입일 → l_cut_part.inbound_ts",
+        "dataType": "5486-101-FR41P-A",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 120,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_m_hull__hull_no": {
+        "id": "col_hot_m_hull__hull_no",
+        "tableId": "tbl_hot_m_hull",
+        "name": "hull_no",
+        "comment": "호선 번호 ← ypwg411m.proj_no · 호선 마스터 ← zcot001.proj_no",
+        "dataType": "text",
+        "default": "",
+        "options": 10,
+        "ui": {
+          "keys": 1,
+          "widthName": 71,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_m_hull__ship_type": {
+        "id": "col_hot_m_hull__ship_type",
+        "tableId": "tbl_hot_m_hull",
+        "name": "ship_type",
+        "comment": "호선 마스터 ← zcot001.ship_type",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 71,
+          "widthComment": 215,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_m_hull__status": {
+        "id": "col_hot_m_hull__status",
+        "tableId": "tbl_hot_m_hull",
+        "name": "status",
+        "comment": "호선 마스터 ← zcot001.cnt_stus",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 71,
+          "widthComment": 208,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_m_block__block_no": {
+        "id": "col_hot_m_block__block_no",
+        "tableId": "tbl_hot_m_block",
+        "name": "block_no",
+        "comment": "블록 번호 ← ypwg411m.blk_zone_no",
+        "dataType": "text",
+        "default": "",
+        "options": 10,
+        "ui": {
+          "keys": 1,
+          "widthName": 64,
+          "widthComment": 224,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_m_code__code": {
+        "id": "col_hot_m_code__code",
+        "tableId": "tbl_hot_m_code",
+        "name": "code",
+        "comment": "가공 절점 정의 ← 레거시 없음",
+        "dataType": "text",
+        "default": "",
+        "options": 10,
+        "ui": {
+          "keys": 1,
+          "widthName": 60,
+          "widthComment": 182,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_m_code__seq": {
+        "id": "col_hot_m_code__seq",
+        "tableId": "tbl_hot_m_code",
+        "name": "seq",
+        "comment": "가공 절점 정의 ← 레거시 없음",
+        "dataType": "int",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 60,
+          "widthComment": 182,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_m_code__attrs": {
+        "id": "col_hot_m_code__attrs",
+        "tableId": "tbl_hot_m_code",
+        "name": "attrs",
+        "comment": "[변경] 가공 절점 정의 ← 레거시 없음",
+        "dataType": "jsonb",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 60,
+          "widthComment": 227,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__hull_no": {
+        "id": "col_hot_l_work_unit__hull_no",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "hull_no",
+        "comment": "호선 번호 ← ypwg411m.proj_no",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 2,
+          "widthName": 85,
+          "widthComment": 196,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__block_no": {
+        "id": "col_hot_l_work_unit__block_no",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "block_no",
+        "comment": "블록 번호 ← ypwg411m.blk_zone_no",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 2,
+          "widthName": 85,
+          "widthComment": 224,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__unit_id": {
+        "id": "col_hot_l_work_unit__unit_id",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "unit_id",
+        "comment": "[보류] W/O 번호 ← ypwg411m.work_ord_no",
+        "dataType": "text",
+        "default": "",
+        "options": 10,
+        "ui": {
+          "keys": 1,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__trade": {
+        "id": "col_hot_l_work_unit__trade",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "trade",
+        "comment": "공종 ← ypwg411m.flag",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 144,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__mp": {
+        "id": "col_hot_l_work_unit__mp",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "mp",
+        "comment": "공정 ← ypwg411m.mp",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 130,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__plan_mh": {
+        "id": "col_hot_l_work_unit__plan_mh",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "plan_mh",
+        "comment": "[변경] W/O 표준시수 ← ypwg411m.std_mh",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 255,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__acc_rate": {
+        "id": "col_hot_l_work_unit__acc_rate",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "acc_rate",
+        "comment": "누계 진도율 ← ypwg411m.accm_prgs_rate · 누계 진도율 → p_progress.legacy_pct",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__plan_sd": {
+        "id": "col_hot_l_work_unit__plan_sd",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "plan_sd",
+        "comment": "W/O 계획 착수일 · 완료일 ← ypwg411m.wo_pln_sd",
+        "dataType": "date",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__plan_fd": {
+        "id": "col_hot_l_work_unit__plan_fd",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "plan_fd",
+        "comment": "W/O 계획 착수일 · 완료일 ← ypwg411m.wo_pln_fd",
+        "dataType": "date",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__actl_sd": {
+        "id": "col_hot_l_work_unit__actl_sd",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "actl_sd",
+        "comment": "W/O 실적 착수일 · 완료일 ← ypwg411m.wo_actl_sd",
+        "dataType": "date",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__actl_fd": {
+        "id": "col_hot_l_work_unit__actl_fd",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "actl_fd",
+        "comment": "W/O 실적 착수일 · 완료일 ← ypwg411m.wo_actl_fd · 도면 완료율 → p_progress.done_qty",
+        "dataType": "date",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__location_id": {
+        "id": "col_hot_l_work_unit__location_id",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "location_id",
+        "comment": "작업 공장 ← ypwg411m.assy_shop · 정반 ← ypwg411m.jig_code",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 2,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__attrs": {
+        "id": "col_hot_l_work_unit__attrs",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "attrs",
+        "comment": "협력사 여부 · 업체 ← ypwg411m.subc_work_indc · 협력사 여부 · 업체 ← ypwg411m.vndr_ogan_code",
+        "dataType": "jsonb",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__mnt_ts": {
+        "id": "col_hot_l_work_unit__mnt_ts",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "mnt_ts",
+        "comment": "W/O 수정일시 ← ypwg411m.mnt_date · W/O 수정일시 ← ypwg411m.mnt_time",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__ref_no": {
+        "id": "col_hot_l_work_unit__ref_no",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "ref_no",
+        "comment": "[추가] 가공 W/O 가 속한 도면 ← ypwg211m.mat_desc1 · 가공 W/O 가 속한 도면 ← ypwg211m.detl_clsf_code · 도면별 W/O 시수 합 (가중치) → l_cut_dwg.wo_std_mh",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__step_code": {
+        "id": "col_hot_l_work_unit__step_code",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "step_code",
+        "comment": "[추가] W/O 단계 (마킹 · 절단 · 곡가공 · 자동분배) ← ypwg411m.work_ord_no",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_work_unit__auto_dist": {
+        "id": "col_hot_l_work_unit__auto_dist",
+        "tableId": "tbl_hot_l_work_unit",
+        "name": "auto_dist",
+        "comment": "[추가] W/O 단계 (마킹 · 절단 · 곡가공 · 자동분배) ← ypwg411m.work_ord_no",
+        "dataType": "bool",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__dwg_no": {
+        "id": "col_hot_l_cut_dwg__dwg_no",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "dwg_no",
+        "comment": "[신규] 절단 도면 번호 (앵커) ← ypwc310m.dwg_no",
+        "dataType": "text",
+        "default": "",
+        "options": 10,
+        "ui": {
+          "keys": 1,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__hull_no": {
+        "id": "col_hot_l_cut_dwg__hull_no",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "hull_no",
+        "comment": "[신규] 도면의 호선 · 블록 · 계열 ← ypwc310m.dwg_no",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 2,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__block_no": {
+        "id": "col_hot_l_cut_dwg__block_no",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "block_no",
+        "comment": "[신규] 도면의 호선 · 블록 · 계열 ← ypwc310m.dwg_no",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 2,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__dwg_series": {
+        "id": "col_hot_l_cut_dwg__dwg_series",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "dwg_series",
+        "comment": "[신규] 도면의 호선 · 블록 · 계열 ← ypwc310m.dwg_no",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__cut_plan_date": {
+        "id": "col_hot_l_cut_dwg__cut_plan_date",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "cut_plan_date",
+        "comment": "[신규] 절단 계획일 ← ypwc310m.cut_pln_date",
+        "dataType": "date",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__cut_site": {
+        "id": "col_hot_l_cut_dwg__cut_site",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "cut_site",
+        "comment": "[신규] 절단 장소 (사내 / 사외) ← ypwc310m.cut_bay_no · 가중치 · 사내외 → v_anchor.site",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__cut_bay": {
+        "id": "col_hot_l_cut_dwg__cut_bay",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "cut_bay",
+        "comment": "[신규] 절단 장소 (사내 / 사외) ← ypwc310m.cut_bay_no · 절단 장소 (사내 / 사외) ← ypwc310m.cnf_cut_bay_no",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__cut_status": {
+        "id": "col_hot_l_cut_dwg__cut_status",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "cut_status",
+        "comment": "[신규] 도면 진행 · 마킹 상태 ← ypwc310m.prcs_stus_code",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__mark_status": {
+        "id": "col_hot_l_cut_dwg__mark_status",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "mark_status",
+        "comment": "[신규] 도면 진행 · 마킹 상태 ← ypwc310m.mark_stus_code",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__cut_std_mh": {
+        "id": "col_hot_l_cut_dwg__cut_std_mh",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "cut_std_mh",
+        "comment": "[신규] 도면 표준시수 ← zppt005.cut_std_mh · 가중치 · 사내외 → v_anchor.weight_mh",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__mark_std_mh": {
+        "id": "col_hot_l_cut_dwg__mark_std_mh",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "mark_std_mh",
+        "comment": "[신규] 도면 표준시수 ← zppt005.mark_std_mh",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__wo_std_mh": {
+        "id": "col_hot_l_cut_dwg__wo_std_mh",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "wo_std_mh",
+        "comment": "[신규] 도면별 W/O 시수 합 (가중치) ← ypwg411m.std_mh · 도면별 W/O 시수 합 (가중치) ← l_work_unit.ref_no · 도면 완료율 → v_anchor.target_qty · 도면 완료율 → p_progress.done_qty",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__steel_in_ts": {
+        "id": "col_hot_l_cut_dwg__steel_in_ts",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "steel_in_ts",
+        "comment": "[신규] 강재 입고일 ← sty01h.acpt_date · 강재 입고일 ← sty01h.dwg_no · 절점 이력 → p_progress.cp_history",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__pick1_ts": {
+        "id": "col_hot_l_cut_dwg__pick1_ts",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "pick1_ts",
+        "comment": "[신규] 강재 1차 선별일 ← sty01h.frst_pick_actl_date_1 · 절점 이력 → p_progress.cp_history",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__pick2_ts": {
+        "id": "col_hot_l_cut_dwg__pick2_ts",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "pick2_ts",
+        "comment": "[신규] 강재 2차 선별일 ← sty01h.scnd_pick_actl_date · 강재 2차 선별일 ← ypwc111m.pick_fin_date · 절점 이력 → p_progress.cp_history",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__steel_issue_ts": {
+        "id": "col_hot_l_cut_dwg__steel_issue_ts",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "steel_issue_ts",
+        "comment": "[신규] 강재 불출일 ← sty01h.iss_actl_date · 강재 불출일 ← ypwc111m.iss_dt_last · 강재 불출일 ← ypwc140m.iss_date · 강재 불출일 ← ypwc140m.iss_time · 절점 이력 → p_progress.cp_history",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__pretreat_ts": {
+        "id": "col_hot_l_cut_dwg__pretreat_ts",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "pretreat_ts",
+        "comment": "[신규] 전처리 통과 (마킹 Y) ← ypwc140m.mark_stus_code · 전처리 통과 (마킹 Y) ← ypwc140m.auto_mark_date · 전처리 통과 (마킹 Y) ← ypwc140m.auto_mark_time · 절점 이력 → p_progress.cp_history",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__mark_done_ts": {
+        "id": "col_hot_l_cut_dwg__mark_done_ts",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "mark_done_ts",
+        "comment": "[신규] 마킹 완료 시각 ← ypwc310m.mark_mfg_fd · 마킹 완료 시각 ← ypwc310m.mark_mfg_time · 절점 이력 → p_progress.cp_history",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__cut_done_ts": {
+        "id": "col_hot_l_cut_dwg__cut_done_ts",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "cut_done_ts",
+        "comment": "[신규] 절단 완료 시각 (도면) ← ypwc310m.cut_mfg_fd · 절단 완료 시각 (도면) ← ypwc310m.cut_mfg_time · 부재 절단 완료 → l_cut_part.cut_done_ts · 절점 이력 → p_progress.cp_history",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__cut_done_src": {
+        "id": "col_hot_l_cut_dwg__cut_done_src",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "cut_done_src",
+        "comment": "[신규] 절단 완료 시각 (도면) ← ypwc310m.pgm_id",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__confirmed_flag": {
+        "id": "col_hot_l_cut_dwg__confirmed_flag",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "confirmed_flag",
+        "comment": "[신규] 도면 확정 · 결품 ← zppt005.crat_ind · 도면 확정 · 결품 ← zppt005_1.aeflg",
+        "dataType": "bool",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_dwg__mnt_ts": {
+        "id": "col_hot_l_cut_dwg__mnt_ts",
+        "tableId": "tbl_hot_l_cut_dwg",
+        "name": "mnt_ts",
+        "comment": "[신규] 도면 수정일시 ← ypwc310m.mnt_date · 도면 수정일시 ← ypwc310m.mnt_time",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 106,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__part_no": {
+        "id": "col_hot_l_cut_part__part_no",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "part_no",
+        "comment": "부재 번호 ← ydeh060m.part_no",
+        "dataType": "text",
+        "default": "",
+        "options": 10,
+        "ui": {
+          "keys": 1,
+          "widthName": 99,
+          "widthComment": 196,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__hull_no": {
+        "id": "col_hot_l_cut_part__hull_no",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "hull_no",
+        "comment": "부재의 호선 · 블록 ← ydeh060m.proj_no",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 2,
+          "widthName": 99,
+          "widthComment": 253,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__block_no": {
+        "id": "col_hot_l_cut_part__block_no",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "block_no",
+        "comment": "부재의 호선 · 블록 ← ydeh060m.blk_no",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 2,
+          "widthName": 99,
+          "widthComment": 246,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__dwg_no": {
+        "id": "col_hot_l_cut_part__dwg_no",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "dwg_no",
+        "comment": "[변경] 부재가 속한 도면 ← zqmt071.(도면별 부재 LIST) · 부재가 속한 도면 ← ypwg211m.mat_desc1",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 2,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__weight_kg": {
+        "id": "col_hot_l_cut_part__weight_kg",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "weight_kg",
+        "comment": "[추가] 부재 중량 · 절단 수량 ← ydeh060m.part_wt",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__cut_req_qty": {
+        "id": "col_hot_l_cut_part__cut_req_qty",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "cut_req_qty",
+        "comment": "[추가] 부재 중량 · 절단 수량 ← ydeh060m.cut_req_qty",
+        "dataType": "int",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__dest_wstg": {
+        "id": "col_hot_l_cut_part__dest_wstg",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "dest_wstg",
+        "comment": "부재 배송지 송선 ← ydeh060m.assy_wstg_code · 부재 배송지 송선 ← ydeh060m.next_wstg_code",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__cut_done_ts": {
+        "id": "col_hot_l_cut_part__cut_done_ts",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "cut_done_ts",
+        "comment": "[변경] 부재 절단 완료 ← ydeh060m.cut_mfg_fd · 부재 절단 완료 ← l_cut_dwg.cut_done_ts",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__bend_flag": {
+        "id": "col_hot_l_cut_part__bend_flag",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "bend_flag",
+        "comment": "곡가공 대상 여부 ← ydeh060m.bend_clsf_code",
+        "dataType": "bool",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__bend_done_ts": {
+        "id": "col_hot_l_cut_part__bend_done_ts",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "bend_done_ts",
+        "comment": "[추가] 곡가공 완료일 ← ypwc510m.bend_mfg_fd · 절점 이력 → p_progress.cp_history",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__grind_flag": {
+        "id": "col_hot_l_cut_part__grind_flag",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "grind_flag",
+        "comment": "[보류] 사상 대상 · 사상 실적 ← ydeh060m.grnd_work_indc",
+        "dataType": "bool",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__grind_done_ts": {
+        "id": "col_hot_l_cut_part__grind_done_ts",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "grind_done_ts",
+        "comment": "[보류] 사상 대상 · 사상 실적 ← ypwc821m.rgsr_date · 사상 대상 · 사상 실적 ← ypwc823m.(열 미확인)",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__group_ts": {
+        "id": "col_hot_l_cut_part__group_ts",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "group_ts",
+        "comment": "[변경] 모듬 · 선별 시각 ← ypdg002m.part_plat_date · 모듬 · 선별 시각 ← ypdg002m.part_plat_time · 모듬 · 선별 시각 ← ypdg002m.part_plat_status · 절점 이력 → p_progress.cp_history",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__issue_ts": {
+        "id": "col_hot_l_cut_part__issue_ts",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "issue_ts",
+        "comment": "부재 불출 (조립 투입) 시각 ← ypdg100m.iss_fd · 부재 불출 (조립 투입) 시각 ← ypdg100m.part_stus_code · 부재 불출 (조립 투입) 시각 ← ypwg411m.wo_actl_sd · 절점 이력 → p_progress.cp_history",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__issue_src": {
+        "id": "col_hot_l_cut_part__issue_src",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "issue_src",
+        "comment": "[추가] 부재 불출 (조립 투입) 시각 ← ypdg100m.iss_fd · 부재 불출 (조립 투입) 시각 ← ypdg100m.part_stus_code · 부재 불출 (조립 투입) 시각 ← ypwg411m.wo_actl_sd",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_l_cut_part__inbound_ts": {
+        "id": "col_hot_l_cut_part__inbound_ts",
+        "tableId": "tbl_hot_l_cut_part",
+        "name": "inbound_ts",
+        "comment": "사외 절단 부재 반입일 ← ycps301m.rgsr_date · 사외 절단 부재 반입일 ← ycps301m.ref_dcmt_type · 사외 절단 부재 반입일 ← ycps301m.mat_code",
+        "dataType": "timestamptz",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 99,
+          "widthComment": 260,
+          "widthDataType": 85,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_v_anchor__target_qty": {
+        "id": "col_hot_v_anchor__target_qty",
+        "tableId": "tbl_hot_v_anchor",
+        "name": "target_qty",
+        "comment": "[신규] 도면 완료율 ← l_cut_dwg.wo_std_mh · 도면 완료율 → p_progress.planned_qty",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 78,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_v_anchor__weight_mh": {
+        "id": "col_hot_v_anchor__weight_mh",
+        "tableId": "tbl_hot_v_anchor",
+        "name": "weight_mh",
+        "comment": "[신규] 가중치 · 사내외 ← l_cut_dwg.cut_std_mh · 가중치 · 사내외 → p_progress.weight_mh",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 78,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_v_anchor__site": {
+        "id": "col_hot_v_anchor__site",
+        "tableId": "tbl_hot_v_anchor",
+        "name": "site",
+        "comment": "[신규] 가중치 · 사내외 ← l_cut_dwg.cut_site · 가중치 · 사내외 → p_progress.site",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 2,
+          "widthName": 78,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_p_progress__legacy_pct": {
+        "id": "col_hot_p_progress__legacy_pct",
+        "tableId": "tbl_hot_p_progress",
+        "name": "legacy_pct",
+        "comment": "누계 진도율 ← l_work_unit.acc_rate",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 236,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_p_progress__cp_history": {
+        "id": "col_hot_p_progress__cp_history",
+        "tableId": "tbl_hot_p_progress",
+        "name": "cp_history",
+        "comment": "[변경] 절점 이력 ← l_cut_dwg.steel_in_ts · 절점 이력 ← l_cut_dwg.pick1_ts · 절점 이력 ← l_cut_dwg.pick2_ts · 절점 이력 ← l_cut_dwg.steel_issue_ts · 절점 이력 ← l_cut_dwg.pretreat_ts · 절점 이력 ← l_cut_dwg.mark_done_ts · 절점 이력 ← l_cut_dwg.cut_done_ts · 절점 이력 ← l_cut_part.bend_done_ts · 절점 이력 ← l_cut_part.group_ts · 절점 이력 ← l_cut_part.issue_ts",
+        "dataType": "jsonb",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_p_progress__planned_qty": {
+        "id": "col_hot_p_progress__planned_qty",
+        "tableId": "tbl_hot_p_progress",
+        "name": "planned_qty",
+        "comment": "도면 완료율 ← v_anchor.target_qty",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 229,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_p_progress__done_qty": {
+        "id": "col_hot_p_progress__done_qty",
+        "tableId": "tbl_hot_p_progress",
+        "name": "done_qty",
+        "comment": "도면 완료율 ← l_cut_dwg.wo_std_mh · 도면 완료율 ← l_work_unit.actl_fd",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_p_progress__weight_mh": {
+        "id": "col_hot_p_progress__weight_mh",
+        "tableId": "tbl_hot_p_progress",
+        "name": "weight_mh",
+        "comment": "[추가] 가중치 · 사내외 ← v_anchor.weight_mh",
+        "dataType": "numeric",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 85,
+          "widthComment": 260,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      },
+      "col_hot_p_progress__site": {
+        "id": "col_hot_p_progress__site",
+        "tableId": "tbl_hot_p_progress",
+        "name": "site",
+        "comment": "[추가] 가중치 · 사내외 ← v_anchor.site",
+        "dataType": "text",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 2,
+          "widthName": 85,
+          "widthComment": 258,
+          "widthDataType": 60,
+          "widthDefault": 60
+        }
+      }
+    },
+    "relationshipEntities": {
+      "rel_000": {
+        "id": "rel_000",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__proj_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__hull_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_001": {
+        "id": "rel_001",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__proj_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_m_hull",
+          "columnIds": [
+            "col_hot_m_hull__hull_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_002": {
+        "id": "rel_002",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__blk_zone_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__block_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_003": {
+        "id": "rel_003",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__blk_zone_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_m_block",
+          "columnIds": [
+            "col_hot_m_block__block_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_004": {
+        "id": "rel_004",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__work_ord_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__unit_id"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_005": {
+        "id": "rel_005",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__flag"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__trade"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_006": {
+        "id": "rel_006",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__mp"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__mp"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_007": {
+        "id": "rel_007",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__plan_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_008": {
+        "id": "rel_008",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__accm_prgs_rate"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__acc_rate"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_009": {
+        "id": "rel_009",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__acc_rate"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__legacy_pct"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_010": {
+        "id": "rel_010",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__wo_pln_sd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__plan_sd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_011": {
+        "id": "rel_011",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__wo_pln_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__plan_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_012": {
+        "id": "rel_012",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__wo_actl_sd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__actl_sd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_013": {
+        "id": "rel_013",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__wo_actl_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__actl_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_014": {
+        "id": "rel_014",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__assy_shop"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__location_id"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_015": {
+        "id": "rel_015",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__jig_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__location_id"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_016": {
+        "id": "rel_016",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__subc_work_indc"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__attrs"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_017": {
+        "id": "rel_017",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__vndr_ogan_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__attrs"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_018": {
+        "id": "rel_018",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__mnt_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__mnt_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_019": {
+        "id": "rel_019",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__mnt_time"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__mnt_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_020": {
+        "id": "rel_020",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_zcot001",
+          "columnIds": [
+            "col_gp_zcot001__proj_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_m_hull",
+          "columnIds": [
+            "col_hot_m_hull__hull_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_021": {
+        "id": "rel_021",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_zcot001",
+          "columnIds": [
+            "col_gp_zcot001__ship_type"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_m_hull",
+          "columnIds": [
+            "col_hot_m_hull__ship_type"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_022": {
+        "id": "rel_022",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_zcot001",
+          "columnIds": [
+            "col_gp_zcot001__cnt_stus"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_m_hull",
+          "columnIds": [
+            "col_hot_m_hull__status"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_023": {
+        "id": "rel_023",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__dwg_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__dwg_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_024": {
+        "id": "rel_024",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__dwg_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__hull_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_025": {
+        "id": "rel_025",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__dwg_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__block_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_026": {
+        "id": "rel_026",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__dwg_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__dwg_series"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_027": {
+        "id": "rel_027",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__cut_pln_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_plan_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_028": {
+        "id": "rel_028",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__cut_bay_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_site"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_029": {
+        "id": "rel_029",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__cut_bay_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_bay"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_030": {
+        "id": "rel_030",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__cnf_cut_bay_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_bay"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_031": {
+        "id": "rel_031",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__prcs_stus_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_status"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_032": {
+        "id": "rel_032",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__mark_stus_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__mark_status"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_033": {
+        "id": "rel_033",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_zppt005",
+          "columnIds": [
+            "col_gp_zppt005__cut_std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_034": {
+        "id": "rel_034",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_zppt005",
+          "columnIds": [
+            "col_gp_zppt005__mark_std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__mark_std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_035": {
+        "id": "rel_035",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__wo_std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_036": {
+        "id": "rel_036",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__ref_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__wo_std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_037": {
+        "id": "rel_037",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg211m",
+          "columnIds": [
+            "col_gp_ypwg211m__mat_desc1"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__ref_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_038": {
+        "id": "rel_038",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg211m",
+          "columnIds": [
+            "col_gp_ypwg211m__detl_clsf_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__ref_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_039": {
+        "id": "rel_039",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__work_ord_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__step_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_040": {
+        "id": "rel_040",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__work_ord_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__auto_dist"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_041": {
+        "id": "rel_041",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_am_sty01h",
+          "columnIds": [
+            "col_am_sty01h__acpt_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__steel_in_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_042": {
+        "id": "rel_042",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_am_sty01h",
+          "columnIds": [
+            "col_am_sty01h__dwg_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__steel_in_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_043": {
+        "id": "rel_043",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_am_sty01h",
+          "columnIds": [
+            "col_am_sty01h__frst_pick_actl_date_1"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__pick1_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_044": {
+        "id": "rel_044",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_am_sty01h",
+          "columnIds": [
+            "col_am_sty01h__scnd_pick_actl_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__pick2_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_045": {
+        "id": "rel_045",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc111m",
+          "columnIds": [
+            "col_gp_ypwc111m__pick_fin_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__pick2_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_046": {
+        "id": "rel_046",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_am_sty01h",
+          "columnIds": [
+            "col_am_sty01h__iss_actl_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__steel_issue_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_047": {
+        "id": "rel_047",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc111m",
+          "columnIds": [
+            "col_gp_ypwc111m__iss_dt_last"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__steel_issue_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_048": {
+        "id": "rel_048",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc140m",
+          "columnIds": [
+            "col_gp_ypwc140m__iss_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__steel_issue_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_049": {
+        "id": "rel_049",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc140m",
+          "columnIds": [
+            "col_gp_ypwc140m__iss_time"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__steel_issue_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_050": {
+        "id": "rel_050",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc140m",
+          "columnIds": [
+            "col_gp_ypwc140m__mark_stus_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__pretreat_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_051": {
+        "id": "rel_051",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc140m",
+          "columnIds": [
+            "col_gp_ypwc140m__auto_mark_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__pretreat_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_052": {
+        "id": "rel_052",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc140m",
+          "columnIds": [
+            "col_gp_ypwc140m__auto_mark_time"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__pretreat_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_053": {
+        "id": "rel_053",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__mark_mfg_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__mark_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_054": {
+        "id": "rel_054",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__mark_mfg_time"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__mark_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_055": {
+        "id": "rel_055",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__cut_mfg_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_056": {
+        "id": "rel_056",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__cut_mfg_time"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_057": {
+        "id": "rel_057",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__pgm_id"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_done_src"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_058": {
+        "id": "rel_058",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_zppt005",
+          "columnIds": [
+            "col_gp_zppt005__crat_ind"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__confirmed_flag"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_059": {
+        "id": "rel_059",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_zppt005_1",
+          "columnIds": [
+            "col_gp_zppt005_1__aeflg"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__confirmed_flag"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_060": {
+        "id": "rel_060",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__mnt_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__mnt_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_061": {
+        "id": "rel_061",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc310m",
+          "columnIds": [
+            "col_gp_ypwc310m__mnt_time"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__mnt_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_062": {
+        "id": "rel_062",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ydeh060m",
+          "columnIds": [
+            "col_gp_ydeh060m__part_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__part_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_063": {
+        "id": "rel_063",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ydeh060m",
+          "columnIds": [
+            "col_gp_ydeh060m__proj_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__hull_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_064": {
+        "id": "rel_064",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ydeh060m",
+          "columnIds": [
+            "col_gp_ydeh060m__blk_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__block_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_065": {
+        "id": "rel_065",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_zqmt071",
+          "columnIds": [
+            "col_gp_zqmt071__(도면별 부재 LIST)"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__dwg_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_066": {
+        "id": "rel_066",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg211m",
+          "columnIds": [
+            "col_gp_ypwg211m__mat_desc1"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__dwg_no"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_067": {
+        "id": "rel_067",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ydeh060m",
+          "columnIds": [
+            "col_gp_ydeh060m__part_wt"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__weight_kg"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_068": {
+        "id": "rel_068",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ydeh060m",
+          "columnIds": [
+            "col_gp_ydeh060m__cut_req_qty"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__cut_req_qty"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_069": {
+        "id": "rel_069",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ydeh060m",
+          "columnIds": [
+            "col_gp_ydeh060m__assy_wstg_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__dest_wstg"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_070": {
+        "id": "rel_070",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ydeh060m",
+          "columnIds": [
+            "col_gp_ydeh060m__next_wstg_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__dest_wstg"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_071": {
+        "id": "rel_071",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ydeh060m",
+          "columnIds": [
+            "col_gp_ydeh060m__cut_mfg_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__cut_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_072": {
+        "id": "rel_072",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__cut_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_073": {
+        "id": "rel_073",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ydeh060m",
+          "columnIds": [
+            "col_gp_ydeh060m__bend_clsf_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__bend_flag"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_074": {
+        "id": "rel_074",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc510m",
+          "columnIds": [
+            "col_gp_ypwc510m__bend_mfg_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__bend_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_075": {
+        "id": "rel_075",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ydeh060m",
+          "columnIds": [
+            "col_gp_ydeh060m__grnd_work_indc"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__grind_flag"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_076": {
+        "id": "rel_076",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc821m",
+          "columnIds": [
+            "col_gp_ypwc821m__rgsr_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__grind_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_077": {
+        "id": "rel_077",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwc823m",
+          "columnIds": [
+            "col_gp_ypwc823m__(열 미확인)"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__grind_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_078": {
+        "id": "rel_078",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypdg002m",
+          "columnIds": [
+            "col_gp_ypdg002m__part_plat_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__group_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_079": {
+        "id": "rel_079",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypdg002m",
+          "columnIds": [
+            "col_gp_ypdg002m__part_plat_time"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__group_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_080": {
+        "id": "rel_080",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypdg002m",
+          "columnIds": [
+            "col_gp_ypdg002m__part_plat_status"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__group_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_081": {
+        "id": "rel_081",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypdg100m",
+          "columnIds": [
+            "col_gp_ypdg100m__iss_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__issue_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_082": {
+        "id": "rel_082",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypdg100m",
+          "columnIds": [
+            "col_gp_ypdg100m__iss_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__issue_src"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_083": {
+        "id": "rel_083",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypdg100m",
+          "columnIds": [
+            "col_gp_ypdg100m__part_stus_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__issue_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_084": {
+        "id": "rel_084",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypdg100m",
+          "columnIds": [
+            "col_gp_ypdg100m__part_stus_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__issue_src"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_085": {
+        "id": "rel_085",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__wo_actl_sd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__issue_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_086": {
+        "id": "rel_086",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ypwg411m",
+          "columnIds": [
+            "col_gp_ypwg411m__wo_actl_sd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__issue_src"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_087": {
+        "id": "rel_087",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ycps301m",
+          "columnIds": [
+            "col_gp_ycps301m__rgsr_date"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__inbound_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_088": {
+        "id": "rel_088",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ycps301m",
+          "columnIds": [
+            "col_gp_ycps301m__ref_dcmt_type"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__inbound_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_089": {
+        "id": "rel_089",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_gp_ycps301m",
+          "columnIds": [
+            "col_gp_ycps301m__mat_code"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__inbound_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_090": {
+        "id": "rel_090",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__steel_in_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__cp_history"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_091": {
+        "id": "rel_091",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__pick1_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__cp_history"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_092": {
+        "id": "rel_092",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__pick2_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__cp_history"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_093": {
+        "id": "rel_093",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__steel_issue_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__cp_history"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_094": {
+        "id": "rel_094",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__pretreat_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__cp_history"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_095": {
+        "id": "rel_095",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__mark_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__cp_history"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_096": {
+        "id": "rel_096",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__cp_history"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_097": {
+        "id": "rel_097",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__bend_done_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__cp_history"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_098": {
+        "id": "rel_098",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__group_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__cp_history"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_099": {
+        "id": "rel_099",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_part",
+          "columnIds": [
+            "col_hot_l_cut_part__issue_ts"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__cp_history"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_100": {
+        "id": "rel_100",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__wo_std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_v_anchor",
+          "columnIds": [
+            "col_hot_v_anchor__target_qty"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_101": {
+        "id": "rel_101",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_v_anchor",
+          "columnIds": [
+            "col_hot_v_anchor__target_qty"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__planned_qty"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_102": {
+        "id": "rel_102",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__wo_std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__done_qty"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_103": {
+        "id": "rel_103",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_work_unit",
+          "columnIds": [
+            "col_hot_l_work_unit__actl_fd"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__done_qty"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_104": {
+        "id": "rel_104",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_std_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_v_anchor",
+          "columnIds": [
+            "col_hot_v_anchor__weight_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_105": {
+        "id": "rel_105",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_v_anchor",
+          "columnIds": [
+            "col_hot_v_anchor__weight_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__weight_mh"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_106": {
+        "id": "rel_106",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_l_cut_dwg",
+          "columnIds": [
+            "col_hot_l_cut_dwg__cut_site"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_v_anchor",
+          "columnIds": [
+            "col_hot_v_anchor__site"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      },
+      "rel_107": {
+        "id": "rel_107",
+        "identification": false,
+        "relationshipType": 4,
+        "startRelationshipType": 2,
+        "onDelete": 1,
+        "onUpdate": 1,
+        "start": {
+          "tableId": "tbl_hot_v_anchor",
+          "columnIds": [
+            "col_hot_v_anchor__site"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "tbl_hot_p_progress",
+          "columnIds": [
+            "col_hot_p_progress__site"
+          ],
+          "x": 0,
+          "y": 0,
+          "direction": 1
+        }
+      }
+    },
+    "indexEntities": {},
+    "indexColumnEntities": {},
+    "memoEntities": {},
+    "tableGroupEntities": {
+      "grp_leg": {
+        "id": "grp_leg",
+        "name": "레거시 (가공)",
+        "color": "#F37321",
+        "ui": {
+          "x": 0,
+          "y": 0,
+          "width": 1340,
+          "height": 2032,
+          "zIndex": 1
+        }
+      },
+      "grp_hot": {
+        "id": "grp_hot",
+        "name": "HotDB v9 + 4-1 수정안",
+        "color": "#2F80ED",
+        "ui": {
+          "x": 1500,
+          "y": 0,
+          "width": 1340,
+          "height": 1510,
+          "zIndex": 1
+        }
+      }
+    }
+  },
+  "lww": {}
+}
