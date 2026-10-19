@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>도형 크기 보기</title>
+<style>
+:root{--bg:#f6f6f4;--panel:#fff;--ink:#1c1c1a;--mute:#6b6a65;--line:#e4e2dc;--acc:#f37321;--sel:rgba(243,115,33,.12)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151514;--panel:#1e1e1c;--ink:#ecebe6;--mute:#9d9b94;--line:#34332f;--acc:#ff8a3d;--sel:rgba(255,138,61,.16)}}
+:root[data-theme="dark"]{--bg:#151514;--panel:#1e1e1c;--ink:#ecebe6;--mute:#9d9b94;--line:#34332f;--acc:#ff8a3d;--sel:rgba(255,138,61,.16)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.5 "Pretendard","Malgun Gothic",system-ui,sans-serif}
+.wrap{display:grid;grid-template-columns:360px 1fr;grid-template-rows:100%;height:100vh;overflow:hidden}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:14px 16px;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:0}
+h1{font-size:15px;margin:0}
+h2{font-size:12px;margin:6px 0 0;color:var(--mute);font-weight:600}
+.mute{color:var(--mute);font-size:12px}
+textarea{width:100%;height:160px;flex:none;font:11.5px/1.4 Consolas,monospace;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);resize:vertical}
+table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+th,td{padding:3px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mute);font-weight:500}
+#list tr{cursor:pointer}
+#list tr:hover td,#list tr.on td{background:var(--sel)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.err{color:#e5484d;font-size:12px}
+.btns{display:flex;gap:6px}
+button{font:12px inherit;padding:3px 10px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--acc)}
+main{position:relative;min-width:0;min-height:0;overflow:hidden}
+svg{width:100%;height:100%;display:block}
+.poly{stroke-width:2;vector-effect:non-scaling-stroke;cursor:pointer}
+.poly.dim{opacity:.35}
+.poly.on{stroke-width:3.5}
+.dot{stroke:var(--panel);stroke-width:2;vector-effect:non-scaling-stroke}
+.vn{font-family:sans-serif;font-weight:700;fill:var(--ink);paint-order:stroke;stroke:var(--bg);text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.el{font-family:Consolas,monospace;font-weight:600;paint-order:stroke;stroke:var(--bg);text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.rn{font-family:sans-serif;font-weight:800;fill:var(--ink);paint-order:stroke;stroke:var(--bg);text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.grid line{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}
+.scale{position:absolute;left:14px;bottom:12px;font-size:11px;color:var(--mute)}
+.scale i{display:block;height:6px;border:1px solid var(--mute);border-top:0;margin-bottom:2px}
+@media (max-width:760px){.wrap{grid-template-columns:1fr;grid-template-rows:auto 60vh;height:auto;overflow:visible}aside{border-right:0;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<aside>
+  <div><h1>도형 크기 보기</h1><div class="mute">미터 좌표(EPSG:5187 등) · <code>[[ [x,y], ... ]]</code> 를 여러 개 이어서 붙여넣기 (쉼표 없어도 됨) · geometry/feature JSON 도 가능</div></div>
+  <textarea id="src" spellcheck="false">[[
+        [172936.14329999965, 252887.43070000038],
+        [172922.67279999983, 252870.99579999968],
+        [172905.23570000008, 252885.28769999929],
+        [172918.7061999999, 252901.72259999998],
+        [172936.14329999965, 252887.43070000038]
+    ]]</textarea>
+  <div id="err" class="err"></div>
+  <h2>도형 목록 <span class="mute" id="cnt"></span></h2>
+  <table><thead><tr><th>#</th><th>긴 변</th><th>짧은 변</th><th>면적 ㎡</th><th>점</th></tr></thead><tbody id="list"></tbody></table>
+  <div class="btns"><button id="all">전체 보기</button><button id="fit">선택 확대</button></div>
+  <h2 id="selT">선택 도형</h2>
+  <div class="mute" id="rot"></div>
+  <table><thead><tr><th>변</th><th>길이 m</th><th>방위 °</th></tr></thead><tbody id="edges"></tbody></table>
+  <table><thead><tr><th>점</th><th>X (동)</th><th>Y (북)</th></tr></thead><tbody id="pts"></tbody></table>
+</aside>
+<main><svg id="svg"></svg><div class="scale" id="scale"></div></main>
+</div>
+<script>
+const $=id=>document.getElementById(id), NS="http://www.w3.org/2000/svg";
+const f2=v=>v.toFixed(2);
+const COLORS=["#f37321","#2f7de1","#18a957","#d6409f","#e0a100","#7c5cff","#00a3a3","#c0392b","#5d6d7e","#8d6e63"];
+let R=[], sel=0, view=null;   // view: null = 전체, 아니면 선택 도형으로 확대
+function parseRings(t){
+  t=t.trim().replace(/,\s*$/,"");
+  let j;
+  try{ j=JSON.parse(t); }catch(e){
+    try{ j=JSON.parse("{"+t+"}"); }                                        // "geometry": {...} 조각
+    catch(e2){ j=JSON.parse("["+t.replace(/\]\s*\]\s*,?\s*\[\s*\[/g,"]],[[")+"]"); }   // [[..]] [[..]] 이어 붙인 것
+  }
+  const rings=[];
+  const isPt=p=>Array.isArray(p)&&typeof p[0]==="number"&&typeof p[1]==="number";
+  const walk=o=>{ if(!o||typeof o!=="object") return;
+    if(Array.isArray(o)&&o.length>=3&&o.every(isPt)) return rings.push(o);
+    (Array.isArray(o)?o:Object.values(o)).forEach(walk); };
+  walk(j);
+  if(!rings.length) throw new Error("좌표 링을 찾지 못했습니다");
+  return rings;
+}
+function measure(ring){
+  const pts=(isFinite(ring[0][0])&&ring[0][0]===ring.at(-1)[0]&&ring[0][1]===ring.at(-1)[1])?ring.slice(0,-1):ring, n=pts.length;
+  const edges=pts.map((p,i)=>{ const q=pts[(i+1)%n], dx=q[0]-p[0], dy=q[1]-p[1];
+    return {i,len:Math.hypot(dx,dy),brg:(Math.atan2(dx,dy)*180/Math.PI+360)%360}; });
+  const area=Math.abs(pts.reduce((a,p,i)=>{ const q=pts[(i+1)%n]; return a+p[0]*q[1]-q[0]*p[1]; },0))/2;
+  let best=null;   // 최소 외접 사각형
+  edges.forEach(e=>{ const p=pts[e.i], q=pts[(e.i+1)%n], a=Math.atan2(q[1]-p[1],q[0]-p[0]), c=Math.cos(a), s=Math.sin(a);
+    const us=pts.map(r=>r[0]*c+r[1]*s), vs=pts.map(r=>-r[0]*s+r[1]*c);
+    const w=Math.max(...us)-Math.min(...us), h=Math.max(...vs)-Math.min(...vs);
+    if(!best||w*h<best.w*best.h) best={w,h}; });
+  const cx=pts.reduce((a,p)=>a+p[0],0)/n, cy=pts.reduce((a,p)=>a+p[1],0)/n;
+  return {pts,n,edges,area,per:edges.reduce((a,e)=>a+e.len,0),L:Math.max(best.w,best.h),S:Math.min(best.w,best.h),cx,cy};
+}
+function el(tag,attrs,parent){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); parent.append(e); return e; }
+function parse(){
+  try{ R=parseRings($("src").value).map((r,i)=>({...measure(r),col:COLORS[i%COLORS.length]})); $("err").textContent=""; }
+  catch(e){ $("err").textContent="읽을 수 없음: "+e.message; return; }
+  if(sel>=R.length) sel=0;
+  $("cnt").textContent=`(${R.length}개)`;
+  $("list").innerHTML=R.map((r,i)=>`<tr data-i="${i}"><td><span class="sw" style="background:${r.col}"></span>${i+1}</td><td>${f2(r.L)}</td><td>${f2(r.S)}</td><td>${r.area.toFixed(1)}</td><td>${r.n}</td></tr>`).join("");
+  draw();
+}
+function detail(){
+  const r=R[sel]; if(!r) return;
+  document.querySelectorAll("#list tr").forEach(tr=>tr.classList.toggle("on",+tr.dataset.i===sel));
+  $("selT").innerHTML=`선택 도형 <span class="sw" style="background:${r.col}"></span>#${sel+1}`;
+  $("rot").textContent=`${f2(r.L)} × ${f2(r.S)} m · 면적 ${r.area.toFixed(1)} ㎡ · 둘레 ${f2(r.per)} m · 채움 ${(r.area/(r.L*r.S)*100).toFixed(1)}%`;
+  $("edges").innerHTML=r.edges.map(e=>`<tr><td>${e.i+1}→${(e.i+1)%r.n+1}</td><td>${f2(e.len)}</td><td>${e.brg.toFixed(1)}</td></tr>`).join("");
+  $("pts").innerHTML=r.pts.map((p,i)=>`<tr><td>${i+1}</td><td>${p[0].toFixed(3)}</td><td>${p[1].toFixed(3)}</td></tr>`).join("");
+}
+function draw(){
+  detail();
+  const svg=$("svg"); svg.replaceChildren(); if(!R.length) return;
+  const src=view===null?R:[R[view]], all=src.flatMap(r=>r.pts);
+  const xs=all.map(p=>p[0]), ys=all.map(p=>p[1]), x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  const span=Math.max(x1-x0,y1-y0)||1, pad=span*.15+2;
+  const box=svg.getBoundingClientRect(), vw=x1-x0+2*pad, vh=y1-y0+2*pad;
+  const k=Math.max(vw/box.width,vh/box.height);                     // 1 px 당 m
+  const cxv=(x0+x1)/2, cyv=(y0+y1)/2, W=box.width*k, H=box.height*k;
+  svg.setAttribute("viewBox",`${cxv-W/2} ${-(cyv+H/2)} ${W} ${H}`);
+  const g=el("g",{class:"grid"},svg), step=[1,2,5,10,20,50,100,200,500,1000].find(s=>s/k>60)||2000;
+  for(let x=Math.floor((cxv-W/2)/step)*step;x<=cxv+W/2;x+=step) el("line",{x1:x,x2:x,y1:-(cyv+H/2),y2:-(cyv-H/2)},g);
+  for(let y=Math.floor((cyv-H/2)/step)*step;y<=cyv+H/2;y+=step) el("line",{y1:-y,y2:-y,x1:cxv-W/2,x2:cxv+W/2},g);
+  const order=R.map((r,i)=>i).filter(i=>i!==sel).concat(sel);      // 선택 도형을 맨 위에
+  order.forEach(i=>{ const r=R[i], on=i===sel;
+    const p=el("polygon",{class:"poly"+(on?" on":R.length>1?" dim":""),points:r.pts.map(q=>`${q[0]},${-q[1]}`).join(" "),
+      fill:r.col,"fill-opacity":on?.18:.1,stroke:r.col},svg);
+    p.addEventListener("click",()=>{ sel=i; if(view!==null) view=i; draw(); });
+  });
+  // 변 길이: 선택 도형은 항상, 나머지는 너무 작지 않을 때만
+  R.forEach((r,i)=>{ const on=i===sel; if(!on&&(R.length>12||r.S/k<70)) return;
+    r.edges.forEach(e=>{ const p=r.pts[e.i], q=r.pts[(e.i+1)%r.n]; if(e.len/k<40) return;
+      let mx=(p[0]+q[0])/2, my=(p[1]+q[1])/2; const ox=mx-r.cx, oy=my-r.cy, d=Math.hypot(ox,oy)||1; mx+=ox/d*12*k; my+=oy/d*12*k;
+      const t=el("text",{class:"el",x:mx,y:-my,"font-size":(on?12:10.5)*k,"stroke-width":4*k,fill:r.col,opacity:on?1:.75},svg); t.textContent=f2(e.len); }); });
+  // 도형 번호
+  R.forEach((r,i)=>{ const t=el("text",{class:"rn",x:r.cx,y:-r.cy,"font-size":(i===sel?15:12)*k,"stroke-width":4*k},svg); t.textContent="#"+(i+1); });
+  // 선택 도형 꼭짓점
+  const s=R[sel];
+  s.pts.forEach((p,i)=>{ el("circle",{class:"dot",cx:p[0],cy:-p[1],r:4.5*k,fill:i?s.col:"#18a957"},svg);
+    const ox=p[0]-s.cx, oy=p[1]-s.cy, d=Math.hypot(ox,oy)||1;
+    const t=el("text",{class:"vn",x:p[0]+ox/d*11*k,y:-(p[1]+oy/d*11*k),"font-size":11*k,"stroke-width":3*k},svg); t.textContent=i+1; });
+  $("scale").innerHTML=`<i style="width:${step/k}px"></i>${step} m · 위쪽 = 북(+Y)`;
+}
+$("src").addEventListener("input",()=>{ view=null; parse(); });
+$("list").addEventListener("click",e=>{ const tr=e.target.closest("tr[data-i]"); if(!tr) return; sel=+tr.dataset.i; if(view!==null) view=sel; draw(); });
+$("list").addEventListener("dblclick",e=>{ const tr=e.target.closest("tr[data-i]"); if(!tr) return; view=sel=+tr.dataset.i; draw(); });
+$("all").onclick=()=>{ view=null; draw(); };
+$("fit").onclick=()=>{ view=sel; draw(); };
+addEventListener("resize",draw);
+parse();
+</script>
+</body>
+</html>
