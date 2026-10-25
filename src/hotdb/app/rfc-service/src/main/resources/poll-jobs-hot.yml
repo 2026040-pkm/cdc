@@ -1,0 +1,757 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ② 레거시 사본 → Hot DB hot.m_* · l_* 적재 작업 (통합안 · 정규화, 2026-10-23)
+#
+# 원천 legacy = 레거시 사본 PostgreSQL(inshoplocal 계열: gp.* SAP 출신). 운영은 HANA 로 바꾼다.
+# 원천 legacy-oracle = 레거시 사본 Oracle(inshoplocal-oracle: AM ProSSYS · SDE GIS · APNB BTS) — hot.m_lot · hot.l_event.ssy
+# 대상 hot    = Hot DB 의 hot 스키마 (계정 rfc_service). 진행 상태는 Hot DB 의 ops.poll_state 에 남는다.
+#
+# 적는 법: from 에 괄호로 싼 SELECT 를 두고 대상 열 이름으로 별칭을 맞춘다. 대상에 없는 별칭(wm 등)은 건너뛴다.
+#   incremental : watermark 식(wm) 이상만 — 원천 표의 MNT_DATE || MNT_TIME
+#   full        : 집계 · 조인이 섞여 워터마크를 못 쓰는 작업 — 주기를 길게 두고 전부 UPSERT
+# 날짜 문자열(YYYYMMDD)은 '00000000' · '' 가 섞여 있어 정규식으로 거른 뒤 변환한다.
+#
+# 근거: 「내업 · 필드 데이터 계보」 통합안 · 정규화 탭 ②→③ 연결. 열 하나하나의 출처는 그 문서의 선을 따른다.
+#   - 가공 앵커 = 도면(YPWC310M → l_work_unit level DWG), 절점 시각 = l_event, 부재 = l_cut_part
+#   - 조립 앵커 = 송선(YPWG411M flag S 의 액티비티‖송선 → l_work_unit level ACTIVITY)
+#   - 의장 앵커 = GDO(ZPPT200 오더 → l_work_unit level ORDER), 도장 앵커 = 호선‖블록‖P(YPWG411M flag P → PBLOCK)
+# 아직 못 채우는 것: l_daily_plan(출처 미확인) · m_location ZONE 행(구역 등록 대기) · l_outfit_item.do_no · part_role(분류 규칙 미정) ·
+#   STEEL_SECURED(ZPPT005_1.AEFLG 가 덤프에서 전부 빈값) · sort_ts(YPDG355M 운영 추출 뒤)
+# ─────────────────────────────────────────────────────────────────────────────
+# 묶음 이름(job-sets.hot)으로 둔다 — hotdb.poll.jobs 로 두면 poll-jobs.yml 의 SAP 114 작업을 덮어쓴다
+hotdb:
+  poll:
+    job-sets:
+      hot:
+        # ── M 마스터 ─────────────────────────────────────────────────────────
+        - name: hot.m_hull
+          source: legacy
+          to: hot
+          target: hot.m_hull
+          mode: full
+          interval-ms: ${POLL_HOT_MASTER_INTERVAL_MS:600000}
+          from: >-
+            (SELECT DISTINCT proj_no AS hull_no, true AS in_scope
+               FROM gp.ypwg411m WHERE proj_no <> '') q
+
+        - name: hot.m_block
+          source: legacy
+          to: hot
+          target: hot.m_block
+          mode: full
+          interval-ms: ${POLL_HOT_MASTER_INTERVAL_MS:600000}
+          from: >-
+            (SELECT DISTINCT proj_no AS hull_no, blk_zone_no AS block_no
+               FROM gp.ypwg411m WHERE proj_no <> '' AND blk_zone_no <> '') q
+
+        # 표준코드 — 한국어 행만. 그룹 이름은 SAP 그룹 코드 그대로 (설계 사전 TRADE · CHECKPOINT … 와 겹치지 않는다)
+        - name: hot.m_code
+          source: legacy
+          to: hot
+          target: hot.m_code
+          watermark: wm
+          from: >-
+            (SELECT std_grp_code AS code_group, std_detl_code AS code, std_detl_code_nm AS name,
+                    (use_indc = 'Y') AS in_scope,
+                    CASE WHEN sort_seq_no ~ '^[0-9]+$' THEN sort_seq_no::int END AS seq,
+                    NULLIF(up_std_detl_cd, '') AS parent_code,
+                    mnt_date || mnt_time AS wm
+               FROM gp.ypgs010m WHERE lang_key = 'KO' AND std_grp_code <> '' AND std_detl_code <> '') q
+
+        # 공정(MP) 코드
+        - name: hot.m_code.mp
+          source: legacy
+          to: hot
+          target: hot.m_code
+          mode: full
+          interval-ms: ${POLL_HOT_MASTER_INTERVAL_MS:600000}
+          from: >-
+            (SELECT DISTINCT ON (mpcode) 'MP' AS code_group, mpcode AS code, mpcode_text AS name, true AS in_scope
+               FROM gp.zpst0010 WHERE mpcode <> '' ORDER BY mpcode) q
+
+        # 지번 — BTS 위치 코드. 원천은 Oracle 사본 SDE.GIF_LOTSMALL. 좌표(shape)는 GeoJSON 변환이 필요해 아직 비운다
+        # (Oracle 은 '' 를 NULL 로 본다 — 빈 값 거르기는 IS NOT NULL 로)
+        - name: hot.m_lot
+          source: legacy-oracle
+          to: hot
+          target: hot.m_lot
+          mode: full
+          interval-ms: ${POLL_HOT_MASTER_INTERVAL_MS:600000}
+          from: >-
+            (SELECT "LOT" AS lot_code, "MIDDLELOT" AS middle_lot, "DESCRIPTION" AS lot_name, "USETYPE" AS use_type,
+                    "PROCESSTYPE" AS process_type,
+                    CASE WHEN "WORKPLACETYPE" = '옥내' THEN 'true' WHEN "WORKPLACETYPE" = '옥외' THEN 'false' END AS indoor,
+                    "AREA" AS area_m2
+               FROM SDE."GIF_LOTSMALL" WHERE "LOT" IS NOT NULL) q
+
+        # 위치 — 공장(SHOP) · 정반(JIG). 구역(ZONE) 은 등록 대기. SHOP 이 먼저 들어가게 정렬한다 (parent FK)
+        - name: hot.m_location
+          source: legacy
+          to: hot
+          target: hot.m_location
+          mode: full
+          interval-ms: ${POLL_HOT_MASTER_INTERVAL_MS:600000}
+          from: >-
+            (SELECT location_id, level, parent_id, code, name, attrs FROM (
+               SELECT DISTINCT assy_shop AS location_id, 'SHOP' AS level, NULL::text AS parent_id, assy_shop AS code,
+                      assy_shop AS name, NULL::text AS attrs, 0 AS ord
+                 FROM gp.ypws120c WHERE assy_shop <> ''
+               UNION ALL
+               SELECT * FROM (
+                 SELECT DISTINCT ON (j.jig_code) j.jig_code AS location_id, 'JIG' AS level, NULLIF(j.assy_shop, '') AS parent_id,
+                        j.jig_code AS code, NULLIF(j.jig_desc, '') AS name,
+                        jsonb_build_object('work_cntr', j.work_cntr, 'work_id', j.work_id, 'vndr_clsf_code', j.vndr_clsf_code,
+                                           'div_id', j.div_id, 'weg_code', j.weg_code, 'wcg_code', j.wcg_code)::text AS attrs, 1 AS ord
+                   FROM gp.ypws120c j WHERE j.jig_code <> '' ORDER BY j.jig_code, j.mnt_date DESC, j.mnt_time DESC) jig
+             ) x ORDER BY ord) q
+
+        # ── L 작업 단위 · 앵커 ───────────────────────────────────────────────
+        # W/O 1장 = WO 행. 가공 W/O 는 소속 도면(411 → 214 → 211 C00 · flag C 의 mat_desc1)을 ref_no 에, 부모로 DWG 앵커를 가리킨다
+        - name: hot.l_work_unit.wo
+          source: legacy
+          to: hot
+          target: hot.l_work_unit
+          watermark: wm
+          from: >-
+            (SELECT w.work_ord_no AS unit_id, 'WO' AS level,
+                    CASE WHEN w.flag = 'C' THEN o.dwg_no
+                         WHEN w.flag = 'S' AND w.wstg_code <> '' THEN left(w.work_ord_no, 12) || '‖' || w.wstg_code
+                         WHEN w.flag = 'P' AND w.blk_zone_no <> '' THEN w.proj_no || '‖' || w.blk_zone_no || '‖P' END AS parent_id,
+                    left(w.work_ord_no, 12) AS act_no, NULLIF(w.proj_no, '') AS hull_no, NULLIF(w.blk_zone_no, '') AS block_no,
+                    NULLIF(w.flag, '') AS trade, NULLIF(w.mp, '') AS mp, NULLIF(w.wstg_code, '') AS wstg_code,
+                    NULLIF(w.assy_shop, '') AS location_id, w.std_mh AS plan_mh, w.accm_prgs_rate AS acc_rate,
+                    CASE WHEN w.wo_pln_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_pln_sd, 'YYYYMMDD') END AS plan_sd,
+                    CASE WHEN w.wo_pln_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_pln_fd, 'YYYYMMDD') END AS plan_fd,
+                    CASE WHEN w.wo_actl_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_actl_sd, 'YYYYMMDD') END AS actl_sd,
+                    CASE WHEN w.wo_actl_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_actl_fd, 'YYYYMMDD') END AS actl_fd,
+                    jsonb_build_object('assy_shop', w.assy_shop, 'jig_code', w.jig_code, 'subc', w.subc_work_indc,
+                                       'vendor', w.vndr_ogan_code, 'stus', w.stus_code, 'detl_clsf', w.detl_clsf_code)::text AS attrs,
+                    CASE WHEN w.mnt_date ~ '^(19|20)[0-9]{6}$' AND w.mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(w.mnt_date || w.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+                    CASE WHEN w.subc_work_indc = 'Y' THEN 'OUT' ELSE 'IN' END AS site,
+                    (w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR')) AS excluded,
+                    CASE WHEN w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR') THEN 'AUTO_DIST' END AS exclude_reason,
+                    'YPWG411M' AS source_table,
+                    CASE WHEN w.flag = 'C' THEN o.dwg_no END AS ref_no,
+                    CASE WHEN w.flag = 'C' THEN right(w.work_ord_no, 2) END AS step_code,
+                    (w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR')) AS auto_dist,
+                    w.mnt_date || w.mnt_time AS wm
+               FROM gp.ypwg411m w
+               LEFT JOIN (SELECT m.work_ord_no, min(o.mat_desc1) AS dwg_no
+                            FROM gp.ypwg214m m JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no
+                           WHERE o.detl_clsf_code = 'C00' AND o.flag = 'C' AND o.mat_desc1 <> ''
+                           GROUP BY m.work_ord_no) o ON o.work_ord_no = w.work_ord_no
+              WHERE w.work_ord_no <> '') q
+
+        # 가공 앵커 = 절단 도면 1행 (level DWG). 시수 = CT · CM W/O 표준시수 합, 없으면 도면 표준시수
+        - name: hot.l_work_unit.dwg
+          source: legacy
+          to: hot
+          target: hot.l_work_unit
+          watermark: wm
+          from: >-
+            (SELECT d.dwg_no AS unit_id, 'DWG' AS level, substr(d.dwg_no, 1, 4) AS hull_no, substr(d.dwg_no, 7, 3) AS block_no,
+                    'C' AS trade,
+                    CASE WHEN d.cut_pln_date ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_pln_date, 'YYYYMMDD') END AS plan_sd,
+                    CASE WHEN d.cut_cmp_pln_date ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_cmp_pln_date, 'YYYYMMDD') END AS plan_fd,
+                    CASE WHEN d.mark_mfg_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(d.mark_mfg_fd, 'YYYYMMDD') END AS actl_sd,
+                    CASE WHEN d.prcs_stus_code = '2' AND d.cut_mfg_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_mfg_fd, 'YYYYMMDD') END AS actl_fd,
+                    coalesce(wo.mh, d.cut_std_mh + d.mark_std_mh) AS plan_mh,
+                    jsonb_build_object('cut_bay', d.cut_bay_no, 'cnf_cut_bay', d.cnf_cut_bay_no, 'cut_status', d.prcs_stus_code,
+                                       'mark_status', d.mark_stus_code, 'dwg_series', substr(d.dwg_no, 11, 2), 'dwg_stus', d.dwg_stus_code,
+                                       'cut_std_mh', d.cut_std_mh, 'mark_std_mh', d.mark_std_mh, 'pgm_id', d.pgm_id,
+                                       'wo_cnt', wo.cnt)::text AS attrs,
+                    CASE WHEN d.mnt_date ~ '^(19|20)[0-9]{6}$' AND d.mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(d.mnt_date || d.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+                    CASE WHEN d.cut_bay_no = '9' THEN 'OUT' ELSE 'IN' END AS site,
+                    (d.dwg_stus_code = 'D' OR substr(d.dwg_no, 5, 4) = 'SSYW' OR substr(d.dwg_no, 11, 1) IN ('T', 'X', 'K', 'Y')) AS excluded,
+                    CASE WHEN d.dwg_stus_code = 'D' THEN 'DWG_D' WHEN substr(d.dwg_no, 5, 4) = 'SSYW' THEN 'SSYW'
+                         WHEN substr(d.dwg_no, 11, 1) IN ('T', 'X', 'K', 'Y') THEN 'TBAR' END AS exclude_reason,
+                    'YPWC310M' AS source_table, 'DWG' AS anchor_type,
+                    coalesce(wo.mh, d.cut_std_mh + d.mark_std_mh) AS target_qty,
+                    CASE WHEN wo.mh IS NOT NULL THEN 'DWG_WO_MH' ELSE 'DWG_STD_MH' END AS target_basis,
+                    d.mnt_date || d.mnt_time AS wm
+               FROM gp.ypwc310m d
+               LEFT JOIN (SELECT o.mat_desc1 AS dwg_no, sum(w.std_mh) AS mh, count(*) AS cnt
+                            FROM gp.ypwg411m w
+                            JOIN gp.ypwg214m m ON m.work_ord_no = w.work_ord_no
+                            JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no AND o.detl_clsf_code = 'C00' AND o.flag = 'C'
+                           WHERE w.flag = 'C' AND right(w.work_ord_no, 2) IN ('CT', 'CM')
+                           GROUP BY o.mat_desc1) wo ON wo.dwg_no = d.dwg_no
+              WHERE length(d.dwg_no) = 14) q
+
+        # 조립 앵커 = 송선 1행 (level ACTIVITY, unit_id = 액티비티‖송선). 목표 = 조립품 소요 수량(YDEH050M)
+        - name: hot.l_work_unit.wstg
+          source: legacy
+          to: hot
+          target: hot.l_work_unit
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT left(w.work_ord_no, 12) || '‖' || w.wstg_code AS unit_id, 'ACTIVITY' AS level, left(w.work_ord_no, 12) AS act_no,
+                    w.proj_no AS hull_no, NULLIF(w.blk_zone_no, '') AS block_no, 'S' AS trade, w.wstg_code,
+                    min(NULLIF(w.assy_shop, '')) AS location_id, sum(w.std_mh) AS plan_mh,
+                    min(CASE WHEN w.wo_pln_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_pln_sd, 'YYYYMMDD') END) AS plan_sd,
+                    max(CASE WHEN w.wo_pln_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_pln_fd, 'YYYYMMDD') END) AS plan_fd,
+                    min(CASE WHEN w.wo_actl_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_actl_sd, 'YYYYMMDD') END) AS actl_sd,
+                    CASE WHEN bool_and(w.wo_actl_fd ~ '^(19|20)[0-9]{6}$')
+                         THEN max(to_date(w.wo_actl_fd, 'YYYYMMDD')) END AS actl_fd,
+                    sum(w.accm_prgs_rate * w.std_mh) / NULLIF(sum(w.std_mh), 0) AS acc_rate,
+                    jsonb_build_object('wo_cnt', count(*), 'acc_rate_min', min(w.accm_prgs_rate))::text AS attrs,
+                    max(CASE WHEN w.mnt_date ~ '^(19|20)[0-9]{6}$' AND w.mnt_time ~ '^[0-9]{6}$'
+                             THEN to_timestamp(w.mnt_date || w.mnt_time, 'YYYYMMDDHH24MISS') END) AS mnt_ts,
+                    CASE WHEN bool_or(w.subc_work_indc = 'Y') THEN 'OUT' ELSE 'IN' END AS site,
+                    'YPWG411M' AS source_table, 'WSTG' AS anchor_type,
+                    max(a.qty) AS target_qty, CASE WHEN max(a.qty) IS NOT NULL THEN 'ASSY_QTY' ELSE 'WO_MH' END AS target_basis
+               FROM gp.ypwg411m w
+               LEFT JOIN (SELECT proj_no, blk_no, assy_wstg_code || next_wstg_code AS wstg, sum(assy_req_qty) AS qty
+                            FROM gp.ydeh050m GROUP BY proj_no, blk_no, assy_wstg_code || next_wstg_code) a
+                      ON a.proj_no = w.proj_no AND a.blk_no = w.blk_zone_no AND a.wstg = w.wstg_code
+              WHERE w.flag = 'S' AND w.wstg_code <> '' AND w.work_ord_no <> ''
+              GROUP BY left(w.work_ord_no, 12), w.wstg_code, w.proj_no, w.blk_zone_no) q
+
+        # 의장 앵커 = GDO 1행 (level ORDER, unit_id = AUFNR‖VORNR). 목표 = 소요 품목 수량 합(W032)
+        - name: hot.l_work_unit.gdo
+          source: legacy
+          to: hot
+          target: hot.l_work_unit
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT z.aufnr || '‖' || z.vornr AS unit_id, 'ORDER' AS level, z.zzact AS act_no,
+                    NULLIF(z.zzpjtno, '') AS hull_no, NULLIF(z.zzbzs_code, '') AS block_no, 'W' AS trade,
+                    NULLIF(z.zzmpcode, '') AS mp, NULLIF(z.zzstage_code, '') AS stage, NULLIF(z.zzsong_sun, '') AS wstg_code,
+                    NULLIF(z.zzshop_code, '') AS location_id,
+                    CASE WHEN z.fsavd ~ '^(19|20)[0-9]{6}$' THEN to_date(z.fsavd, 'YYYYMMDD') END AS plan_sd,
+                    CASE WHEN z.fsedd ~ '^(19|20)[0-9]{6}$' THEN to_date(z.fsedd, 'YYYYMMDD') END AS plan_fd,
+                    CASE WHEN z.iedd ~ '^(19|20)[0-9]{6}$' THEN to_date(z.iedd, 'YYYYMMDD') END AS actl_fd,
+                    jsonb_build_object('aufnr', z.aufnr, 'vornr', z.vornr, 'item_cnt', i.cnt, 'order_cnt', z.ord_cnt)::text AS attrs,
+                    CASE WHEN z.aedat ~ '^(19|20)[0-9]{6}$' THEN to_date(z.aedat, 'YYYYMMDD')::timestamptz END AS mnt_ts,
+                    'IN' AS site, 'ZPPT200' AS source_table,
+                    CASE WHEN z.rn = 1 THEN 'GDO' END AS anchor_type,
+                    CASE WHEN z.rn = 1 THEN i.req END AS target_qty,
+                    CASE WHEN z.rn = 1 AND i.req IS NOT NULL THEN 'ITEMS' END AS target_basis
+               FROM (SELECT z.*, row_number() OVER (PARTITION BY zzact ORDER BY aufnr || '‖' || vornr) AS rn,
+                            count(*) OVER (PARTITION BY zzact) AS ord_cnt
+                       FROM gp.zppt200 z WHERE substr(z.zzact, 5, 1) = 'W' AND z.aufnr <> '') z
+               LEFT JOIN (SELECT zzact, sum(bdmng) AS req, count(*) AS cnt FROM gp.zpptw032 GROUP BY zzact) i ON i.zzact = z.zzact) q
+
+        # 도장 앵커 = 호선‖블록‖P 1행 (level PBLOCK). 전처리(C) · 도장(P) W/O 의 부모. 시수 = Σ 411 STD_MH (212 대체)
+        - name: hot.l_work_unit.pblock
+          source: legacy
+          to: hot
+          target: hot.l_work_unit
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT w.unit_id, 'PBLOCK' AS level, w.proj_no AS hull_no, w.blk_zone_no AS block_no, 'P' AS trade,
+                    w.location_id, w.plan_mh, w.plan_sd, w.plan_fd, w.actl_sd, w.actl_fd, w.acc_rate, w.attrs, w.site,
+                    'YPWG411M' AS source_table, 'PAINT_ORDER' AS anchor_type,
+                    coalesce(p.mh, w.plan_mh) AS target_qty, CASE WHEN p.mh IS NOT NULL THEN 'MH_212' ELSE 'MH_411' END AS target_basis
+               FROM (SELECT proj_no || '‖' || blk_zone_no || '‖P' AS unit_id, proj_no, blk_zone_no,
+                            min(NULLIF(assy_shop, '')) AS location_id, sum(std_mh) AS plan_mh,
+                            min(CASE WHEN wo_pln_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(wo_pln_sd, 'YYYYMMDD') END) AS plan_sd,
+                            max(CASE WHEN wo_pln_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(wo_pln_fd, 'YYYYMMDD') END) AS plan_fd,
+                            min(CASE WHEN wo_actl_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(wo_actl_sd, 'YYYYMMDD') END) AS actl_sd,
+                            CASE WHEN bool_and(wo_actl_fd ~ '^(19|20)[0-9]{6}$') THEN max(to_date(wo_actl_fd, 'YYYYMMDD')) END AS actl_fd,
+                            sum(accm_prgs_rate * std_mh) / NULLIF(sum(std_mh), 0) AS acc_rate,
+                            jsonb_build_object('wo_cnt', count(*), 'pre_cnt', count(*) FILTER (WHERE substr(work_ord_no, 13, 1) = 'C'),
+                                               'paint_cnt', count(*) FILTER (WHERE substr(work_ord_no, 13, 1) = 'P'))::text AS attrs,
+                            CASE WHEN bool_or(subc_work_indc = 'Y') THEN 'OUT' ELSE 'IN' END AS site
+                       FROM gp.ypwg411m
+                      WHERE flag = 'P' AND mp IN ('B', 'P') AND proj_no <> '' AND blk_zone_no NOT IN ('', 'ZZZ')
+                      GROUP BY proj_no, blk_zone_no) w
+               LEFT JOIN (SELECT o.proj_no, o.blk_zone_no, sum(p.acty_mh_1) AS mh
+                            FROM (SELECT DISTINCT w.proj_no, w.blk_zone_no, m.prod_ord_no, m.oper_no
+                                    FROM gp.ypwg411m w JOIN gp.ypwg214m m ON m.work_ord_no = w.work_ord_no
+                                   WHERE w.flag = 'P' AND w.mp IN ('B', 'P') AND w.blk_zone_no NOT IN ('', 'ZZZ')) o
+                            JOIN gp.ypwg212m p ON p.prod_ord_no = o.prod_ord_no AND p.oper_no = o.oper_no
+                           GROUP BY o.proj_no, o.blk_zone_no) p ON p.proj_no = w.proj_no AND p.blk_zone_no = w.blk_zone_no) q
+
+        # ── L 사건 (가공 절점) ──────────────────────────────────────────────
+        # 절점 6 · 7 — 310M. SCHEDULER 입력분은 conf LOW (완료 사실만 믿는다)
+        - name: hot.l_event.310m
+          source: legacy
+          to: hot
+          target: hot.l_event
+          watermark: wm
+          from: >-
+            (SELECT dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'MARK_DONE' AS event_code, '310M' AS source,
+                    to_timestamp(mark_mfg_fd || lpad(coalesce(NULLIF(mark_mfg_time, ''), '0'), 6, '0'), 'YYYYMMDDHH24MISS') AS event_ts,
+                    CASE WHEN pgm_id = 'SCHEDULER' THEN 'LOW' ELSE 'HIGH' END AS conf, pgm_id AS src_value,
+                    CASE WHEN mnt_date ~ '^(19|20)[0-9]{6}$' AND mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(mnt_date || mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+                    mnt_date || mnt_time AS wm
+               FROM gp.ypwc310m
+              WHERE length(dwg_no) = 14 AND mark_mfg_fd ~ '^(19|20)[0-9]{6}$' AND coalesce(mark_mfg_time, '') ~ '^[0-9]{0,6}$'
+             UNION ALL
+             SELECT dwg_no, 'CHECKPOINT', 'CUT_DONE', '310M',
+                    to_timestamp(cut_mfg_fd || lpad(coalesce(NULLIF(cut_mfg_time, ''), '0'), 6, '0'), 'YYYYMMDDHH24MISS'),
+                    CASE WHEN pgm_id = 'SCHEDULER' THEN 'LOW' ELSE 'HIGH' END, pgm_id,
+                    CASE WHEN mnt_date ~ '^(19|20)[0-9]{6}$' AND mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(mnt_date || mnt_time, 'YYYYMMDDHH24MISS') END,
+                    mnt_date || mnt_time
+               FROM gp.ypwc310m
+              WHERE length(dwg_no) = 14 AND prcs_stus_code = '2' AND cut_mfg_fd ~ '^(19|20)[0-9]{6}$'
+                AND coalesce(cut_mfg_time, '') ~ '^[0-9]{0,6}$') q
+
+        # 절점 7 사내 — W/O CT 완료일 (사외 310M 과 합치지 않는다 · source 로 가른다)
+        - name: hot.l_event.wo_ct
+          source: legacy
+          to: hot
+          target: hot.l_event
+          watermark: wm
+          from: >-
+            (SELECT o.dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'CUT_DONE' AS event_code, 'WO_CT' AS source,
+                    to_date(w.wo_actl_fd, 'YYYYMMDD')::timestamptz AS event_ts, 'HIGH' AS conf, w.work_ord_no AS src_value,
+                    CASE WHEN w.mnt_date ~ '^(19|20)[0-9]{6}$' AND w.mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(w.mnt_date || w.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+                    w.mnt_date || w.mnt_time AS wm
+               FROM gp.ypwg411m w
+               JOIN (SELECT m.work_ord_no, min(o.mat_desc1) AS dwg_no
+                       FROM gp.ypwg214m m JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no
+                      WHERE o.detl_clsf_code = 'C00' AND o.flag = 'C' AND o.mat_desc1 <> ''
+                      GROUP BY m.work_ord_no) o ON o.work_ord_no = w.work_ord_no
+              WHERE w.flag = 'C' AND right(w.work_ord_no, 2) = 'CT' AND w.wo_actl_fd ~ '^(19|20)[0-9]{6}$') q
+
+        # 절점 4 · 5 — 140M 컨베이어 (1행 = 강판 1장). 불출 = 도면 강판 중 첫 투입, 전처리 = 도면의 강판 전부 Y 일 때 마지막 마킹.
+        # 사본의 140M 은 dwg_no 가 비어 있어 선별 지시(pick_ser_id → 111M)로 도면을 찾는다. 시각은 HHMM · HHMMSS 가 섞여 오른쪽을 0 으로 채운다
+        - name: hot.l_event.140m
+          source: legacy
+          to: hot
+          target: hot.l_event
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT x.dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'STEEL_ISSUE' AS event_code, '140M' AS source,
+                    min(to_timestamp(x.iss_date || rpad(coalesce(x.iss_time, ''), 6, '0'), 'YYYYMMDDHH24MISS')) AS event_ts,
+                    'HIGH' AS conf, count(*)::text AS src_value
+               FROM (SELECT coalesce(NULLIF(c.dwg_no, ''), p.dwg_no) AS dwg_no, c.iss_date, c.iss_time, c.auto_mark_date, c.auto_mark_time,
+                            c.mark_stus_code
+                       FROM gp.ypwc140m c
+                       LEFT JOIN (SELECT pick_ser_id, min(dwg_no) AS dwg_no FROM gp.ypwc111m WHERE length(dwg_no) = 14 GROUP BY pick_ser_id) p
+                              ON p.pick_ser_id = c.pick_ser_id) x
+              WHERE length(x.dwg_no) = 14 AND x.iss_date ~ '^(19|20)[0-9]{6}$' AND coalesce(x.iss_time, '') ~ '^[0-9]{0,6}$'
+              GROUP BY x.dwg_no
+             UNION ALL
+             SELECT x.dwg_no, 'CHECKPOINT', 'PRETREAT', '140M',
+                    max(to_timestamp(x.auto_mark_date || rpad(coalesce(x.auto_mark_time, ''), 6, '0'), 'YYYYMMDDHH24MISS')),
+                    'HIGH', count(*)::text
+               FROM (SELECT coalesce(NULLIF(c.dwg_no, ''), p.dwg_no) AS dwg_no, c.auto_mark_date, c.auto_mark_time, c.mark_stus_code
+                       FROM gp.ypwc140m c
+                       LEFT JOIN (SELECT pick_ser_id, min(dwg_no) AS dwg_no FROM gp.ypwc111m WHERE length(dwg_no) = 14 GROUP BY pick_ser_id) p
+                              ON p.pick_ser_id = c.pick_ser_id) x
+              WHERE length(x.dwg_no) = 14 AND x.auto_mark_date ~ '^(19|20)[0-9]{6}$' AND coalesce(x.auto_mark_time, '') ~ '^[0-9]{0,6}$'
+              GROUP BY x.dwg_no
+             HAVING bool_and(x.mark_stus_code = 'Y')) q
+
+        # 절점 1 · 2 · 3 · 4 — ProSSYS 강재 이력 (AM.STY01H, Oracle 사본). 도면 강재 중 최소(입고 · 선별) · 최대(불출)
+        - name: hot.l_event.ssy
+          source: legacy-oracle
+          to: hot
+          target: hot.l_event
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT "DWG_NO" AS unit_id, 'CHECKPOINT' AS event_group, 'STEEL_IN' AS event_code, 'SSY' AS source,
+                    MIN("ACPT_DATE") AS event_ts, 'MID' AS conf, TO_CHAR(COUNT(*)) AS src_value
+               FROM AM."STY01H" WHERE LENGTH("DWG_NO") = 14 AND "ACPT_DATE" IS NOT NULL GROUP BY "DWG_NO"
+             UNION ALL
+             SELECT "DWG_NO", 'CHECKPOINT', 'PICK1', 'SSY', MIN("FRST_PICK_ACTL_DATE_1"), 'MID', TO_CHAR(COUNT(*))
+               FROM AM."STY01H" WHERE LENGTH("DWG_NO") = 14 AND "FRST_PICK_ACTL_DATE_1" IS NOT NULL GROUP BY "DWG_NO"
+             UNION ALL
+             SELECT "DWG_NO", 'CHECKPOINT', 'PICK2', 'SSY', MIN("SCND_PICK_ACTL_DATE"), 'MID', TO_CHAR(COUNT(*))
+               FROM AM."STY01H" WHERE LENGTH("DWG_NO") = 14 AND "SCND_PICK_ACTL_DATE" IS NOT NULL GROUP BY "DWG_NO"
+             UNION ALL
+             SELECT "DWG_NO", 'CHECKPOINT', 'STEEL_ISSUE', 'SSY', MAX("ISS_ACTL_DATE"), 'MID', TO_CHAR(COUNT(*))
+               FROM AM."STY01H" WHERE LENGTH("DWG_NO") = 14 AND "ISS_ACTL_DATE" IS NOT NULL GROUP BY "DWG_NO") q
+
+        # 입고 2층 — 반입예정 경과 (111M). 예정일이 지났는데 불출 전이면 사건. src_value = 경과 장수 ("안 나갔다")
+        - name: hot.l_event.cary_due
+          source: legacy
+          to: hot
+          target: hot.l_event
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT dwg_no AS unit_id, 'EVENT' AS event_group, 'CARY_DUE' AS event_code, '111M' AS source,
+                    min(to_date(cary_due_date, 'YYYYMMDD'))::timestamptz AS event_ts, 'HIGH' AS conf, count(*)::text AS src_value
+               FROM gp.ypwc111m
+              WHERE length(dwg_no) = 14 AND cary_due_date ~ '^(19|20)[0-9]{6}$'
+                AND to_date(cary_due_date, 'YYYYMMDD') < current_date
+                AND NOT (iss_dt_last ~ '^(19|20)[0-9]{6}$')
+              GROUP BY dwg_no) q
+
+        # 사외 절단 부재 반입 — 납품운송 신청(301M, DC04). 도면 단위로는 첫 반입을 사건으로
+        - name: hot.l_event.inbound
+          source: legacy
+          to: hot
+          target: hot.l_event
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT b.dwg_no AS unit_id, 'EVENT' AS event_group, 'PART_INBOUND' AS event_code, '301M' AS source,
+                    min(to_date(n.rgsr_date, 'YYYYMMDD'))::timestamptz AS event_ts, 'MID' AS conf, count(*)::text AS src_value
+               FROM gp.ycps301m n
+               JOIN (SELECT part_no, min(dwg_no) AS dwg_no FROM gp.ydeh090m GROUP BY part_no) b ON b.part_no = n.mat_code
+              WHERE n.ref_dcmt_type = 'DC04' AND n.rgsr_date ~ '^(19|20)[0-9]{6}$' AND length(b.dwg_no) = 14
+              GROUP BY b.dwg_no) q
+
+        # ── L 부재 · 일일 실적 · 조립품 · 품목 · 요소 ─────────────────────────
+        # 가공 부재 1개 — 도면은 절단BOM(090M, 판별 서비스와 같은 경로), 절점 8 · 9 · 10 은 510M · 002M · 100M / 송선 조립 W/O
+        - name: hot.l_cut_part
+          source: legacy
+          to: hot
+          target: hot.l_cut_part
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT p.part_no, NULLIF(p.proj_no, '') AS hull_no, NULLIF(p.blk_no, '') AS block_no, b.dwg_no,
+                    NULLIF(p.assy_wstg_code, '') AS dest_wstg, (coalesce(p.bend_clsf_code, '') <> '') AS bend_flag,
+                    coalesce(CASE WHEN p.cut_mfg_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(p.cut_mfg_fd, 'YYYYMMDD')::timestamptz END,
+                             CASE WHEN d.prcs_stus_code = '2' AND d.cut_mfg_fd ~ '^(19|20)[0-9]{6}$'
+                                  THEN to_date(d.cut_mfg_fd, 'YYYYMMDD')::timestamptz END,
+                             ct.ct_done) AS cut_done_ts,
+                    g.group_ts,
+                    coalesce(wo.assy_sd, i.iss_ts) AS issue_ts,
+                    CASE WHEN wo.assy_sd IS NOT NULL THEN 'ASSY_WO' WHEN i.iss_ts IS NOT NULL THEN '100M' END AS issue_src,
+                    n.inbound_ts,
+                    CASE WHEN d.cut_bay_no = '9' THEN 'OUT' WHEN d.dwg_no IS NOT NULL THEN 'IN' END AS cut_site,
+                    p.part_wt AS weight_kg,
+                    CASE WHEN p.cut_req_qty ~ '^[0-9]+$' THEN p.cut_req_qty::int END AS cut_req_qty,
+                    bd.bend_done_ts, (p.grnd_work_indc = 'Y') AS grind_flag, gr.grind_done_ts,
+                    CASE WHEN p.mnt_date ~ '^(19|20)[0-9]{6}$' AND p.mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(p.mnt_date || p.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts
+               FROM gp.ydeh060m p
+               LEFT JOIN (SELECT DISTINCT ON (part_no) part_no, dwg_no FROM (
+                            SELECT part_no, dwg_no, 1 AS pri FROM gp.ydeh090m WHERE length(dwg_no) = 14
+                            UNION ALL SELECT part_no, dwg_no, 2 FROM gp.ypdg002m WHERE length(dwg_no) = 14
+                            UNION ALL SELECT part_no, dwg_no, 3 FROM gp.ypwc821m WHERE length(dwg_no) = 14
+                            UNION ALL SELECT part_no, dwg_no, 4 FROM gp.ypdg800m WHERE length(dwg_no) = 14) x
+                           ORDER BY part_no, pri, dwg_no) b ON b.part_no = p.part_no
+               LEFT JOIN gp.ypwc310m d ON d.dwg_no = b.dwg_no
+               LEFT JOIN (SELECT o.mat_desc1 AS dwg_no, min(to_date(w.wo_actl_fd, 'YYYYMMDD'))::timestamptz AS ct_done
+                            FROM gp.ypwg411m w JOIN gp.ypwg214m m ON m.work_ord_no = w.work_ord_no
+                            JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no AND o.detl_clsf_code = 'C00' AND o.flag = 'C'
+                           WHERE w.flag = 'C' AND right(w.work_ord_no, 2) = 'CT' AND w.wo_actl_fd ~ '^(19|20)[0-9]{6}$'
+                           GROUP BY o.mat_desc1) ct ON ct.dwg_no = b.dwg_no
+               LEFT JOIN (SELECT part_no, max(to_timestamp(part_plat_date || lpad(part_plat_time, 4, '0'), 'YYYYMMDDHH24MI')) AS group_ts
+                            FROM gp.ypdg002m WHERE part_plat_date ~ '^(19|20)[0-9]{6}$' AND part_plat_time ~ '^[0-9]{1,4}$'
+                           GROUP BY part_no) g ON g.part_no = p.part_no
+               LEFT JOIN (SELECT part_no, max(to_date(iss_fd, 'YYYYMMDD'))::timestamptz AS iss_ts
+                            FROM gp.ypdg100m WHERE part_stus_code = 'S' AND iss_fd ~ '^(19|20)[0-9]{6}$' GROUP BY part_no) i ON i.part_no = p.part_no
+               LEFT JOIN (SELECT part_no, max(to_date(bend_mfg_fd, 'YYYYMMDD'))::timestamptz AS bend_done_ts
+                            FROM gp.ypwc510m WHERE bend_mfg_fd ~ '^(19|20)[0-9]{6}$' GROUP BY part_no) bd ON bd.part_no = p.part_no
+               LEFT JOIN (SELECT part_no, max(to_date(rgsr_date, 'YYYYMMDD'))::timestamptz AS grind_done_ts
+                            FROM gp.ypwc821m WHERE rgsr_date ~ '^(19|20)[0-9]{6}$' AND part_no <> '' GROUP BY part_no) gr ON gr.part_no = p.part_no
+               LEFT JOIN (SELECT mat_code, min(to_date(rgsr_date, 'YYYYMMDD'))::timestamptz AS inbound_ts
+                            FROM gp.ycps301m WHERE ref_dcmt_type = 'DC04' AND rgsr_date ~ '^(19|20)[0-9]{6}$' GROUP BY mat_code) n ON n.mat_code = p.part_no
+               LEFT JOIN (SELECT proj_no, blk_zone_no, wstg_code, min(to_date(wo_actl_sd, 'YYYYMMDD'))::timestamptz AS assy_sd
+                            FROM gp.ypwg411m WHERE flag = 'S' AND wo_actl_sd ~ '^(19|20)[0-9]{6}$'
+                           GROUP BY proj_no, blk_zone_no, wstg_code) wo
+                      ON wo.proj_no = p.proj_no AND wo.blk_zone_no = p.blk_no AND wo.wstg_code = p.assy_wstg_code || p.next_wstg_code
+              WHERE p.part_no <> '') q
+
+        # W/O × 실적일 × 조직 — 413M
+        - name: hot.l_wo_daily
+          source: legacy
+          to: hot
+          target: hot.l_wo_daily
+          watermark: wm
+          from: >-
+            (SELECT work_ord_no AS wo_no, to_date(actl_date, 'YYYYMMDD') AS actl_date, coalesce(work_ogan_code, '') AS org_code,
+                    dly_prgs_rate AS daily_rate, dly_prgs_mh AS daily_mh,
+                    CASE WHEN rgsr_date ~ '^(19|20)[0-9]{6}$' AND rgsr_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(rgsr_date || rgsr_time, 'YYYYMMDDHH24MISS') END AS rgsr_ts,
+                    rgsr_date || rgsr_time AS wm
+               FROM gp.ypwg413m WHERE work_ord_no <> '' AND actl_date ~ '^(19|20)[0-9]{6}$') q
+
+        # 조립품 1개 — 050M. 생산 송선 앵커는 같은 호선 · 블록 · 송선의 액티비티‖송선
+        - name: hot.l_assy_node
+          source: legacy
+          to: hot
+          target: hot.l_assy_node
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT a.proj_no AS hull_no, a.blk_no AS block_no, a.assy_no AS node_id, 'ASSY' AS node_kind,
+                    par.parent AS parent_node_id, par.clsf AS part_clsf,
+                    NULLIF(a.next_wstg_code, '') AS next_wstg, a.assy_req_qty::int AS qty, a.part_wt AS weight_kg,
+                    NULLIF(a.assy_wstg_code, '') AS design_wstg, u.unit_id AS prod_wstg,
+                    NULLIF(g.wstg_grp_code, '') AS series,
+                    concat_ws('‖', NULLIF(a.assy_strc_code, ''), a.part_wt::text, a.part_acr::text) AS shape_key,
+                    CASE WHEN u.unit_id IS NOT NULL THEN 'DIRECT' ELSE 'FALLBACK' END AS rule_applied
+               FROM gp.ydeh050m a
+               LEFT JOIN (SELECT proj_no, blk_zone_no, wstg_code, min(left(work_ord_no, 12) || '‖' || wstg_code) AS unit_id
+                            FROM gp.ypwg411m WHERE flag = 'S' AND wstg_code <> '' GROUP BY proj_no, blk_zone_no, wstg_code) u
+                      ON u.proj_no = a.proj_no AND u.blk_zone_no = a.blk_no AND u.wstg_code = a.assy_wstg_code || a.next_wstg_code
+               LEFT JOIN (SELECT cmpt_part_no, min(prdt_part_no) AS parent, min(part_clsf_code) AS clsf
+                            FROM gp.ydeh040m GROUP BY cmpt_part_no) par ON par.cmpt_part_no = a.assy_no
+               LEFT JOIN gp.zpdtb118 g ON g.assy_wstg_code = a.assy_wstg_code
+              WHERE a.assy_no <> '' AND a.proj_no <> '' AND a.blk_no <> '') q
+
+        # 의장 품목 1개 — W032. GDO 앵커는 같은 액티비티의 오더 (AUFNR‖VORNR, 여럿이면 첫 것)
+        - name: hot.l_outfit_item
+          source: legacy
+          to: hot
+          target: hot.l_outfit_item
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT w.rsnum, w.rspos, NULLIF(w.zzpjtno, '') AS hull_no, NULLIF(w.zzbzs_code, '') AS block_no, w.matnr,
+                    NULLIF(substr(w.matnr, 6, 4), '') AS class_code, w.bdmng AS req_qty, w.wsmng AS inst_qty,
+                    w.gsmng AS temp_qty, w.gbmng AS fixed_qty,
+                    CASE WHEN w.ready_date ~ '^(19|20)[0-9]{6}$' THEN to_date(w.ready_date, 'YYYYMMDD') END AS ready_date,
+                    g.gdo_no, s.inst_date, iss.issue_ts,
+                    CASE WHEN w.aedat ~ '^(19|20)[0-9]{6}$' THEN to_date(w.aedat, 'YYYYMMDD')::timestamptz END AS mnt_ts
+               FROM gp.zpptw032 w
+               LEFT JOIN (SELECT zzact, min(aufnr || '‖' || vornr) AS gdo_no FROM gp.zppt200 GROUP BY zzact) g ON g.zzact = w.zzact
+               LEFT JOIN (SELECT rsnum, rspos, max(to_date(getri, 'YYYYMMDD')) AS inst_date
+                            FROM gp.zpptw033 WHERE getri ~ '^(19|20)[0-9]{6}$' AND wsmng > 0 GROUP BY rsnum, rspos) s
+                      ON s.rsnum = w.rsnum AND s.rspos = w.rspos
+               LEFT JOIN (SELECT rsnum, rspos, min(ts) AS issue_ts FROM (
+                            SELECT rsnum, rspos, to_timestamp(endat || lpad(coalesce(NULLIF(enzei, ''), '0'), 6, '0'), 'YYYYMMDDHH24MISS') AS ts
+                              FROM gp.zppt031 WHERE endat ~ '^(19|20)[0-9]{6}$' AND coalesce(enzei, '') ~ '^[0-9]{0,6}$'
+                            UNION ALL
+                            SELECT rsnum, rspos, to_date(endat, 'YYYYMMDD')::timestamptz FROM gp.zppt072 WHERE endat ~ '^(19|20)[0-9]{6}$') x
+                           GROUP BY rsnum, rspos) iss ON iss.rsnum = w.rsnum AND iss.rspos = w.rspos
+              WHERE w.rsnum <> '' AND w.rspos <> '') q
+
+        # 도장 요소 1개 — 720M (PK 그대로). 앵커 = 호선‖블록‖P
+        - name: hot.l_paint_element
+          source: legacy
+          to: hot
+          target: hot.l_paint_element
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT e.proj_no || '‖' || e.blk_no || '‖P' AS anchor_id, e.pnt_work_kind AS kind, e.pnt_zone_code AS zone_code,
+                    e.elmt_item_code AS elem_code, e.pnt_seq AS seq, NULLIF(e.work_ord_no, '') AS wo_no,
+                    CASE WHEN e.fd_actl ~ '^(19|20)[0-9]{6}$' THEN to_date(e.fd_actl, 'YYYYMMDD') END AS done_date,
+                    e.std_mh, NULLIF(e.insp_req_clsf, '') AS insp_req_clsf,
+                    CASE WHEN e.sd_actl ~ '^(19|20)[0-9]{6}$' THEN to_date(e.sd_actl, 'YYYYMMDD') END AS actl_sd,
+                    d.cmpl_indc AS daily_cmpl, d.ord_mh AS daily_ord_mh, s.wo_mh AS wo_mh_split,
+                    CASE WHEN e.mnt_date ~ '^(19|20)[0-9]{6}$' AND e.mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(e.mnt_date || e.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts
+               FROM gp.ypwp720m e
+               LEFT JOIN (SELECT DISTINCT ON (proj_no, blk_no, pnt_work_kind, pnt_seq, elmt_item_code)
+                                 proj_no, blk_no, pnt_work_kind, pnt_seq, elmt_item_code, NULLIF(cmpl_indc, '') AS cmpl_indc, ord_mh
+                            FROM gp.ypwp710m ORDER BY proj_no, blk_no, pnt_work_kind, pnt_seq, elmt_item_code, pln_date DESC) d
+                      ON d.proj_no = e.proj_no AND d.blk_no = e.blk_no AND d.pnt_work_kind = e.pnt_work_kind
+                     AND d.pnt_seq = e.pnt_seq AND d.elmt_item_code = e.elmt_item_code
+               LEFT JOIN (SELECT proj_no, block, pnt_work_kind, pnt_zone_code, pnt_seq, sum(wo_mh) AS wo_mh
+                            FROM gp.zppt052 WHERE coalesce(del_indc, '') = '' GROUP BY 1, 2, 3, 4, 5) s
+                      ON s.proj_no = e.proj_no AND s.block = e.blk_no AND s.pnt_work_kind = e.pnt_work_kind
+                     AND s.pnt_zone_code = e.pnt_zone_code AND s.pnt_seq = e.pnt_seq
+              WHERE e.proj_no <> '' AND e.blk_no <> '' AND e.pnt_work_kind <> '' AND e.pnt_zone_code <> '' AND e.elmt_item_code <> ''
+                AND e.pnt_seq <> '') q
+
+        # 호선 마스터 — ZCOT001. 4자리 호선 번호는 PROJ_NOC (PROJ_NO 는 8자리 계약 번호). 작업 단위에 나오는 호선만
+        - name: hot.m_hull.zcot001
+          source: legacy
+          to: hot
+          target: hot.m_hull
+          mode: full
+          interval-ms: ${POLL_HOT_MASTER_INTERVAL_MS:600000}
+          from: >-
+            (SELECT z.proj_noc AS hull_no, NULLIF(z.ship_type, '') AS ship_type, NULLIF(z.cnt_stus, '') AS status, true AS in_scope
+               FROM gp.zcot001 z
+              WHERE z.proj_noc IN (SELECT DISTINCT proj_no FROM gp.ypwg411m WHERE proj_no <> '')) q
+
+
+        # BTS 운반 이력 — 실시간 위치(NB202M)의 도착 시각마다 한 행. m_block.bts_lot · bts_at 은 Hot DB 트리거가 최신 행으로 맞춘다(V18). NB201M(운반 실적)에는 블록 ID 가 없고 NB103M 과도 안 이어진다
+        - name: hot.l_bts_move
+          source: legacy-oracle
+          to: hot
+          target: hot.l_bts_move
+          mode: full
+          mark-missing: true   # 원천에서 사라진 행 → src_deleted_at (V20)
+          interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+          from: >-
+            (SELECT REGEXP_SUBSTR("TPT_TRSP_OBJT_ID", '^[0-9]{4}') AS hull_no,
+                    REGEXP_SUBSTR("TPT_TRSP_OBJT_ID", '[0-9A-Z]{3}$') AS block_no,
+                    TO_TIMESTAMP("RGSR_DATE" || LPAD(NVL("RGSR_TIME", '0'), 6, '0'), 'YYYYMMDDHH24MISS') AS move_ts,
+                    "ACTL_LANDNO" AS to_lot, 'ARRIVE' AS move_type
+               FROM APNB."NB202M"
+              WHERE REGEXP_LIKE("TPT_TRSP_OBJT_ID", '^[0-9]{4}_[0-9A-Z]{3}$') AND REGEXP_LIKE("RGSR_DATE", '^(19|20)[0-9]{6}$')) q
+
+        # ── 하루 1회 전체 재동기화 (V20 F5) — 증분 작업 여섯(W/O · 도면 · 코드 · 일별 실적 · 310M · WO_CT)이 수정 시각 없이 바뀐 행 · 지워진 행을 놓치지 않게. 같은 SQL, scope 공유
+        - name: hot.l_work_unit.wo.resync
+          source: legacy
+          to: hot
+          target: hot.l_work_unit
+          mode: full
+          scope: hot.l_work_unit.wo      # 증분 작업과 한 범위
+          mark-missing: true
+          interval-ms: ${POLL_HOT_RESYNC_INTERVAL_MS:86400000}
+          from: >-
+            (SELECT w.work_ord_no AS unit_id, 'WO' AS level,
+                    CASE WHEN w.flag = 'C' THEN o.dwg_no
+                         WHEN w.flag = 'S' AND w.wstg_code <> '' THEN left(w.work_ord_no, 12) || '‖' || w.wstg_code
+                         WHEN w.flag = 'P' AND w.blk_zone_no <> '' THEN w.proj_no || '‖' || w.blk_zone_no || '‖P' END AS parent_id,
+                    left(w.work_ord_no, 12) AS act_no, NULLIF(w.proj_no, '') AS hull_no, NULLIF(w.blk_zone_no, '') AS block_no,
+                    NULLIF(w.flag, '') AS trade, NULLIF(w.mp, '') AS mp, NULLIF(w.wstg_code, '') AS wstg_code,
+                    NULLIF(w.assy_shop, '') AS location_id, w.std_mh AS plan_mh, w.accm_prgs_rate AS acc_rate,
+                    CASE WHEN w.wo_pln_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_pln_sd, 'YYYYMMDD') END AS plan_sd,
+                    CASE WHEN w.wo_pln_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_pln_fd, 'YYYYMMDD') END AS plan_fd,
+                    CASE WHEN w.wo_actl_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_actl_sd, 'YYYYMMDD') END AS actl_sd,
+                    CASE WHEN w.wo_actl_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_actl_fd, 'YYYYMMDD') END AS actl_fd,
+                    jsonb_build_object('assy_shop', w.assy_shop, 'jig_code', w.jig_code, 'subc', w.subc_work_indc,
+                                       'vendor', w.vndr_ogan_code, 'stus', w.stus_code, 'detl_clsf', w.detl_clsf_code)::text AS attrs,
+                    CASE WHEN w.mnt_date ~ '^(19|20)[0-9]{6}$' AND w.mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(w.mnt_date || w.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+                    CASE WHEN w.subc_work_indc = 'Y' THEN 'OUT' ELSE 'IN' END AS site,
+                    (w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR')) AS excluded,
+                    CASE WHEN w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR') THEN 'AUTO_DIST' END AS exclude_reason,
+                    'YPWG411M' AS source_table,
+                    CASE WHEN w.flag = 'C' THEN o.dwg_no END AS ref_no,
+                    CASE WHEN w.flag = 'C' THEN right(w.work_ord_no, 2) END AS step_code,
+                    (w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR')) AS auto_dist,
+                    w.mnt_date || w.mnt_time AS wm
+               FROM gp.ypwg411m w
+               LEFT JOIN (SELECT m.work_ord_no, min(o.mat_desc1) AS dwg_no
+                            FROM gp.ypwg214m m JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no
+                           WHERE o.detl_clsf_code = 'C00' AND o.flag = 'C' AND o.mat_desc1 <> ''
+                           GROUP BY m.work_ord_no) o ON o.work_ord_no = w.work_ord_no
+              WHERE w.work_ord_no <> '') q
+
+        # 가공 앵커 = 절단 도면 1행 (level DWG). 시수 = CT · CM W/O 표준시수 합, 없으면 도면 표준시수
+        - name: hot.l_wo_daily.resync
+          source: legacy
+          to: hot
+          target: hot.l_wo_daily
+          mode: full
+          scope: hot.l_wo_daily      # 증분 작업과 한 범위
+          mark-missing: true
+          interval-ms: ${POLL_HOT_RESYNC_INTERVAL_MS:86400000}
+          from: >-
+            (SELECT work_ord_no AS wo_no, to_date(actl_date, 'YYYYMMDD') AS actl_date, coalesce(work_ogan_code, '') AS org_code,
+                    dly_prgs_rate AS daily_rate, dly_prgs_mh AS daily_mh,
+                    CASE WHEN rgsr_date ~ '^(19|20)[0-9]{6}$' AND rgsr_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(rgsr_date || rgsr_time, 'YYYYMMDDHH24MISS') END AS rgsr_ts,
+                    rgsr_date || rgsr_time AS wm
+               FROM gp.ypwg413m WHERE work_ord_no <> '' AND actl_date ~ '^(19|20)[0-9]{6}$') q
+
+        # 조립품 1개 — 050M. 생산 송선 앵커는 같은 호선 · 블록 · 송선의 액티비티‖송선
+
+        - name: hot.l_event.310m.resync
+          source: legacy
+          to: hot
+          target: hot.l_event
+          mode: full
+          scope: hot.l_event.310m      # 증분 작업과 한 범위
+          mark-missing: true
+          interval-ms: ${POLL_HOT_RESYNC_INTERVAL_MS:86400000}
+          from: >-
+            (SELECT dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'MARK_DONE' AS event_code, '310M' AS source,
+                    to_timestamp(mark_mfg_fd || lpad(coalesce(NULLIF(mark_mfg_time, ''), '0'), 6, '0'), 'YYYYMMDDHH24MISS') AS event_ts,
+                    CASE WHEN pgm_id = 'SCHEDULER' THEN 'LOW' ELSE 'HIGH' END AS conf, pgm_id AS src_value,
+                    CASE WHEN mnt_date ~ '^(19|20)[0-9]{6}$' AND mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(mnt_date || mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+                    mnt_date || mnt_time AS wm
+               FROM gp.ypwc310m
+              WHERE length(dwg_no) = 14 AND mark_mfg_fd ~ '^(19|20)[0-9]{6}$' AND coalesce(mark_mfg_time, '') ~ '^[0-9]{0,6}$'
+             UNION ALL
+             SELECT dwg_no, 'CHECKPOINT', 'CUT_DONE', '310M',
+                    to_timestamp(cut_mfg_fd || lpad(coalesce(NULLIF(cut_mfg_time, ''), '0'), 6, '0'), 'YYYYMMDDHH24MISS'),
+                    CASE WHEN pgm_id = 'SCHEDULER' THEN 'LOW' ELSE 'HIGH' END, pgm_id,
+                    CASE WHEN mnt_date ~ '^(19|20)[0-9]{6}$' AND mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(mnt_date || mnt_time, 'YYYYMMDDHH24MISS') END,
+                    mnt_date || mnt_time
+               FROM gp.ypwc310m
+              WHERE length(dwg_no) = 14 AND prcs_stus_code = '2' AND cut_mfg_fd ~ '^(19|20)[0-9]{6}$'
+                AND coalesce(cut_mfg_time, '') ~ '^[0-9]{0,6}$') q
+
+        # 절점 7 사내 — W/O CT 완료일 (사외 310M 과 합치지 않는다 · source 로 가른다)
+
+        - name: hot.l_event.wo_ct.resync
+          source: legacy
+          to: hot
+          target: hot.l_event
+          mode: full
+          scope: hot.l_event.wo_ct      # 증분 작업과 한 범위
+          mark-missing: true
+          interval-ms: ${POLL_HOT_RESYNC_INTERVAL_MS:86400000}
+          from: >-
+            (SELECT o.dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'CUT_DONE' AS event_code, 'WO_CT' AS source,
+                    to_date(w.wo_actl_fd, 'YYYYMMDD')::timestamptz AS event_ts, 'HIGH' AS conf, w.work_ord_no AS src_value,
+                    CASE WHEN w.mnt_date ~ '^(19|20)[0-9]{6}$' AND w.mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(w.mnt_date || w.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+                    w.mnt_date || w.mnt_time AS wm
+               FROM gp.ypwg411m w
+               JOIN (SELECT m.work_ord_no, min(o.mat_desc1) AS dwg_no
+                       FROM gp.ypwg214m m JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no
+                      WHERE o.detl_clsf_code = 'C00' AND o.flag = 'C' AND o.mat_desc1 <> ''
+                      GROUP BY m.work_ord_no) o ON o.work_ord_no = w.work_ord_no
+              WHERE w.flag = 'C' AND right(w.work_ord_no, 2) = 'CT' AND w.wo_actl_fd ~ '^(19|20)[0-9]{6}$') q
+
+        # 절점 4 · 5 — 140M 컨베이어 (1행 = 강판 1장). 불출 = 도면 강판 중 첫 투입, 전처리 = 도면의 강판 전부 Y 일 때 마지막 마킹.
+        # 사본의 140M 은 dwg_no 가 비어 있어 선별 지시(pick_ser_id → 111M)로 도면을 찾는다. 시각은 HHMM · HHMMSS 가 섞여 오른쪽을 0 으로 채운다
+
+        - name: hot.l_work_unit.dwg.resync
+          source: legacy
+          to: hot
+          target: hot.l_work_unit
+          mode: full
+          scope: hot.l_work_unit.dwg      # 증분 작업과 한 범위
+          mark-missing: true
+          interval-ms: ${POLL_HOT_RESYNC_INTERVAL_MS:86400000}
+          from: >-
+            (SELECT d.dwg_no AS unit_id, 'DWG' AS level, substr(d.dwg_no, 1, 4) AS hull_no, substr(d.dwg_no, 7, 3) AS block_no,
+                    'C' AS trade,
+                    CASE WHEN d.cut_pln_date ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_pln_date, 'YYYYMMDD') END AS plan_sd,
+                    CASE WHEN d.cut_cmp_pln_date ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_cmp_pln_date, 'YYYYMMDD') END AS plan_fd,
+                    CASE WHEN d.mark_mfg_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(d.mark_mfg_fd, 'YYYYMMDD') END AS actl_sd,
+                    CASE WHEN d.prcs_stus_code = '2' AND d.cut_mfg_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_mfg_fd, 'YYYYMMDD') END AS actl_fd,
+                    coalesce(wo.mh, d.cut_std_mh + d.mark_std_mh) AS plan_mh,
+                    jsonb_build_object('cut_bay', d.cut_bay_no, 'cnf_cut_bay', d.cnf_cut_bay_no, 'cut_status', d.prcs_stus_code,
+                                       'mark_status', d.mark_stus_code, 'dwg_series', substr(d.dwg_no, 11, 2), 'dwg_stus', d.dwg_stus_code,
+                                       'cut_std_mh', d.cut_std_mh, 'mark_std_mh', d.mark_std_mh, 'pgm_id', d.pgm_id,
+                                       'wo_cnt', wo.cnt)::text AS attrs,
+                    CASE WHEN d.mnt_date ~ '^(19|20)[0-9]{6}$' AND d.mnt_time ~ '^[0-9]{6}$'
+                         THEN to_timestamp(d.mnt_date || d.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+                    CASE WHEN d.cut_bay_no = '9' THEN 'OUT' ELSE 'IN' END AS site,
+                    (d.dwg_stus_code = 'D' OR substr(d.dwg_no, 5, 4) = 'SSYW' OR substr(d.dwg_no, 11, 1) IN ('T', 'X', 'K', 'Y')) AS excluded,
+                    CASE WHEN d.dwg_stus_code = 'D' THEN 'DWG_D' WHEN substr(d.dwg_no, 5, 4) = 'SSYW' THEN 'SSYW'
+                         WHEN substr(d.dwg_no, 11, 1) IN ('T', 'X', 'K', 'Y') THEN 'TBAR' END AS exclude_reason,
+                    'YPWC310M' AS source_table, 'DWG' AS anchor_type,
+                    coalesce(wo.mh, d.cut_std_mh + d.mark_std_mh) AS target_qty,
+                    CASE WHEN wo.mh IS NOT NULL THEN 'DWG_WO_MH' ELSE 'DWG_STD_MH' END AS target_basis,
+                    d.mnt_date || d.mnt_time AS wm
+               FROM gp.ypwc310m d
+               LEFT JOIN (SELECT o.mat_desc1 AS dwg_no, sum(w.std_mh) AS mh, count(*) AS cnt
+                            FROM gp.ypwg411m w
+                            JOIN gp.ypwg214m m ON m.work_ord_no = w.work_ord_no
+                            JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no AND o.detl_clsf_code = 'C00' AND o.flag = 'C'
+                           WHERE w.flag = 'C' AND right(w.work_ord_no, 2) IN ('CT', 'CM')
+                           GROUP BY o.mat_desc1) wo ON wo.dwg_no = d.dwg_no
+              WHERE length(d.dwg_no) = 14) q
+
+        # 조립 앵커 = 송선 1행 (level ACTIVITY, unit_id = 액티비티‖송선). 목표 = 조립품 소요 수량(YDEH050M)
+
+        - name: hot.m_code.resync
+          source: legacy
+          to: hot
+          target: hot.m_code
+          mode: full
+          scope: hot.m_code      # 증분 작업과 한 범위
+          interval-ms: ${POLL_HOT_RESYNC_INTERVAL_MS:86400000}
+          from: >-
+            (SELECT std_grp_code AS code_group, std_detl_code AS code, std_detl_code_nm AS name,
+                    (use_indc = 'Y') AS in_scope,
+                    CASE WHEN sort_seq_no ~ '^[0-9]+$' THEN sort_seq_no::int END AS seq,
+                    NULLIF(up_std_detl_cd, '') AS parent_code,
+                    mnt_date || mnt_time AS wm
+               FROM gp.ypgs010m WHERE lang_key = 'KO' AND std_grp_code <> '' AND std_detl_code <> '') q
+
+        # 공정(MP) 코드

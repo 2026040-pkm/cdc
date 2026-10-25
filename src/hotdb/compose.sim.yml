@@ -19,5 +19,11 @@ services:
       # 도장 · 가공은 필드 정의서가 없어 기본 0. up.ps1 -AllZones 면 30대씩 (LiDAR 페이로드를 그대로 쓰는 가정값)
       SIM_PAINTING: ${SIM_PAINTING:-0}
       SIM_MACHINING: ${SIM_MACHINING:-0}
+      SIM_ASSEMBLY: ${SIM_ASSEMBLY:-210}
+      SIM_OUTFITTING: ${SIM_OUTFITTING:-140}
+      SIM_STATUS_INTERVAL_MS: ${SIM_STATUS_INTERVAL_MS:-1000}
+      # 실제 호선-블록 (레거시 앵커와 맞춤) — 비우면 가짜 번호만. 예: 2607-824,6065-518
+      SIM_BLOCKS: ${SIM_BLOCKS:-}
+      SIM_FAKE_RATE: ${SIM_FAKE_RATE:-0.2}
       JAVA_TOOL_OPTIONS: -Xms64m -Xmx192m
     ports: ["${SIM_PORT:-59480}:8080"]

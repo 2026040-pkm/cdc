@@ -1,4 +1,8 @@
-# 가공 권역 — tsdb.device.zone 값이 MACHINING 인 장비만 받는다
+# 가공 권역 — tsdb.device.zone 값이 MACHINING 인 장비만 받는다.
+# 가공은 센서가 아니라 레거시 절점으로 실적을 판별한다 (hot.l_event · l_cut_part → p_progress) — 절점 판별을 켠다
 hotdb:
   zone:
     code: MACHINING
+  judge:
+    checkpoint:
+      enabled: ${JUDGE_CHECKPOINT_ENABLED:true}

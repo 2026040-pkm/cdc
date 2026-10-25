@@ -112,17 +112,20 @@ def sap_setup(n):
         total += len(data)
         vals = ",\n".join("(" + ", ".join(lit(v) for v in r) + ")" for r in data)
         out.append(f"INSERT INTO {SAP_SCHEMA}.{table} ({names}) VALUES\n{vals};")
-    # RFC Service 가 쓰는 SAP 쪽 "RDB field data" 표. PK = 실적 키 + 판정 상태 (SAP 쪽 멱등 키)
+    # RFC Service 가 쓰는 SAP 쪽 "RDB field data" 표 — hot.p_progress 한 행(앵커 × 기준일 × 상태)이 한 번씩 (V17).
+    # PK = anchor_id · as_of · state (SAP 쪽 멱등 키)
     out.append(f"""
 DROP TABLE IF EXISTS {SAP_SCHEMA}.zhotdb_actual_result;
-CREATE TABLE {SAP_SCHEMA}.zhotdb_actual_result (
-  zone text NOT NULL, hull_no text NOT NULL, block_id text NOT NULL, scan_id varchar(36) NOT NULL,
-  judged_status text NOT NULL, device_id text, completed_at timestamp, block_progress_rate double precision,
-  match_confidence double precision, sent_at timestamp NOT NULL,
-  PRIMARY KEY (zone, hull_no, block_id, scan_id, judged_status));""")
+DROP TABLE IF EXISTS {SAP_SCHEMA}.zhotdb_progress;
+CREATE TABLE {SAP_SCHEMA}.zhotdb_progress (
+  anchor_id text NOT NULL, as_of date NOT NULL, state text NOT NULL, anchor_type text, hull_no text, block_no text,
+  auto_pct double precision, legacy_pct double precision, gap_pct double precision, last_cp text,
+  planned_qty double precision, done_qty double precision, site text, judged_at timestamp, payload_hash text NOT NULL,
+  sent_at timestamp NOT NULL,
+  PRIMARY KEY (anchor_id, as_of, payload_hash));""")
     run("hotdb-sap-sim", PSQL, "\n".join(out))
     print(f"sap-sim: {SAP_SCHEMA} 표 {len(SAP_TABLES)}개 · {total:,}행 (통합 테스트 표 {len(SAP_POLLED)}개는 {n}행, "
-          f"나머지 {OTHER_ROWS}행) · {SAP_SCHEMA}.zhotdb_actual_result")
+          f"나머지 {OTHER_ROWS}행) · {SAP_SCHEMA}.zhotdb_progress")
 
 
 ORA_TYPE = {"text": "VARCHAR2(400)", "numeric": "NUMBER", "date": "DATE"}

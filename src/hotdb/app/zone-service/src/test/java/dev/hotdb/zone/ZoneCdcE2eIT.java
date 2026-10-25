@@ -16,7 +16,8 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
- * tsdb INSERT → (Debezium) → 판별 모듈 → svc (module 컬럼) 까지 실제로 흐르는지.
+ * tsdb INSERT → (Debezium) → 판별 모듈 → hot.m_device · m_device_state · ts.device_signal · s_scan_* · ts.sensor_event 까지
+ * 실제로 흐르는지 (V17 통합안 · 정규화).
  *
  * <p>기동 중인 스택(HotDB + zone-asm + zone-oft)이 필요하다. 발행기와 섞이지 않게 IT- 로 시작하는
  * 장비를 새로 등록해서 쓴다. 실행마다 장비 id 가 달라 몇 번을 돌려도 된다.
@@ -51,38 +52,39 @@ class ZoneCdcE2eIT {
 
     @Test
     @Order(1)
-    void status_가_자기_권역_최신값_표에만_들어간다() throws SQLException {
+    void 장비_마스터와_현재_상태가_자기_권역_모듈로_들어간다() throws SQLException {
         status(asmStatus, T0, "ONLINE", null);
         status(oftStatus, T0, "ONLINE", null);
 
         try (Db db = Db.as("postgres")) {
-            await().atMost(WAIT).until(() -> "ONLINE".equals(
-                    db.one("SELECT status FROM svc.device_status_current WHERE module = 'asm' AND device_id = ?", ASM)));
-            await().atMost(WAIT).until(() -> db.count(
-                    "SELECT count(*) FROM svc.device_status_current WHERE module = 'oft' AND device_id = ?", OFT) == 1);
+            await().atMost(WAIT).until(() -> Boolean.TRUE.equals(
+                    db.one("SELECT online FROM hot.m_device_state WHERE device_id = ?", ASM)));
+            await().atMost(WAIT).until(() -> db.count("SELECT count(*) FROM hot.m_device_state WHERE device_id = ?", OFT) == 1);
 
-            assertThat(db.count("SELECT count(*) FROM svc.device_status_current WHERE module = 'oft' AND device_id = ?", ASM)).isZero();
-            assertThat(db.count("SELECT count(*) FROM svc.device_status_current WHERE module = 'asm' AND device_id = ?", OFT)).isZero();
+            assertThat(db.one("SELECT zone FROM hot.m_device WHERE device_id = ?", ASM)).isEqualTo("ASSEMBLY");
+            assertThat(db.one("SELECT zone FROM hot.m_device WHERE device_id = ?", OFT)).isEqualTo("OUTFITTING");
+            assertThat(db.one("SELECT class_code FROM hot.m_device WHERE device_id = ?", ASM)).isEqualTo("LIDAR");
 
             double lag = ((Number) db.one("""
-                    SELECT extract(epoch FROM applied_at - src_received_at)
-                      FROM svc.device_status_current WHERE module = 'asm' AND device_id = ?""", ASM)).doubleValue();
+                    SELECT extract(epoch FROM updated_at - src_received_at) FROM hot.m_device_state WHERE device_id = ?""", ASM))
+                    .doubleValue();
             assertThat(lag).as("수신 → 반영 지연(초)").isLessThan(5);
         }
     }
 
     @Test
     @Order(2)
-    void 상태가_바뀐_순간만_전이_이력에_남는다() throws SQLException {
+    void 신호는_사전_코드별로_시계열에_쌓인다() throws SQLException {
         status(asmStatus, T0.plusSeconds(1), "ERROR", "E101");
-        status(asmStatus, T0.plusSeconds(2), "ERROR", "E101");   // 같은 상태 — 이력 안 늘어남
-        status(asmStatus, T0.plusSeconds(3), "ONLINE", null);
+        status(asmStatus, T0.plusSeconds(2), "ONLINE", null);
 
         try (Db db = Db.as("postgres")) {
             await().atMost(WAIT).until(() -> db.count(
-                    "SELECT count(*) FROM svc.device_status_change WHERE module = 'asm' AND device_id = ?", ASM) == 3);
-            assertThat(db.rows("SELECT status FROM svc.device_status_change WHERE module = 'asm' AND device_id = ? ORDER BY changed_at", ASM))
-                    .extracting(r -> r.get("status")).containsExactly("ONLINE", "ERROR", "ONLINE");
+                    "SELECT count(*) FROM ts.device_signal WHERE device_id = ? AND signal_code = 'status'", ASM) >= 3);
+            assertThat(db.rows("SELECT value_text FROM ts.device_signal WHERE device_id = ? AND signal_code = 'status' ORDER BY time", ASM))
+                    .extracting(r -> r.get("value_text")).containsExactly("ONLINE", "ERROR", "ONLINE");
+            assertThat(db.one("SELECT fault FROM hot.m_device_state WHERE device_id = ?", ASM)).isEqualTo(false);
+            assertThat(db.count("SELECT count(*) FROM hot.m_signal_code WHERE signal_code = 'status'")).isEqualTo(1);
         }
     }
 
@@ -93,14 +95,15 @@ class ZoneCdcE2eIT {
         status(asmStatus, T0.plusSeconds(4), "CALIBRATING", null);   // 이게 반영되면 앞의 것도 처리된 것
 
         try (Db db = Db.as("postgres")) {
-            await().atMost(WAIT).until(() -> "CALIBRATING".equals(
-                    db.one("SELECT status FROM svc.device_status_current WHERE module = 'asm' AND device_id = ?", ASM)));
+            await().atMost(WAIT).until(() -> T0.plusSeconds(4).toInstant().equals(
+                    ((java.sql.Timestamp) db.one("SELECT last_seen FROM hot.m_device_state WHERE device_id = ?", ASM)).toInstant()));
+            assertThat(db.one("SELECT online FROM hot.m_device_state WHERE device_id = ?", ASM)).isEqualTo(true);
         }
     }
 
     @Test
     @Order(4)
-    void 스캔_START_부터_COMPLETE_까지_스캔과_실적이_만들어진다() throws SQLException {
+    void 스캔_START_부터_COMPLETE_까지_회차_원문_인식_객체가_만들어진다() throws SQLException {
         UUID scan = UUID.randomUUID();
         actual(scan, T0, "START", 0);
         actual(scan, T0.plusSeconds(60), "PROGRESS", 55);
@@ -108,18 +111,25 @@ class ZoneCdcE2eIT {
 
         try (Db db = Db.as("postgres")) {
             await().atMost(WAIT).until(() -> db.count(
-                    "SELECT count(*) FROM svc.actual_result WHERE module = 'asm' AND scan_id = ?", scan) == 1);
-            var s = db.rows("SELECT * FROM svc.scan WHERE module = 'asm' AND scan_id = ?", scan).get(0);
-            assertThat(s.get("last_event_type")).isEqualTo("COMPLETE");
-            assertThat(s.get("completed_at")).isNotNull();
-            assertThat(((java.sql.Timestamp) s.get("first_event_at")).toInstant()).isEqualTo(T0.toInstant());
-            assertThat(db.count("SELECT count(*) FROM svc.scan WHERE module = 'oft' AND scan_id = ?", scan)).isZero();
+                    "SELECT count(*) FROM hot.s_scan_detection WHERE scan_id = ?", scan.toString()) == 1);
+            var s = db.rows("SELECT * FROM hot.s_scan_session WHERE scan_id = ?", scan.toString()).get(0);
+            assertThat(s.get("status")).isEqualTo("CLOSED");
+            assertThat(s.get("zone")).isEqualTo("ASSEMBLY");
+            assertThat(s.get("first_msg_ts")).isNotNull();
+            assertThat(db.count("SELECT count(*) FROM hot.s_scan_device WHERE scan_id = ? AND device_id = ?", scan.toString(), ASM))
+                    .isEqualTo(1);
+            assertThat(db.count("SELECT count(*) FROM ts.sensor_event WHERE scan_id = ?", scan.toString()))
+                    .as("원문 1:1 — START · PROGRESS · COMPLETE").isEqualTo(3);
+            var d = db.rows("SELECT * FROM hot.s_scan_detection WHERE scan_id = ?", scan.toString()).get(0);
+            assertThat(d.get("object_key")).isEqualTo("B1");
+            assertThat(d.get("object_type")).isEqualTo("BLOCK");
+            assertThat(((Number) d.get("progress_est")).doubleValue()).isEqualTo(100.0);
         }
     }
 
     @Test
     @Order(5)
-    void 산출물_변환행렬_배열이_그대로_옮겨진다() throws SQLException {
+    void 산출물은_회차의_경로로만_남는다() throws SQLException {
         UUID scan = UUID.randomUUID();
         try (Db p = Db.as("hotdb_provider")) {
             p.update("""
@@ -135,12 +145,9 @@ class ZoneCdcE2eIT {
                     """, T0, asmSegment, scan);
         }
         try (Db db = Db.as("postgres")) {
-            await().atMost(WAIT).until(() -> db.count("SELECT count(*) FROM svc.artifact WHERE module = 'asm' AND scan_id = ?", scan) == 2);
-            assertThat(db.one("""
-                    SELECT transformation_matrix[4] FROM svc.artifact
-                     WHERE module = 'asm' AND scan_id = ? AND artifact_type = 'TRANSFORMATION_MATRIX'""", scan)).isEqualTo(10.5f);
-            assertThat(db.one("SELECT device_id FROM svc.artifact WHERE module = 'asm' AND scan_id = ? AND segment_key = 'SEG-01'", scan))
-                    .isEqualTo(ASM);
+            await().atMost(WAIT).until(() -> "file://it/seg01.pcd".equals(
+                    db.one("SELECT artifact_dir FROM hot.s_scan_session WHERE scan_id = ?", scan.toString())));
+            assertThat(db.one("SELECT status FROM hot.s_scan_session WHERE scan_id = ?", scan.toString())).isEqualTo("OPEN");
         }
     }
 
@@ -151,8 +158,8 @@ class ZoneCdcE2eIT {
         OffsetDateTime future = T0.plusDays(40);
         status(asmStatus, future, "OFFLINE", null);
         try (Db db = Db.as("postgres")) {
-            await().atMost(WAIT).until(() -> "OFFLINE".equals(
-                    db.one("SELECT status FROM svc.device_status_current WHERE module = 'asm' AND device_id = ?", ASM)));
+            await().atMost(WAIT).until(() -> Boolean.FALSE.equals(
+                    db.one("SELECT online FROM hot.m_device_state WHERE device_id = ?", ASM)));
             assertThat(db.count("SELECT count(*) FROM ops.cdc_dead_letter WHERE payload::text LIKE ?", "%" + RUN + "%"))
                     .isZero();
         }
@@ -160,7 +167,7 @@ class ZoneCdcE2eIT {
 
     @Test
     @Order(7)
-    void 산출물이_스캔보다_먼저_와도_부모_자리를_만들고_START_가_제자리를_채운다() throws SQLException {
+    void 산출물이_스캔보다_먼저_와도_회차_자리를_만들고_START_가_제자리를_채운다() throws SQLException {
         UUID scan = UUID.randomUUID();
         try (Db p = Db.as("hotdb_provider")) {
             p.update("""
@@ -170,31 +177,32 @@ class ZoneCdcE2eIT {
                     """, T0.plusSeconds(10), asmRegistered, scan);
         }
         try (Db db = Db.as("postgres")) {
-            await().atMost(WAIT).until(() -> db.count("SELECT count(*) FROM svc.artifact WHERE module = 'asm' AND scan_id = ?", scan) == 1);
-            assertThat(db.one("SELECT last_event_type FROM svc.scan WHERE module = 'asm' AND scan_id = ?", scan)).isEqualTo("PENDING");
+            await().atMost(WAIT).until(() -> "file://it/reg.pcd".equals(
+                    db.one("SELECT raw_dir FROM hot.s_scan_session WHERE scan_id = ?", scan.toString())));
+            assertThat(db.one("SELECT status FROM hot.s_scan_session WHERE scan_id = ?", scan.toString())).isEqualTo("OPEN");
         }
         actual(scan, T0, "START", 0);   // 산출물보다 이른 시각의 START 가 뒤늦게 온다
         try (Db db = Db.as("postgres")) {
-            await().atMost(WAIT).until(() -> "START".equals(
-                    db.one("SELECT last_event_type FROM svc.scan WHERE module = 'asm' AND scan_id = ?", scan)));
-            assertThat(((java.sql.Timestamp) db.one("SELECT first_event_at FROM svc.scan WHERE module = 'asm' AND scan_id = ?", scan))
-                    .toInstant()).as("first_event_at = min(산출물, START)").isEqualTo(T0.toInstant());
+            await().atMost(WAIT).until(() -> db.count("""
+                    SELECT count(*) FROM hot.s_scan_session WHERE scan_id = ? AND last_msg_ts > TIMESTAMPTZ '-infinity'""",
+                    scan.toString()) == 1);
+            assertThat(db.one("SELECT raw_dir FROM hot.s_scan_session WHERE scan_id = ?", scan.toString()))
+                    .as("START 가 와도 산출물 경로는 남는다").isEqualTo("file://it/reg.pcd");
         }
     }
 
     @Test
     @Order(8)
-    void 모듈_RDB_는_관계로_묶여_있어_부모_없는_자식은_들어가지_않는다() throws SQLException {
+    void 관계로_묶여_있어_부모_없는_자식은_들어가지_않는다() throws SQLException {
         try (Db svc = Db.as("svc_asm")) {
             assertThatThrownBy(() -> svc.update("""
-                    INSERT INTO svc.actual_result (module, hull_no, block_id, scan_id, device_id, completed_at,
-                      src_received_at, applied_at)
-                    VALUES ('asm', 'H9', 'B9', ?, ?, now(), now(), now())""", UUID.randomUUID(), ASM))
+                    INSERT INTO hot.s_scan_device (scan_id, device_id, role) VALUES ('no-such-scan', 'NO-SUCH-DEVICE', 'PRIMARY')"""))
                     .hasMessageContaining("foreign key");
             assertThatThrownBy(() -> svc.update("""
-                    INSERT INTO svc.device_status_current (module, site, device_id, status, src_event_time, src_received_at, applied_at)
-                    VALUES ('asm', 'it', 'NO-SUCH-DEVICE', 'ONLINE', now(), now(), now())"""))
-                    .as("장비 마스터(tsdb.device)에 없는 장비").hasMessageContaining("foreign key");
+                    INSERT INTO hot.m_device_state (device_id, updated_at) VALUES ('NO-SUCH-DEVICE', now())"""))
+                    .as("장비 개체(m_device)에 없는 장비").hasMessageContaining("foreign key");
+            assertThatThrownBy(() -> svc.update("DELETE FROM hot.l_work_unit WHERE false"))
+                    .as("판별 모듈은 레거시 참조 표를 쓰지 못한다").hasMessageContaining("permission denied");
         }
     }
 
@@ -221,12 +229,17 @@ class ZoneCdcE2eIT {
     }
 
     static void actual(UUID scan, OffsetDateTime at, String type, double progress) throws SQLException {
+        actual(asmActual, scan, at, type, "H1", "B1", progress, 0.95);
+    }
+
+    static void actual(long tag, UUID scan, OffsetDateTime at, String type, String hull, String block, double progress,
+                       double confidence) throws SQLException {
         try (Db p = Db.as("hotdb_provider")) {
             p.update("""
                     INSERT INTO tsdb.actual_history (event_time, tag_key, scan_id, event_type, hull_no, block_id,
-                      block_progress_rate, source_time_text, received_at)
-                    VALUES (?, ?, ?, ?, 'H1', 'B1', ?, 'it', clock_timestamp())
-                    """, at, asmActual, scan, type, (float) progress);
+                      block_progress_rate, match_confidence, source_time_text, received_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'it', clock_timestamp())
+                    """, at, tag, scan, type, hull, block, (float) progress, (float) confidence);
         }
     }
 }

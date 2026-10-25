@@ -50,7 +50,7 @@ if [ $build = 1 ]; then
   fi
   [ -n "$JAVA_HOME" ] || { echo "JDK 21 이 없습니다"; exit 1; }
   export JAVA_HOME
-  gradle=app/gradlew
+  gradle=./gradlew   # (cd app 안에서 부른다)
   if [ ! -f app/gradle/wrapper/gradle-wrapper.jar ]; then   # *.jar 가 .gitignore 라 래퍼 jar 가 없다 — 받아 둔 배포판으로
     gradle=$(ls -d ~/.gradle/wrapper/dists/gradle-8.14-bin/*/gradle-8.14/bin/gradle 2>/dev/null | head -1 || true)
     [ -n "$gradle" ] || gradle=$(command -v gradle || true)

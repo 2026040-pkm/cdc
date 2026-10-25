@@ -16,6 +16,7 @@ import java.util.Objects;
  *   'ASSEMBLY' · 123 · null   상수
  *   $now                  DB 의 clock_timestamp() — 반영 시각
  *   식 if 조건            조건이 거짓이면 null
+ *   식 if 조건 else 식    조건이 거짓이면 뒤의 식 (예: 'true' if row.status=ONLINE else 'false')
  * </pre>
  */
 public sealed interface Expr {
@@ -76,10 +77,14 @@ public sealed interface Expr {
         }
     }
 
-    record Conditional(Expr value, Condition condition) implements Expr {
+    /** {@code 식 if 조건 [else 식]} — else 가 없으면 조건이 거짓일 때 null. */
+    record Conditional(Expr value, Condition condition, Expr otherwise) implements Expr {
         @Override
         public Object eval(EvalContext ctx) {
-            return condition.test(ctx) ? value.eval(ctx) : null;
+            if (condition.test(ctx)) {
+                return value.eval(ctx);
+            }
+            return otherwise == null ? null : otherwise.eval(ctx);
         }
     }
 

@@ -17,7 +17,7 @@ public record RfcProperties(@DefaultValue("5") int maxRetries, @DefaultValue("50
                             @DefaultValue("dry-run") String sender, Sap sap) {
 
     /**
-     * @param table SAP 쪽 실적 표 (스키마.표). PK = zone, hull_no, block_id, scan_id, judged_status
+     * @param table SAP 쪽 실적 표 (스키마.표). PK = anchor_id, as_of, state
      */
-    public record Sap(String url, String user, String password, @DefaultValue("zhotdb_actual_result") String table) {}
+    public record Sap(String url, String user, String password, @DefaultValue("zhotdb_progress") String table) {}
 }

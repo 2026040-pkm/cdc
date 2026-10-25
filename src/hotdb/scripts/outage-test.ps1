@@ -13,7 +13,7 @@ $ErrorActionPreference = "Continue"
 
 function Sql([string]$q) { podman exec hotdb-pg psql -U postgres -d hotdb -Atc $q 2>&1 | ForEach-Object { "$_" } }
 $slotQ = "SELECT pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn)) FROM pg_replication_slots WHERE slot_name = 'zone_$Zone'"
-$staleQ = "SELECT count(*) FROM svc.device_status_current WHERE module = '$Zone' AND device_id LIKE 'LDR-%' AND src_event_time < now() - interval '10 seconds'"
+$staleQ = "SELECT count(*) FROM hot.m_device_state s JOIN hot.m_device d ON d.device_id = s.device_id JOIN ops.module m ON m.zone_code = d.zone WHERE m.module = '$Zone' AND s.device_id LIKE 'LDR-%' AND s.last_seen < now() - interval '10 seconds'"
 
 Write-Host "[$(Get-Date -f T)] hotdb-zone-$Zone 멈춤 ($Seconds 초)"
 podman stop "hotdb-zone-$Zone" | Out-Null

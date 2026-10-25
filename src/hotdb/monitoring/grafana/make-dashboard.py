@@ -100,7 +100,7 @@ ROWS = [
         ("송신 · 중복 건/초 (권역별)", "timeseries", "short",
          [("sum by (zone) (rate(hotdb_rfc_sent_total[1m]))", "{{zone}} 송신"),
           ("sum by (zone) (rate(hotdb_rfc_duplicate_total[1m]))", "{{zone}} 중복(이미 보냄)")],
-         "중복 = 권역 서비스의 재전송 UPSERT 가 낸 UPDATE. ops.rfc_sent 가 걸러 SAP 로는 한 번만 간다"),
+         "중복 = 같은 앵커 · 기준일 · 상태의 재갱신 UPDATE. ops.rfc_progress_sent 가 걸러 SAP 로는 한 번만 간다"),
         ("지연 (DB 시계)", "timeseries", "s",
          [("hotdb_rfc_lag_hop2_p99_seconds", "{{zone}} 2단 p99"), ("hotdb_rfc_lag_e2e_p99_seconds", "{{zone}} 전 구간 p99"),
           ("hotdb_rfc_lag_e2e_max_seconds", "{{zone}} 전 구간 max")], ""),

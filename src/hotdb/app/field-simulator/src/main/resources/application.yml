@@ -36,3 +36,6 @@ hotdb:
     anomaly-rate: ${SIM_ANOMALY_RATE:0.002}
     artifacts: true
     auto-start: ${SIM_AUTO_START:true}
+    # 실제 호선-블록 (레거시 앵커와 맞춤). 예: 2607-824,6065-518 — 비우면 가짜 번호만
+    blocks: ${SIM_BLOCKS:}
+    fake-rate: ${SIM_FAKE_RATE:0.2}

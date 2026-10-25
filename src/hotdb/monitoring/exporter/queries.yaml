@@ -68,8 +68,8 @@ hotdb_hypertable:
     - compressed_chunks: { usage: GAUGE, description: 압축된 청크 수 }
     - inserted_rows: { usage: COUNTER, description: "적재 행 수 — 청크가 지워지면 줄어든다(보존 정책)" }
 
-# 원천 수신(received_at) → 권역 RDB 반영(applied_at). 둘 다 DB 시계라 서버 간 시계 편차가 없다.
-# 최근 1분 사이 갱신된 최신값 행으로 잰다. 권역이 늘면 여기 UNION 한 줄을 더한다.
+# 원천 수신(src_received_at) → 장비 현재 상태 반영(hot.m_device_state.updated_at). 둘 다 DB 시계라 서버 간 시계 편차가 없다.
+# 최근 1분 사이 갱신된 행으로 잰다 (V17 ops.module_apply_lag).
 hotdb_zone_apply_lag:
   # 판별 모듈 수와 상관없이 함수 하나 (ops.module 등록부를 돈다 — V7). 레이블 이름은 zone 그대로
   query: SELECT zone, rows_1m, p50_seconds, p99_seconds, max_seconds FROM ops.module_apply_lag()
@@ -80,32 +80,33 @@ hotdb_zone_apply_lag:
     - p99_seconds: { usage: GAUGE, description: 반영 지연 p99 }
     - max_seconds: { usage: GAUGE, description: 반영 지연 최대 }
 
-# 2단 CDC: 권역 RDB 반영(applied_at) → SAP 송신(sent_at), 그리고 Provider 수신부터 전 구간. 전부 DB 시계.
+# 2단 CDC: 판별(judged_at) → SAP 송신(sent_at). 전부 DB 시계. zone = 앵커 유형(DWG · WSTG · GDO · PAINT_ORDER)
 hotdb_rfc_lag:
   query: |
-    SELECT zone,
+    SELECT coalesce(p.anchor_type, 'unknown') AS zone,
            count(*) AS sent_1m,
-           coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY extract(epoch FROM sent_at - src_applied_at)), 0) AS hop2_p99_seconds,
-           coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY extract(epoch FROM sent_at - src_received_at)), 0) AS e2e_p99_seconds,
-           coalesce(max(extract(epoch FROM sent_at - src_received_at)), 0) AS e2e_max_seconds
-      FROM ops.rfc_sent
-     WHERE sent_at > now() - interval '1 minute'
-     GROUP BY zone
+           coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY extract(epoch FROM s.sent_at - s.src_judged_at)), 0) AS hop2_p99_seconds,
+           coalesce(percentile_cont(0.99) WITHIN GROUP (ORDER BY extract(epoch FROM s.sent_at - p.first_detect_ts)), 0) AS e2e_p99_seconds,
+           coalesce(max(extract(epoch FROM s.sent_at - p.first_detect_ts)), 0) AS e2e_max_seconds
+      FROM ops.rfc_progress_sent s
+      LEFT JOIN hot.p_progress p ON p.anchor_id = s.anchor_id AND p.as_of = s.as_of
+     WHERE s.sent_at > now() - interval '1 minute'
+     GROUP BY 1
   metrics:
-    - zone: { usage: LABEL, description: 권역 }
+    - zone: { usage: LABEL, description: 앵커 유형 }
     - sent_1m: { usage: GAUGE, description: 최근 1분 송신 건수 }
-    - hop2_p99_seconds: { usage: GAUGE, description: "권역 RDB 반영 → SAP 송신 p99" }
-    - e2e_p99_seconds: { usage: GAUGE, description: "Provider 수신 → SAP 송신 p99 (CDC 두 번)" }
-    - e2e_max_seconds: { usage: GAUGE, description: "Provider 수신 → SAP 송신 최대" }
+    - hop2_p99_seconds: { usage: GAUGE, description: "판별 → SAP 송신 p99" }
+    - e2e_p99_seconds: { usage: GAUGE, description: "첫 인식 → SAP 송신 p99 (센서 판별 앵커만)" }
+    - e2e_max_seconds: { usage: GAUGE, description: "첫 인식 → SAP 송신 최대" }
 
-# 권역 RDB 행 수
+# Hot DB 표 행 수 (hot · ts)
 hotdb_zone_rows:
   query: |
     SELECT n.nspname AS schema, c.relname AS table_name, c.reltuples::bigint AS estimate
       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname = 'svc' AND c.relkind = 'r'
+     WHERE n.nspname IN ('hot', 'ts') AND c.relkind = 'r'
   metrics:
-    - schema: { usage: LABEL, description: 권역 스키마 }
+    - schema: { usage: LABEL, description: 스키마 (hot · ts) }
     - table_name: { usage: LABEL, description: 표 }
     - estimate: { usage: GAUGE, description: "행 수 추정 (reltuples — ANALYZE 주기만큼 늦다)" }
 

@@ -1721,7 +1721,7 @@
       "id": 40,
       "type": "timeseries",
       "title": "송신 · 중복 건/초 (권역별)",
-      "description": "중복 = 권역 서비스의 재전송 UPSERT 가 낸 UPDATE. ops.rfc_sent 가 걸러 SAP 로는 한 번만 간다",
+      "description": "중복 = 같은 앵커 · 기준일 · 상태의 재갱신 UPDATE. ops.rfc_progress_sent 가 걸러 SAP 로는 한 번만 간다",
       "datasource": {
         "type": "prometheus",
         "uid": "hotdb-prom"

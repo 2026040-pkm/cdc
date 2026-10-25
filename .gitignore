@@ -222,3 +222,4 @@ latest/legacy-tables-by-domain.html
 ### HotDB
 # 서버별 접속 정보
 src/hotdb/.env
+src/hotdb/.env.wssh

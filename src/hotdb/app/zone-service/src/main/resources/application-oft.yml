@@ -2,3 +2,7 @@
 hotdb:
   zone:
     code: OUTFITTING
+  # 레거시 실적 판별을 켠다: 의장 — GDO 설치율(Σ설치 ÷ Σ소요) · 품목 상태 · 레거시 W/O 진척 대비 차이 알림
+  judge:
+    legacy:
+      enabled: ${JUDGE_LEGACY_ENABLED:true}

@@ -1,19 +1,23 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# RFC Service (O-8) — 두 방향
-#   ① SAP 폴링 → 레거시 DB erp           (poll-core, 계정 rfc_agent)
-#   ② svc.actual_result(CDC) → SAP (2단 CDC, 계정 rfc_service)
+# RFC Service (O-8) — 세 방향
+#   ① SAP 폴링 → 레거시 DB erp 사본                      (poll-core, 작업 목록 poll-jobs.yml, 대상 기본 = 레거시 DB)
+#   ② 레거시 사본 폴링 → Hot DB hot.m_* · l_*            (poll-core, 작업 목록 poll-jobs-hot.yml, 대상 hot = Hot DB)
+#   ③ hot.p_progress(CDC) → SAP Z 표 zhotdb_progress    (2단 CDC, 계정 rfc_service)
 #
-#   1단: tsdb ─(slot zone_<모듈>, tsdb_cdc_pub)─▶ 판별 모듈 ─▶ svc (module 컬럼)
-#   2단: svc ─(slot rfc_service, svc_cdc_pub)─▶ 이 서비스 ─▶ SAP
+#   1단: tsdb ─(slot zone_<모듈>, tsdb_cdc_pub)─▶ 판별 모듈 ─▶ hot.s_* · m_device_state · ts.* → 판별 ─▶ hot.p_progress
+#   2단: hot ─(slot rfc_service, hot_cdc_pub)─▶ 이 서비스 ─▶ SAP
 #
-# 판별 모듈 전부를 슬롯 하나로 받는다. svc_cdc_pub 에는 실적 표만 실려 있다 (V6).
-# SAP 송신은 아직 dry-run — 보낸 기록(ops.rfc_sent)과 지표는 실제와 똑같이 쌓인다.
+# hot_cdc_pub 에는 p_progress 만 실려 있다 (V17). SAP 송신은 RFC_SENDER=jdbc · dry-run.
+# ② 의 원천은 레거시 DB 사본 — 로컬은 inshoplocal(docker, 54433), 운영은 HANA · Oracle 사본. 적재 SQL 은
+#   PostgreSQL 사본 기준으로 적었다 (poll-jobs-hot.yml). HANA 로 바꾸면 날짜 변환 식만 손본다.
 # ─────────────────────────────────────────────────────────────────────────────
 spring:
   application:
     name: rfc-service
   config:
-    import: classpath:poll-jobs.yml
+    import:
+      - classpath:poll-jobs.yml
+      - classpath:poll-jobs-hot.yml
   datasource:
     url: jdbc:postgresql://${HOTDB_HOST:localhost}:${HOTDB_PORT:59433}/${HOTDB_DB:hotdb}?ApplicationName=rfc-service
     username: ${HOTDB_USER:rfc_service}
@@ -46,11 +50,11 @@ hotdb:
       user: ${HOTDB_USER:rfc_service}
       password: ${HOTDB_PASSWORD:rfc_service}
     slot: rfc_service
-    publication: svc_cdc_pub
+    publication: hot_cdc_pub
     include-tables:
       - ops\.cdc_heartbeat
-      - svc\.actual_result      # 판별 모듈 전부 한 표 (module 컬럼) — 모듈이 늘어도 그대로
-    # svc 는 작다. 처음 붙을 때 이미 있는 실적도 보낸다 — 이미 보낸 것은 ops.rfc_sent 가 거른다
+      - hot\.p_progress          # 앵커 × 기준일 실적 — 판별 모듈 전부 한 표
+    # hot.p_progress 는 작다. 처음 붙을 때 이미 있는 실적도 보낸다 — 이미 보낸 것은 ops.rfc_progress_sent 가 거른다
     snapshot-mode: initial
     offset-file: ${CDC_OFFSET_DIR:./data}/offsets-rfc-service.dat
     max-batch-size: 512
@@ -67,25 +71,38 @@ hotdb:
       url: ${SAP_URL:jdbc:postgresql://localhost:59434/sapsim}
       user: ${SAP_USER:sapsim}
       password: ${SAP_PASSWORD:sapsim}
-      table: ${SAP_RESULT_TABLE:erpsrc.zhotdb_actual_result}
+      table: ${SAP_RESULT_TABLE:erpsrc.zhotdb_progress}
 
-  # ── ① SAP → erp 폴링 ────────────────────────────────────────────────────
+  # ── ① SAP → erp 폴링 · ② 레거시 사본 → hot 적재 ───────────────────────
   # 운영 HANA: SAP_URL=jdbc:sap://<host>:<port>/?currentschema=<스키마> , SAP_SCHEMA=<스키마>
   # 워터마크 upd_date || upd_time = 원천 표의 최종 수정 일자 · 시각 (DATS · TIMS 문자열)
   poll:
     agent: rfc-service
     default-interval-ms: ${POLL_INTERVAL_MS:60000}
     threads: ${POLL_THREADS:4}
-    target:   # 레거시 DB 의 erp — rfc_agent 만 쓴다 (Hot DB 와 분리된 별도 DB)
+    target:   # 기본 대상 = 레거시 DB 의 erp — rfc_agent 만 쓴다 (Hot DB 와 분리된 별도 DB)
       url: jdbc:postgresql://${LEGACY_HOST:localhost}:${LEGACY_PORT:59435}/${LEGACY_DB:legacy}?ApplicationName=rfc-service-poll&reWriteBatchedInserts=true
       user: ${HOTDB_POLL_USER:rfc_agent}
       password: ${HOTDB_POLL_PASSWORD:rfc_agent}
+    targets:
+      hot:    # Hot DB 의 hot 스키마 — rfc_service 가 m_* · l_* 를 쓴다. 진행 상태는 Hot DB 의 ops.poll_state
+        url: jdbc:postgresql://${HOTDB_HOST:localhost}:${HOTDB_PORT:59433}/${HOTDB_DB:hotdb}?ApplicationName=rfc-service-hot&reWriteBatchedInserts=true
+        user: ${HOTDB_USER:rfc_service}
+        password: ${HOTDB_PASSWORD:rfc_service}
     sources:
       sap:
         url: ${SAP_URL:jdbc:postgresql://localhost:59434/sapsim}
         user: ${SAP_USER:sapsim}
         password: ${SAP_PASSWORD:sapsim}
-    # 작업 목록은 poll-jobs.yml — scripts/gen-sample-legacy.py 가 SAP 사본 표 전부(114)로 만든다
+      legacy:   # 레거시 사본 중 SAP 출신 (PostgreSQL inshoplocal 계열) — gp.* (+ bak.*)
+        url: ${LEGACY_SRC_URL:jdbc:postgresql://localhost:54433/inshoplocal}
+        user: ${LEGACY_SRC_USER:inshoplocal}
+        password: ${LEGACY_SRC_PASSWORD:inshoplocal}
+      legacy-oracle:   # 레거시 사본 중 Oracle 출신 (inshoplocal-oracle) — AM(ProSSYS) · APNB(BTS) · SDE(GIS)
+        url: ${LEGACY_ORA_URL:jdbc:oracle:thin:@//localhost:59522/FREEPDB1}
+        user: ${LEGACY_ORA_USER:inshoplocal_reader}
+        password: ${LEGACY_ORA_PASSWORD:inshoplocal_reader}
+    # 작업 목록: poll-jobs.yml (SAP 사본 114표, scripts/gen-sample-legacy.py 생성) · poll-jobs-hot.yml (hot 적재, 손으로 적음)
 
 logging:
   level:

@@ -20,7 +20,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  * RFC Service 의 SAP 쪽 두 방향 — 로컬 SAP 대역(sap-sim)으로 확인한다.
  * <ul>
  *   <li>① SAP 폴링: erpsrc.order_line 에 넣은 행이 레거시 DB erp.order_line 으로 (주기 10초 작업)
- *   <li>② 실적 송신: tsdb COMPLETE → 판별 모듈 → actual_result → (CDC) → erpsrc.zhotdb_actual_result (RFC_SENDER=jdbc)
+ *   <li>③ 실적 송신: tsdb COMPLETE → 판별 모듈 → hot.p_progress → (CDC) → erpsrc.zhotdb_progress (RFC_SENDER=jdbc)
  * </ul>
  */
 @EnabledIfSystemProperty(named = "hotdb.it", matches = "true")
@@ -45,11 +45,20 @@ class RfcServiceSapIT {
     }
 
     @Test
-    void 판별_모듈의_실적이_SAP_Z_표에_한_번_쓰인다() throws SQLException {
+    void 판별_실적이_SAP_Z_표_zhotdb_progress_에_한_번_쓰인다() throws SQLException {
         String run = UUID.randomUUID().toString().substring(0, 8);
         String device = "IT-SAP-" + run;
-        String hull = "S" + run;
-        UUID scan = UUID.randomUUID();
+        String hull = "S" + run.substring(0, 4);
+        String anchor = hull + "SB01A200‖S6G9";
+        try (Db rfc = Db.as("rfc_service")) {
+            rfc.update("INSERT INTO hot.m_hull (hull_no) VALUES (?) ON CONFLICT DO NOTHING", hull);
+            rfc.update("INSERT INTO hot.m_block (hull_no, block_no) VALUES (?, 'B01') ON CONFLICT DO NOTHING", hull);
+            rfc.update("""
+                    INSERT INTO hot.l_work_unit (unit_id, level, hull_no, block_no, trade, wstg_code, plan_mh, actl_sd, site,
+                                                 source_table, anchor_type, target_qty, target_basis)
+                    VALUES (?, 'ACTIVITY', ?, 'B01', 'S', 'S6G9', 600, DATE '2026-10-01', 'IN', 'YPWG411M', 'WSTG', 11, 'ASSY_QTY')
+                    ON CONFLICT (unit_id) DO NOTHING""", anchor, hull);
+        }
         try (Db p = Db.as("hotdb_provider")) {
             p.update("INSERT INTO tsdb.device (site, device_id, device_role, zone) VALUES ('it', ?, 'LIDAR', 'ASSEMBLY')", device);
             p.update("""
@@ -59,20 +68,20 @@ class RfcServiceSapIT {
             p.update("""
                     INSERT INTO tsdb.actual_history (event_time, tag_key, scan_id, event_type, hull_no, block_id,
                       block_progress_rate, match_confidence, source_time_text, received_at)
-                    VALUES (?, ?, ?, 'COMPLETE', ?, 'B1', 100, 0.93, 'it', clock_timestamp())""",
-                    OffsetDateTime.now(), tag, scan, hull);
+                    VALUES (?, ?, ?, 'COMPLETE', ?, 'B01', 100, 0.93, 'it', clock_timestamp())""",
+                    OffsetDateTime.now(), tag, UUID.randomUUID(), hull);
         }
         try (Connection sap = DriverManager.getConnection(SAP, "sapsim", "sapsim")) {
-            await().atMost(WAIT).until(() -> count(sap, "SELECT count(*) FROM erpsrc.zhotdb_actual_result WHERE hull_no = ?", hull) == 1);
+            await().atMost(WAIT).until(() -> count(sap, "SELECT count(*) FROM erpsrc.zhotdb_progress WHERE anchor_id = ?", anchor) == 1);
             try (PreparedStatement ps = sap.prepareStatement(
-                    "SELECT zone, judged_status, device_id, block_progress_rate FROM erpsrc.zhotdb_actual_result WHERE hull_no = ?")) {
-                ps.setString(1, hull);
+                    "SELECT anchor_type, state, hull_no, auto_pct FROM erpsrc.zhotdb_progress WHERE anchor_id = ?")) {
+                ps.setString(1, anchor);
                 try (ResultSet rs = ps.executeQuery()) {
                     rs.next();
-                    assertThat(rs.getString("zone")).isEqualTo("asm");
-                    assertThat(rs.getString("judged_status")).isEqualTo("PENDING");
-                    assertThat(rs.getString("device_id")).isEqualTo(device);
-                    assertThat(rs.getDouble("block_progress_rate")).isEqualTo(100.0);
+                    assertThat(rs.getString("anchor_type")).isEqualTo("WSTG");
+                    assertThat(rs.getString("state")).isEqualTo("done");
+                    assertThat(rs.getString("hull_no")).isEqualTo(hull);
+                    assertThat(rs.getDouble("auto_pct")).isEqualTo(100.0);
                 }
             }
         }

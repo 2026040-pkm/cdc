@@ -39,7 +39,14 @@ public final class ExprParser {
         String t = text.trim();
         int ifAt = t.lastIndexOf(" if ");
         if (ifAt > 0) {
-            return new Expr.Conditional(expr(t.substring(0, ifAt)), condition(t.substring(ifAt + 4)));
+            // 식 if 조건 [else 식] — else 가 없으면 조건이 거짓일 때 null
+            String tail = t.substring(ifAt + 4);
+            int elseAt = tail.lastIndexOf(" else ");
+            if (elseAt > 0) {
+                return new Expr.Conditional(expr(t.substring(0, ifAt)), condition(tail.substring(0, elseAt)),
+                        expr(tail.substring(elseAt + 6)));
+            }
+            return new Expr.Conditional(expr(t.substring(0, ifAt)), condition(tail), null);
         }
         if (t.equals("$now")) {
             return new Expr.Now();

@@ -86,6 +86,22 @@ class RouteCompilerTest {
     }
 
     @Test
+    void else_가_있으면_거짓일_때_뒤의_식() {
+        RouteSpec spec = spec("svc_asm.device_status_current", "upsert", List.of("device_id"), null,
+                cols("device_id", "tag.device_id", "status", "'ON' if row.status=ONLINE|CALIBRATING else 'OFF'",
+                        "src_event_time", "row.event_time"));
+        CompiledRoute r = compile(spec);
+        assertThat(r.params(new EvalContext(event(Map.of("status", "CALIBRATING", "event_time", "T1")),
+                Map.of("tag", Map.of("device_id", "D"))))).containsExactly("D", "ON", "T1");
+        assertThat(r.params(new EvalContext(event(Map.of("status", "ERROR", "event_time", "T1")),
+                Map.of("tag", Map.of("device_id", "D"))))).containsExactly("D", "OFF", "T1");
+        // else 쪽 식도 원천과 대조한다
+        assertThatThrownBy(() -> compile(spec("svc_asm.device_status_current", "upsert", List.of("device_id"), null,
+                cols("device_id", "tag.device_id", "status", "'ON' if row.status=ONLINE else row.nope"))))
+                .hasMessageContaining("원천 tsdb.status_history 에 컬럼 nope 가 없습니다");
+    }
+
+    @Test
     void insert_on_change_는_직전_행과_비교한다() {
         RouteSpec spec = new RouteSpec("change", "tsdb.status_history", Map.of("tag", "row.tag_key"), List.of(),
                 List.of("c"), "svc_asm.device_status_change", "insert-on-change", List.of(), null,

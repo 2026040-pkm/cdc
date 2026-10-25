@@ -241,8 +241,15 @@ public class FieldSimulator {
             if (d.scanId == null) {
                 d.scanId = UUID.randomUUID();
                 d.progress = 0;
-                d.hull = "H" + (1200 + rnd.nextInt(20));
-                d.block = "B" + (100 + rnd.nextInt(80)) + (rnd.nextBoolean() ? "P" : "S");
+                List<String[]> real = props.blockList();
+                if (!real.isEmpty() && rnd.nextDouble() >= props.fakeRate()) {
+                    String[] hb = real.get(rnd.nextInt(real.size()));
+                    d.hull = hb[0];
+                    d.block = hb[1];
+                } else {
+                    d.hull = "H" + (1200 + rnd.nextInt(20));
+                    d.block = "B" + (100 + rnd.nextInt(80)) + (rnd.nextBoolean() ? "P" : "S");
+                }
                 type = "START";
             } else {
                 d.progress = Math.min(100, d.progress + 10 + rnd.nextDouble() * 25);

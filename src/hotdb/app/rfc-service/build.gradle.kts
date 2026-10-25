@@ -7,6 +7,8 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
     // SAP HANA JDBC — SAP 폴링 · Z 테이블 쓰기 (JCo 가 생기면 RfcSender 만 갈아 끼운다)
     runtimeOnly("com.sap.cloud.db.jdbc:ngdbc:2.25.9")
+    // Oracle JDBC — ② hot 적재의 Oracle 출신 원천(inshoplocal-oracle: AM · APNB · SDE)
+    runtimeOnly("com.oracle.database.jdbc:ojdbc11")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.awaitility:awaitility")

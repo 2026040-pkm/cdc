@@ -177,7 +177,8 @@ public class RouteCompiler {
         List<Expr> out = new ArrayList<>();
         for (Expr e : exprs) {
             if (e instanceof Expr.Conditional c) {
-                out.addAll(flatten(List.of(c.value(), c.condition().left())));
+                out.addAll(flatten(c.otherwise() == null ? List.of(c.value(), c.condition().left())
+                        : List.of(c.value(), c.condition().left(), c.otherwise())));
             } else {
                 out.add(e);
             }

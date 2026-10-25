@@ -10,14 +10,18 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * RFC Service (O-8) — 판별 모듈 RDB(svc.actual_result)를 CDC 로 받아 SAP 로 보내고 (2단 CDC),
- * SAP 레거시 표를 폴링해 레거시 DB erp 에 쓴다 (poll-core — 설정 hotdb.poll).
+ * RFC Service (O-8) — 세 방향.
  *
  * <pre>
- * Provider → [tsdb] ─CDC─▶ 판별 모듈 → [svc] ─CDC─▶ RFC Service → SAP
+ *   ① SAP 폴링            → 레거시 DB erp 사본                    (poll-core, poll-jobs.yml, 대상 기본)
+ *   ② 레거시 사본 폴링    → Hot DB hot.m_* · l_* (통합안 · 정규화)  (poll-core, poll-jobs-hot.yml, 대상 hot)
+ *   ③ hot.p_progress CDC  → SAP Z 표 zhotdb_progress               (2단 CDC, {@link ProgressRelay})
+ *
+ *   Provider → [tsdb] ─CDC─▶ 판별 모듈 → [hot.s_* · p_*] ─CDC─▶ RFC Service → SAP
+ *   레거시(inshoplocal 사본 · 운영은 HANA) ─폴링─▶ RFC Service ─▶ [hot.l_* · m_*] ─▶ 판별 모듈이 앵커 · 절점으로 읽는다
  * </pre>
  *
- * <p>엔진 · 디코딩은 cdc-core 를 그대로 쓰고, 반영 대상만 표가 아니라 {@link ActualResultRelay} 로 바꾼다.
+ * <p>엔진 · 디코딩은 cdc-core 를 그대로 쓰고, 반영 대상만 표가 아니라 {@link ProgressRelay} 로 바꾼다.
  * SAP 송신은 {@link RfcSender} — dry-run · jdbc(Z 테이블). JCo 가 붙으면 구현 하나만 더한다.
  */
 @SpringBootApplication
@@ -25,6 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class RfcServiceApplication {
 
     public static void main(String[] args) {
+        dev.hotdb.cdc.resource.SiteZone.apply();   // JDBC 세션 시간대 = 현장 시간대 (UTC 면 날짜 · 시각이 9시간 밀린다)
         SpringApplication.run(RfcServiceApplication.class, args);
     }
 
@@ -48,8 +53,8 @@ public class RfcServiceApplication {
     }
 
     @Bean
-    ActualResultRelay actualResultRelay(HotdbCdcProperties cdc, RfcProperties rfc, JdbcTemplate jdbc,
-                                        TransactionTemplate tx, RfcSender sender, MeterRegistry meters) {
-        return new ActualResultRelay(cdc.pipeline(), rfc, jdbc, tx, sender, meters);
+    ProgressRelay progressRelay(HotdbCdcProperties cdc, RfcProperties rfc, JdbcTemplate jdbc,
+                                TransactionTemplate tx, RfcSender sender, MeterRegistry meters) {
+        return new ProgressRelay(cdc.pipeline(), rfc, jdbc, tx, sender, meters);
     }
 }

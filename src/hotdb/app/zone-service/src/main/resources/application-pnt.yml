@@ -2,3 +2,7 @@
 hotdb:
   zone:
     code: PAINTING
+  # 레거시 실적 판별을 켠다: 도장 — 블록 실적률(Σ413 ÷ Σ212 공정당 1회) · 요소 종류별 공정율
+  judge:
+    legacy:
+      enabled: ${JUDGE_LEGACY_ENABLED:true}

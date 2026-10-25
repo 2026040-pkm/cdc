@@ -19,6 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class ZoneServiceApplication {
 
     public static void main(String[] args) {
+        dev.hotdb.cdc.resource.SiteZone.apply();   // JDBC 세션 시간대 = 현장 시간대 (UTC 면 날짜 · 시각이 9시간 밀린다)
         SpringApplication.run(ZoneServiceApplication.class, args);
     }
 

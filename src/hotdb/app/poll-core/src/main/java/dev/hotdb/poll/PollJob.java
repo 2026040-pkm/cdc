@@ -35,6 +35,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   replace     : 대상 DELETE + SELECT 전부 INSERT (한 트랜잭션) — PK 없는 표
  * </pre>
  *
+ * <p>적재 추적 (V20): 대상에 {@code src_job · polled_at · src_deleted_at} 열이 있으면 쓰는 행마다
+ * src_job = scope, polled_at = 이번 실행 시각, src_deleted_at = NULL 을 함께 쓴다 (다시 나타난 행은 삭제 표시가 풀린다).
+ * {@code mark-missing} 인 full 작업은 끝까지 성공했을 때만 같은 scope 에서 이번 실행에 안 온 행에 src_deleted_at 을 찍는다.
+ *
  * <p>워터마크는 모든 행을 쓴 뒤에만 저장한다. 중간에 실패하면 다음 주기에 같은 자리부터 다시 읽고,
  * UPSERT 라 결과가 같다. 같은 워터마크 값의 행은 매번 다시 읽힌다(>=) — 같은 초에 바뀐 행을 놓치지 않기 위해서다.
  */
@@ -42,6 +46,8 @@ public class PollJob {
 
     private static final Logger log = LoggerFactory.getLogger(PollJob.class);
     private static final String WM_ALIAS = "HOTDB_WM";
+    /** 적재 추적 열 — 원천이 아니라 이 작업이 채운다 */
+    static final List<String> TRACK = List.of("src_job", "polled_at", "src_deleted_at");
 
     private final String agent;
     private final PollProperties.JobSpec spec;
@@ -55,6 +61,7 @@ public class PollJob {
     private final MeterRegistry meters;
     private final Timer runTimer;
     private volatile Instant lastOkAt;
+    private final boolean track;
 
     public PollJob(String agent, PollProperties.JobSpec spec, DataSource source, JdbcTemplate target,
                    TransactionTemplate tx, Map<String, String> targetTypes, List<String> targetPk,
@@ -90,6 +97,11 @@ public class PollJob {
             if (!targetTypes.containsKey(k)) {
                 throw new IllegalStateException("작업 " + spec.jobName() + ": 키 " + k + " 가 대상 " + spec.target() + " 에 없습니다");
             }
+        }
+        this.track = !mode.equals("replace") && targetTypes.keySet().containsAll(TRACK);
+        if (spec.markMissing() && !(mode.equals("full") && track)) {
+            throw new IllegalStateException("작업 " + spec.jobName() + ": mark-missing 은 full 작업이고 대상 " + spec.target()
+                    + " 에 " + TRACK + " 열이 있어야 합니다 (V20)");
         }
     }
 
@@ -133,6 +145,8 @@ public class PollJob {
 
     long poll() throws SQLException {
         String mode = mode();
+        // 이번 실행 시각 — polled_at 과 삭제 판정에 같은 값을 쓴다 (PostgreSQL 정밀도 = 마이크로초)
+        Instant runAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         String watermark = mode.equals("incremental")
                 ? target.query("SELECT watermark FROM ops.poll_state WHERE agent = ? AND job = ?",
                         rs -> rs.next() ? rs.getString(1) : null, agent, name())
@@ -140,6 +154,9 @@ public class PollJob {
 
         try (Connection c = source.getConnection()) {
             c.setReadOnly(true);
+            // PostgreSQL 드라이버는 autocommit 이면 결과를 통째로 메모리에 올린다 — fetchSize 가 듣게 커서 모드로 읽는다
+            // (hot 적재의 411M 41만 행이 192MB 힙을 넘겼다). HANA · Oracle 도 트랜잭션 안에서 읽어 해가 없다
+            c.setAutoCommit(false);
             List<String> cols = sharedColumns(c);
             String sql = selectSql(spec.from(), cols, mode.equals("incremental") ? spec.watermark() : null, watermark != null);
             try (PreparedStatement ps = c.prepareStatement(sql)) {
@@ -147,9 +164,14 @@ public class PollJob {
                 if (watermark != null) {
                     ps.setString(1, watermark);
                 }
+                long rows;
                 try (ResultSet rs = ps.executeQuery()) {
-                    return write(rs, cols, mode, watermark);
+                    rows = write(rs, cols, mode, watermark, runAt);
                 }
+                if (spec.markMissing()) {
+                    markMissing(runAt);
+                }
+                return rows;
             }
         }
     }
@@ -163,7 +185,7 @@ public class PollJob {
             ResultSetMetaData md = rs.getMetaData();
             for (int i = 1; i <= md.getColumnCount(); i++) {
                 String name = md.getColumnName(i);
-                if (targetTypes.containsKey(name.toLowerCase(Locale.ROOT))) {
+                if (targetTypes.containsKey(name.toLowerCase(Locale.ROOT)) && !TRACK.contains(name.toLowerCase(Locale.ROOT))) {
                     out.add(name);
                 } else {
                     missing.add(name);
@@ -190,11 +212,15 @@ public class PollJob {
         return sb.append(" FROM ").append(from).append(hasWatermark ? " WHERE (" + watermarkExpr + ") >= ?" : "").toString();
     }
 
-    private long write(ResultSet rs, List<String> cols, String mode, String startWatermark) throws SQLException {
-        List<Column> targetCols = cols.stream()
-                .map(c -> new Column(c.toLowerCase(Locale.ROOT), new Expr.Literal(null), Policy.OVERWRITE,
-                        targetTypes.get(c.toLowerCase(Locale.ROOT))))
+    private long write(ResultSet rs, List<String> cols, String mode, String startWatermark, Instant runAt) throws SQLException {
+        List<String> written = new ArrayList<>(cols.stream().map(c -> c.toLowerCase(Locale.ROOT)).toList());
+        if (track) {
+            written.addAll(TRACK);
+        }
+        List<Column> targetCols = written.stream()
+                .map(c -> new Column(c, new Expr.Literal(null), Policy.OVERWRITE, targetTypes.get(c)))
                 .toList();
+        java.sql.Timestamp polledAt = java.sql.Timestamp.from(runAt);
         TableId t = TableId.parse(spec.target());
         String sql = mode.equals("replace")
                 ? SqlBuilder.build(RouteMode.INSERT, t, targetCols, List.of(), null, List.of(), List.of(), null).sql()
@@ -212,9 +238,14 @@ public class PollJob {
                     target.update("DELETE FROM " + q(t));
                 }
                 while (rs.next()) {
-                    Object[] row = new Object[cols.size()];
+                    Object[] row = new Object[written.size()];
                     for (int i = 0; i < cols.size(); i++) {
                         row[i] = PollValues.toSql(rs.getObject(i + 1));
+                    }
+                    if (track) {
+                        row[cols.size()] = spec.trackScope();
+                        row[cols.size() + 1] = polledAt;
+                        row[cols.size() + 2] = null;
                     }
                     if (hasWm) {
                         String wm = rs.getString(cols.size() + 1);
@@ -250,6 +281,17 @@ public class PollJob {
             body.run();
         }
         return total[0];
+    }
+
+    /** 같은 scope 에서 이번 실행(runAt)에 안 온 행 → 원천 삭제 표시. 끝까지 성공한 full 실행 뒤에만 부른다. */
+    private void markMissing(Instant runAt) {
+        int n = target.update("UPDATE " + q(TableId.parse(spec.target())) + " SET src_deleted_at = clock_timestamp()"
+                        + " WHERE src_job = ? AND polled_at < ? AND src_deleted_at IS NULL",
+                spec.trackScope(), java.sql.Timestamp.from(runAt));
+        if (n > 0) {
+            meters.counter("hotdb.poll.source.deleted", "job", name()).increment(n);
+            log.info("[{}] 원천에서 사라진 행 {} 건 — src_deleted_at 표시 (scope {})", name(), n, spec.trackScope());
+        }
     }
 
     private void flush(String sql, List<Object[]> batch, String mode) {

@@ -38,16 +38,31 @@ public class PollAutoConfiguration {
     /** 폴링 작업 묶음. 기동 때 대상 표와 키를 대조한다 — 어긋나면 기동을 거부한다. */
     @Bean
     PollRunner pollRunner(PollProperties props, DataSource primary, MeterRegistry meters) {
-        DataSource targetDs = props.target() == null || props.target().url() == null
-                ? primary : pool("hotdb-poll-target", props.target(), 4, false);
-        JdbcTemplate target = new JdbcTemplate(targetDs);
-        TransactionTemplate tx = new TransactionTemplate(new DataSourceTransactionManager(targetDs));
+        // 기본 대상 하나 + 이름 붙인 대상들. 작업은 to 로 고른다 (없으면 기본)
+        DataSource defaultDs = props.target() == null || props.target().url() == null
+                ? primary : pool("hotdb-poll-target", props.target(), 4, true);
+        Map<String, Target> targets = new LinkedHashMap<>();
+        targets.put("", Target.of(defaultDs));
+        props.targets().forEach((name, conn) -> targets.put(name, Target.of(pool("poll-target-" + name, conn, 4, true))));
+        // 기동 때 닿지 않는 대상 DB 는 그 대상의 작업만 빼고 뜬다 — 레거시 서버가 내려가 있어도 Hot DB 적재 · SAP 송신은 돈다.
+        // 닿는데 표 · 키가 어긋난 것은 그대로 기동 거부다. 빠진 작업은 재기동하면 다시 붙는다
+        Map<String, String> unreachable = new LinkedHashMap<>();
+        targets.forEach((name, t) -> {
+            try {
+                t.jdbc().queryForObject("SELECT 1", Integer.class);
+            } catch (org.springframework.dao.DataAccessException e) {
+                unreachable.put(name, rootMessage(e));
+            }
+        });
+        unreachable.forEach((name, why) -> log.warn("폴링 대상 '{}' 에 닿지 않아 그 대상 작업을 뺀다 (재기동하면 다시 붙는다): {}",
+                name.isEmpty() ? "기본" : name, why));
 
         Map<String, DataSource> sources = new LinkedHashMap<>();
-        props.sources().forEach((name, conn) -> sources.put(name, pool("poll-src-" + name, conn, 2, true)));
+        props.sources().forEach((name, conn) -> sources.put(name, pool("poll-src-" + name, conn, Math.max(2, props.threads()), true)));
 
         List<String> errors = new ArrayList<>();
         List<PollJob> jobs = new ArrayList<>();
+        int skipped = 0;
         for (PollProperties.JobSpec spec : props.jobs()) {
             if (!spec.enabled()) {
                 continue;
@@ -57,8 +72,17 @@ public class PollAutoConfiguration {
                 if (src == null) {
                     throw new IllegalStateException("작업 " + spec.jobName() + ": 원천 '" + spec.source() + "' 가 hotdb.poll.sources 에 없습니다");
                 }
-                jobs.add(new PollJob(props.agent(), spec, src, target, tx,
-                        PollJob.targetColumns(target, spec.target()), PollJob.targetPk(target, spec.target()),
+                String to = spec.to() == null ? "" : spec.to();
+                Target t = targets.get(to);
+                if (t == null) {
+                    throw new IllegalStateException("작업 " + spec.jobName() + ": 대상 '" + spec.to() + "' 가 hotdb.poll.targets 에 없습니다");
+                }
+                if (unreachable.containsKey(to)) {
+                    skipped++;
+                    continue;
+                }
+                jobs.add(new PollJob(props.agent(), spec, src, t.jdbc(), t.tx(),
+                        PollJob.targetColumns(t.jdbc(), spec.target()), PollJob.targetPk(t.jdbc(), spec.target()),
                         props.fetchSize(), props.batchSize(), meters));
             } catch (RuntimeException e) {
                 errors.add(e.getMessage());
@@ -69,12 +93,30 @@ public class PollAutoConfiguration {
                     + String.join("\n  - ", errors));
         }
         jobs.forEach(j -> log.info("폴링 작업 {} (주기 {}ms)", j.name(), j.intervalMs(props.defaultIntervalMs())));
+        if (skipped > 0) {
+            log.warn("닿지 않는 대상 때문에 뺀 폴링 작업 {}개", skipped);
+        }
         return new PollRunner(jobs, props, meters);
+    }
+
+    /** 대상 DB 하나 — 쓰기 접속과 그 트랜잭션. ops.poll_state 도 이 DB 에 있다. */
+    record Target(JdbcTemplate jdbc, TransactionTemplate tx) {
+        static Target of(DataSource ds) {
+            return new Target(new JdbcTemplate(ds), new TransactionTemplate(new DataSourceTransactionManager(ds)));
+        }
     }
 
     @Bean
     HealthIndicator pollHealthIndicator(PollRunner runner) {
         return () -> Health.up().withDetail("jobs", runner.jobs().stream().map(PollJob::name).toList()).build();
+    }
+
+    private static String rootMessage(Throwable t) {
+        Throwable c = t;
+        while (c.getCause() != null && c.getCause() != c) {
+            c = c.getCause();
+        }
+        return c.getMessage();
     }
 
     // 원천은 읽기 전용 · 작은 풀. 원천이 기동 때 죽어 있어도 서비스는 뜬다 (첫 접속을 미룬다)
@@ -86,6 +128,7 @@ public class PollAutoConfiguration {
         cfg.setPassword(c.password());
         cfg.setMaximumPoolSize(size);
         cfg.setMinimumIdle(0);
+        cfg.setConnectionTimeout(10_000);   // 닿지 않는 서버를 기동 때 30초씩 기다리지 않게
         if (lazy) {
             cfg.setInitializationFailTimeout(-1);
         }

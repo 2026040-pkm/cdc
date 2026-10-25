@@ -80,8 +80,8 @@ class CdcSafetyIT {
         ZoneCdcE2eIT.status(tag, t0, "ONLINE", null);   // 정상 경로로 한 번 — 모듈의 태그 캐시에 이 장비가 올라온다
 
         try (Db db = Db.as("postgres")) {
-            await().atMost(Duration.ofSeconds(30)).until(() -> "ONLINE".equals(
-                    db.one("SELECT status FROM svc.device_status_current WHERE module = 'asm' AND device_id = ?", device)));
+            await().atMost(Duration.ofSeconds(30)).until(() -> Boolean.TRUE.equals(
+                    db.one("SELECT online FROM hot.m_device_state WHERE device_id = ?", device)));
 
             long newer = deadLetter(db, tag, t0.plusSeconds(10), "ERROR", "PENDING");
             long older = deadLetter(db, tag, t0.plusSeconds(5), "ONLINE", "PENDING");
@@ -96,14 +96,14 @@ class CdcSafetyIT {
             assertThat(db.one("SELECT resolution FROM ops.cdc_dead_letter WHERE id = ?", newer)).isEqualTo("APPLIED");
             assertThat(db.one("SELECT resolution FROM ops.cdc_dead_letter WHERE id = ?", older))
                     .as("더 새 값(10초)이 이미 있어 newer-than 에 막힌다").isEqualTo("STALE_SKIPPED");
-            assertThat(db.one("SELECT status FROM svc.device_status_current WHERE module = 'asm' AND device_id = ?", device))
-                    .isEqualTo("ERROR");
+            assertThat(db.one("SELECT fault FROM hot.m_device_state WHERE device_id = ?", device))
+                    .as("ERROR 가 반영돼 fault").isEqualTo(true);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
     }
 
-    /** status-current 라우트에서 격리됐던 것처럼 Debezium 원문을 넣는다. */
+    /** device-state 라우트에서 격리됐던 것처럼 Debezium 원문을 넣는다. */
     static long deadLetter(Db db, long tag, OffsetDateTime at, String status, String state) throws SQLException {
         String raw = """
                 {"before":null,
@@ -114,7 +114,7 @@ class CdcSafetyIT {
                 at.toInstant().toEpochMilli());
         return ((Number) db.one("""
                 INSERT INTO ops.cdc_dead_letter (pipeline, route, source, lsn, payload, error, status)
-                VALUES ('zone-asm', 'status-current', 'tsdb.status_history', 1, CAST(? AS jsonb), 'it', ?)
+                VALUES ('zone-asm', 'device-state', 'tsdb.status_history', 1, CAST(? AS jsonb), 'it', ?)
                 RETURNING id""", raw, state)).longValue();
     }
 }

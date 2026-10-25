@@ -1,12 +1,12 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# RFC Service (O-8) — ① SAP 폴링 → 레거시 DB erp  ② 판별 모듈 실적 CDC → SAP (2단 CDC)
+# RFC Service (O-8) — ① SAP 폴링 → 레거시 DB erp  ② 레거시 사본 → Hot DB hot.l_* · m_* 적재  ③ hot.p_progress CDC → SAP (2단 CDC)
 #   (모듈 · 컨테이너 · 계정 · 슬롯 · 지표 모두 rfc-service / rfc_service — V14 에서 rfc-provider 이름을 정리)
 #
 #   한 대에 전부:   scripts/up.ps1
 #   RFC AGENT 서버: .env 에 HOTDB_HOST=<HotDB 서버 IP>, HOTDB_PORT=59433 을 적고
 #                   podman compose -f compose.rfc.yml up -d
 #
-# 슬롯 rfc_service 하나로 판별 모듈 전부를 받는다. SAP 송신: RFC_SENDER=jdbc(Z 테이블) · dry-run
+# 슬롯 rfc_service 하나로 hot.p_progress 를 받는다 (hot_cdc_pub). SAP 송신: RFC_SENDER=jdbc(Z 표 zhotdb_progress) · dry-run
 # ─────────────────────────────────────────────────────────────────────────────
 name: hotdb
 
@@ -30,7 +30,18 @@ services:
       SAP_USER: ${SAP_USER:-sapsim}
       SAP_PASSWORD: ${SAP_PASSWORD:-sapsim}
       SAP_SCHEMA: ${SAP_SCHEMA:-erpsrc}
-      SAP_RESULT_TABLE: ${SAP_RESULT_TABLE:-erpsrc.zhotdb_actual_result}
+      SAP_RESULT_TABLE: ${SAP_RESULT_TABLE:-erpsrc.zhotdb_progress}
+      # ② 레거시 사본 → hot.m_* · l_* 적재 원천 (inshoplocal). 운영은 HANA 사본 주소로
+      LEGACY_SRC_URL: ${LEGACY_SRC_URL:-jdbc:postgresql://host.docker.internal:54433/inshoplocal}
+      LEGACY_SRC_USER: ${LEGACY_SRC_USER:-inshoplocal}
+      LEGACY_SRC_PASSWORD: ${LEGACY_SRC_PASSWORD:-inshoplocal}
+      # ② 의 Oracle 출신 원천 (inshoplocal-oracle: AM · APNB · SDE)
+      LEGACY_ORA_URL: ${LEGACY_ORA_URL:-jdbc:oracle:thin:@//host.docker.internal:59522/FREEPDB1}
+      LEGACY_ORA_USER: ${LEGACY_ORA_USER:-inshoplocal_reader}
+      LEGACY_ORA_PASSWORD: ${LEGACY_ORA_PASSWORD:-inshoplocal_reader}
+      POLL_HOT_INTERVAL_MS: ${POLL_HOT_INTERVAL_MS:-300000}
+      POLL_HOT_MASTER_INTERVAL_MS: ${POLL_HOT_MASTER_INTERVAL_MS:-600000}
+      POLL_HOT_RESYNC_INTERVAL_MS: ${POLL_HOT_RESYNC_INTERVAL_MS:-86400000}   # 증분 작업의 전체 재동기화 (V20 F5)
       POLL_INTERVAL_MS: ${POLL_INTERVAL_MS:-60000}
       POLL_FAST_INTERVAL_MS: ${POLL_FAST_INTERVAL_MS:-10000}
       JAVA_TOOL_OPTIONS: ${RFC_JAVA_OPTS:--Xms64m -Xmx192m}
