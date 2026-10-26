@@ -1,1 +1,1 @@
-[ { "targets": ["podman-exporter:9882"], "labels": { "server": "local" } } ]
+[ { "targets": ["cadvisor:8080"], "labels": { "server": "local" } } ]
