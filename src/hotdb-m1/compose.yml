@@ -1,0 +1,58 @@
+# M1-1.4 Hot DB — compose 기동 · DDL 마이그레이션 (IPCS-303)
+#
+#   hotdb  Hot DB(필드 DB) — PostgreSQL 17 + TimescaleDB, logical WAL. 통합안 · 정규화 30표
+#
+#   ./hotdb.sh up            기동 + 확인 (Windows: .\hotdb.ps1 up)
+#   docker compose up -d     래퍼 없이도 같은 결과
+#
+# 스키마는 hotdb/initdb/010_hotdb_baseline.sql 이 볼륨이 비어 있을 때 한 번 만든다 (docker-entrypoint-initdb.d).
+# 이미지 자체의 000_ · 001_ 스크립트를 덮지 않게 폴더가 아니라 파일 하나만 마운트한다.
+# 스키마를 바꾸면 reset (볼륨 삭제 후 재기동) — 기존 볼륨에는 다시 돌지 않는다.
+#
+# 관리자 계정은 HOTDB_ADMIN_USER(기본 hotdb/hotdb). 기본 권한이 이 계정 기준으로 걸린다.
+# 값은 .env 로 바꾼다. 59248~59347 은 Windows 예약 구간이라 피한다.
+name: ${HOTDB_PROJECT:-hotdb-m1}
+
+services:
+  hotdb:
+    image: ${HOTDB_IMAGE:-timescale/timescaledb:2.29.2-pg17}
+    container_name: ${HOTDB_PROJECT:-hotdb-m1}-hotdb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hotdb
+      POSTGRES_USER: ${HOTDB_ADMIN_USER:-hotdb}
+      POSTGRES_PASSWORD: ${HOTDB_ADMIN_PASSWORD:-hotdb}
+      TZ: Asia/Seoul
+    command:
+      - postgres
+      - -c
+      - timezone=Asia/Seoul
+      - -c
+      - timescaledb.telemetry_level=off
+      - -c
+      - shared_buffers=${HOTDB_SHARED_BUFFERS:-256MB}
+      # CDC: 판별 모듈 4 + RFC Service 1 이 슬롯을 쓴다 (cdc compose.db.yml 과 같은 값)
+      - -c
+      - wal_level=logical
+      - -c
+      - max_wal_senders=16
+      - -c
+      - max_replication_slots=16
+      - -c
+      - max_slot_wal_keep_size=${HOTDB_SLOT_WAL_KEEP:-20GB}
+      - -c
+      - wal_sender_timeout=5min
+    ports:
+      - "${HOTDB_PORT:-5432}:5432"
+    volumes:
+      - hotdb-pgdata:/var/lib/postgresql/data
+      - ./hotdb/initdb/010_hotdb_baseline.sql:/docker-entrypoint-initdb.d/010_hotdb_baseline.sql:ro
+    healthcheck:
+      # TCP 로 본다 — 초기화 중 임시 서버는 소켓만 열어서, 소켓 검사는 스키마가 생기기 전에 통과한다
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d hotdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+volumes:
+  hotdb-pgdata:
