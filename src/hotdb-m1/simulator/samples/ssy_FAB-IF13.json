@@ -1,0 +1,29 @@
+{
+ "profile": "ssy",
+ "source_clock": "2021-12-31T00:00:00",
+ "shift_days": 0,
+ "dwg_no": "2514DS662CFG03",
+ "hulls": "2514",
+ "if": "FAB-IF13",
+ "tables": [
+  {
+   "table": "GP.YDEH081M",
+   "note": null,
+   "rows": [
+    {
+     "mandt": "100",
+     "dwg_no": "2514DS662CFG03",
+     "mat_no": "2514ALP662FG033",
+     "need_qty_dsgn": 2.0,
+     "shop_prmr": "A",
+     "rgsr_date": "20210902",
+     "rgsr_time": "143552",
+     "rgsr_user_id": "06434289",
+     "mnt_date": "20210902",
+     "mnt_time": "143552",
+     "mnt_user_id": "06434289"
+    }
+   ]
+  }
+ ]
+}

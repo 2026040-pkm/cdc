@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>가공 리플레이 제어</title>
+<style>
+:root {
+  --bg: #f6f6f4; --surface: #fff; --line: #e3e2de; --fg: #1d1c1a; --muted: #6f6d68;
+  --accent: #f37321; --accent-soft: #fde7d7; --ok: #1f8a4c; --ok-soft: #dff3e6; --warn: #b7791f; --warn-soft: #fbf0d9;
+  --err: #c9452f; --err-soft: #fbe3de; --hot: #2f6fdb;
+  --sans: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #141413; --surface: #1d1d1b; --line: #33322f; --fg: #ecebe8; --muted: #9c9a94;
+  --accent: #ff8a3d; --accent-soft: #3d2614; --ok: #4cc27f; --ok-soft: #173323; --warn: #e3b04b; --warn-soft: #3a2e14;
+  --err: #ff7a63; --err-soft: #3d1c16; --hot: #6d9bff; color-scheme: dark } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--sans); }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 14px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+h1 { font-size: 20px; margin: 0; margin-right: auto; }
+.dsn { color: var(--muted); font: 12px var(--mono); }
+.pill { font-weight: 600; font-size: 12.5px; padding: 3px 10px; border-radius: 99px; background: var(--line); color: var(--muted); }
+.pill.running { background: var(--ok-soft); color: var(--ok); }
+.pill.paused { background: var(--warn-soft); color: var(--warn); }
+.pill.error { background: var(--err-soft); color: var(--err); }
+.pill.done { background: var(--accent-soft); color: var(--accent); }
+.grid { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; align-content: start; }
+.card h2 { font-size: 13px; margin: 0; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+label { display: grid; gap: 3px; font-size: 12.5px; color: var(--muted); }
+input, select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; min-width: 0; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: inherit; font-weight: 600; font-size: 13px; border-radius: 6px; padding: 7px 12px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: .4; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--err); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hint { color: var(--muted); font-size: 12px; margin: 0; }
+.msg { font-size: 12.5px; min-height: 18px; color: var(--err); margin: 0; overflow-wrap: anywhere; }
+.clock { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.clock .big { font: 600 26px var(--mono); font-variant-numeric: tabular-nums; }
+.clock .lab { font-size: 12px; color: var(--muted); }
+.bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+.barlab { display: flex; justify-content: space-between; font: 12px var(--mono); color: var(--muted); }
+svg.spark { width: 100%; height: 90px; display: block; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 11.5px; white-space: nowrap; }
+td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td.m { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+td.err { color: var(--err); }
+.scroll { overflow-x: auto; }
+.log { font: 12px/1.6 var(--mono); max-height: 320px; overflow: auto; margin: 0; padding: 0; list-style: none; }
+.log li { border-bottom: 1px dashed var(--line); padding: 2px 0; overflow-wrap: anywhere; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 1100px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.samples a { font: 12px var(--mono); color: var(--hot); margin-right: 10px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>가공 리플레이 제어</h1>
+    <span id="pill" class="pill">대기</span>
+    <span class="dsn" id="dsn"></span>
+  </header>
+
+  <div class="grid">
+    <div class="card" style="gap:12px">
+      <h2>설정</h2>
+      <label>프로필
+        <select id="profile"></select>
+      </label>
+      <p class="hint" id="pdesc"></p>
+      <div class="row2">
+        <label>원천 시작 <input id="start" type="date"></label>
+        <label>원천 끝 <input id="end" type="date"></label>
+      </div>
+      <div class="row2">
+        <label>한 걸음 (폴링 한 주기)
+          <select id="step"></select>
+        </label>
+        <label>속도
+          <select id="speed">
+            <option value="">최대</option>
+            <option value="86400">하루 = 1초</option>
+            <option value="8640">하루 = 10초</option>
+            <option value="3600">한 시간 = 1초</option>
+            <option value="60">한 시간 = 1분</option>
+            <option value="1">실시간</option>
+          </select>
+        </label>
+      </div>
+      <div class="row2">
+        <label>날짜 옮기기
+          <select id="shift">
+            <option value="none">그대로</option>
+            <option value="today">구간 끝을 오늘로 (7일 단위)</option>
+          </select>
+        </label>
+        <label>full 작업 최소 간격
+          <select id="full_every">
+            <option value="">작업 설정대로</option>
+            <option value="6h">6시간</option>
+            <option value="1d">하루</option>
+          </select>
+        </label>
+      </div>
+      <label>호선 (비우면 프로필 값)
+        <input id="hulls" placeholder="6065">
+      </label>
+      <div class="btns">
+        <button class="primary" id="b-start">처음부터 시작</button>
+        <button id="b-resume-run">이어서 시작</button>
+      </div>
+      <p class="hint" id="saved"></p>
+      <h2 style="margin-top:6px">원천 · Hot DB</h2>
+      <div class="btns">
+        <button id="b-prepare">준비 (sim 스키마)</button>
+        <button class="danger" id="b-clean">정리 (시뮬레이터 적재분)</button>
+      </div>
+      <p class="hint">처음 한 번 "준비". 프로필 · 구간을 바꿔 처음부터 돌릴 때는 "정리" 먼저 — 워터마크가 남아 있으면 시작이 막힌다.</p>
+      <p class="msg" id="msg" role="status"></p>
+    </div>
+
+    <div style="display:grid;gap:14px;min-width:0">
+      <div class="card">
+        <div class="btns">
+          <button id="b-pause">일시정지</button>
+          <button id="b-continue">계속</button>
+          <button id="b-step">한 걸음</button>
+          <button class="danger" id="b-stop">멈춤</button>
+          <label style="flex-direction:row;display:flex;align-items:center;gap:6px;margin-left:auto">도는 중 속도
+            <select id="speed-live">
+              <option value="">최대</option>
+              <option value="86400">하루 = 1초</option>
+              <option value="8640">하루 = 10초</option>
+              <option value="3600">한 시간 = 1초</option>
+              <option value="60">한 시간 = 1분</option>
+              <option value="1">실시간</option>
+            </select>
+          </label>
+        </div>
+        <div class="clock">
+          <div><div class="lab">다음 원천 시각 (T)</div><div class="big" id="clock">—</div></div>
+          <div><div class="lab">마지막 주기의 Hot DB 시각 (polled_at)</div><div class="big" id="now">—</div></div>
+          <div><div class="lab">호선 · 한 걸음 · 날짜 이동</div><div class="big" id="meta" style="font-size:18px">—</div></div>
+        </div>
+        <div class="bar"><i id="prog"></i></div>
+        <div class="barlab"><span id="pstart"></span><span id="ppct"></span><span id="pend"></span></div>
+        <div>
+          <div class="lab" style="font-size:12px;color:var(--muted)">주기마다 쓴 행 (주황) · 삭제 표시 (빨강) — 최근 120 주기</div>
+          <svg class="spark" id="spark" viewBox="0 0 600 90" preserveAspectRatio="none" aria-label="주기별 적재 행 수"></svg>
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="card">
+          <h2>Hot DB 적재 현황 (agent rfc-sim)</h2>
+          <div class="scroll"><table>
+            <thead><tr><th>대상</th><th style="text-align:right">살아 있음</th><th style="text-align:right">완료</th><th style="text-align:right">삭제 표시</th></tr></thead>
+            <tbody id="counts"></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <h2>로그</h2>
+          <ul class="log" id="log"></ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>작업 상태 (ops.poll_state)</h2>
+        <div class="scroll"><table>
+          <thead><tr><th>작업</th><th>마지막 성공</th><th style="text-align:right">마지막 읽은 행</th><th>워터마크</th><th>오류</th></tr></thead>
+          <tbody id="jobs"></tbody>
+        </table></div>
+      </div>
+
+      <div class="card">
+        <h2>IF 별 입력 샘플</h2>
+        <div class="btns" style="align-items:end">
+          <label>원천 시각 (비우면 구간 끝)<input id="s-at" type="datetime-local"></label>
+          <label>도면 (비우면 프로필 샘플 도면)<input id="s-dwg" placeholder="6065DS447CNE06"></label>
+          <button id="b-samples">샘플 뽑기</button>
+        </div>
+        <p class="hint">샘플은 원천 행 모양(RFC/DB Agent 가 넘길 행) 그대로 IF 별 JSON 으로, 같은 도면의 Hot DB 출력은 *_hot.json 으로 남는다. 리플레이가 멈춰 있을 때만 뽑을 수 있다.</p>
+        <div class="samples" id="samples"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = s => s ? s.replace("T", " ").slice(0, 16) : "—";
+const num = n => n == null ? "" : Number(n).toLocaleString("ko-KR");
+let S = null, inited = false;
+
+async function api(path, body) {
+  $("#msg").textContent = "";
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok) $("#msg").textContent = j.error || `실패 (${r.status})`;
+  refresh();
+  return j;
+}
+
+function cfgFromForm() {
+  return {
+    profile: $("#profile").value, start: $("#start").value, end: $("#end").value, step: $("#step").value,
+    speed: $("#speed").value, shift: $("#shift").value, full_every: $("#full_every").value, hulls: $("#hulls").value.trim(),
+  };
+}
+
+function fillProfile() {
+  const p = S.profiles[$("#profile").value];
+  $("#start").value = p.start; $("#end").value = p.end; $("#hulls").placeholder = p.hulls;
+  $("#pdesc").textContent = `호선 ${p.hulls} · ${p.start} ~ ${p.end} · 샘플 도면 ${p.dwg || "—"}`;
+  $("#s-dwg").placeholder = p.dwg || "";
+  const sv = S.saved[$("#profile").value];
+  $("#saved").textContent = sv ? `이어서 시작하면 원천 ${fmt(sv.clock)} 부터 (호선 ${sv.hulls})` : "저장된 위치 없음 — 처음부터 시작";
+}
+
+function init() {
+  $("#profile").innerHTML = Object.keys(S.profiles).map(k => `<option value="${k}">${k}</option>`).join("");
+  $("#step").innerHTML = S.steps.map(k => `<option ${k === "1d" ? "selected" : ""}>${k}</option>`).join("");
+  $("#profile").addEventListener("change", fillProfile);
+  fillProfile();
+  $("#dsn").textContent = `원천 ${S.dsn.src} · Hot DB ${S.dsn.hot}`;
+  $("#b-start").onclick = () => api("/api/start", { ...cfgFromForm(), resume: false });
+  $("#b-resume-run").onclick = () => api("/api/start", { ...cfgFromForm(), resume: true });
+  $("#b-pause").onclick = () => api("/api/pause");
+  $("#b-continue").onclick = () => api("/api/resume");
+  $("#b-step").onclick = () => api("/api/step");
+  $("#b-stop").onclick = () => api("/api/stop");
+  $("#b-prepare").onclick = () => api("/api/prepare");
+  $("#b-clean").onclick = () => { if (confirm("시뮬레이터(rfc-sim)가 쓴 Hot DB 행과 워터마크를 지웁니다.")) api("/api/clean"); };
+  $("#b-samples").onclick = () => api("/api/samples", { profile: $("#profile").value, at: $("#s-at").value.replace("T", " "),
+                                                         dwg: $("#s-dwg").value.trim(), shift: $("#shift").value });
+  $("#speed-live").onchange = e => api("/api/speed", { speed: e.target.value });
+  inited = true;
+}
+
+function spark(ticks) {
+  const W = 600, H = 90, n = 120, bw = W / n;
+  const max = Math.max(1, ...ticks.map(t => t[1] + t[2]));
+  const off = n - ticks.length;
+  $("#spark").innerHTML = ticks.map((t, i) => {
+    const x = (off + i) * bw, hw = t[1] / max * (H - 4), hd = t[2] / max * (H - 4);
+    return `<rect x="${x + 0.5}" y="${H - hw}" width="${Math.max(1, bw - 1)}" height="${hw}" fill="var(--accent)"><title>${esc(fmt(t[0]))} · 쓴 행 ${t[1]} · 삭제 ${t[2]} · ${t[3]}s</title></rect>`
+         + (hd ? `<rect x="${x + 0.5}" y="${H - hw - hd}" width="${Math.max(1, bw - 1)}" height="${hd}" fill="var(--err)"/>` : "");
+  }).join("");
+}
+
+function render() {
+  const st = S.state, labels = { idle: "대기", running: "도는 중", paused: "일시정지", done: "구간 끝", error: "오류" };
+  $("#pill").className = "pill " + st;
+  $("#pill").textContent = (S.busy ? S.busy + " 중 · " : "") + labels[st];
+  if (S.message) $("#msg").textContent = S.message;
+  const live = st === "running" || st === "paused";
+  $("#b-start").disabled = $("#b-resume-run").disabled = live || !!S.busy;
+  $("#b-prepare").disabled = $("#b-clean").disabled = $("#b-samples").disabled = live || !!S.busy;
+  $("#b-pause").disabled = st !== "running";
+  $("#b-continue").disabled = $("#b-step").disabled = st !== "paused";
+  $("#b-stop").disabled = !live;
+  const c = S.cfg;
+  $("#clock").textContent = fmt(S.clock);
+  $("#now").textContent = fmt(S.last_now);
+  $("#meta").textContent = c ? `${c.hulls || "—"} · ${c.step} · +${c.shift_days ?? 0}일` : "—";
+  if (c && c.start && c.end && S.clock) {
+    const a = Date.parse(c.start), b = Date.parse(c.end), t = Date.parse(S.clock);
+    const p = Math.max(0, Math.min(100, (t - a) / Math.max(1, b - a) * 100));
+    $("#prog").style.width = p + "%"; $("#ppct").textContent = p.toFixed(1) + "%";
+    $("#pstart").textContent = c.start.slice(0, 10); $("#pend").textContent = c.end.slice(0, 10);
+  }
+  spark(S.ticks);
+  const h = S.hot;
+  $("#counts").innerHTML = h.error ? `<tr><td colspan="4" class="err">${esc(h.error)}</td></tr>`
+    : h.counts.map(r => `<tr><td>${esc(r.name)}</td><td class="n">${num(r.live)}</td><td class="n">${num(r.done)}</td><td class="n">${num(r.deleted)}</td></tr>`).join("");
+  $("#jobs").innerHTML = (h.jobs || []).map(j => `<tr><td class="m">${esc(j.job.replace("hot.", ""))}</td><td class="m">${esc(fmt(j.last_ok_at))}</td>
+    <td class="n">${num(j.last_rows)}</td><td class="m">${esc(j.watermark || "")}</td><td class="err">${esc(j.last_error || "")}</td></tr>`).join("")
+    || `<tr><td colspan="5" style="color:var(--muted)">아직 없음</td></tr>`;
+  $("#log").innerHTML = S.log.map(l => `<li>${esc(l)}</li>`).join("");
+  $("#samples").innerHTML = S.samples.map(f => `<a href="/samples/${encodeURIComponent(f)}" target="_blank" rel="noopener">${esc(f)}</a>`).join("")
+    || `<span class="hint">아직 없음</span>`;
+  if (c && document.activeElement !== $("#speed-live")) $("#speed-live").value = c.speed ? String(c.speed) : "";
+}
+
+async function refresh() {
+  try {
+    S = await (await fetch("/api/state")).json();
+    if (!inited) init();
+    render();
+  } catch (e) { $("#pill").textContent = "서버 연결 끊김"; $("#pill").className = "pill error"; }
+}
+refresh();
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>

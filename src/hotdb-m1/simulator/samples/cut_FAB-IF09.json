@@ -1,0 +1,59 @@
+{
+ "profile": "cut",
+ "source_clock": "2023-11-20T00:00:00",
+ "shift_days": 0,
+ "dwg_no": "6065DS447CNE06",
+ "hulls": "6065",
+ "if": "FAB-IF09",
+ "tables": [
+  {
+   "table": "GP.YPWC310M",
+   "note": null,
+   "rows": [
+    {
+     "mandt": "100",
+     "dwg_no": "6065DS447CNE06",
+     "mark_bay_no": "2",
+     "mark_mch_code": "PL21",
+     "cut_bay_no": "2",
+     "cut_mch_code": "PL21",
+     "cut_actl_stl_qty": 1.0,
+     "mark_stl_iss_qty": 1.0,
+     "cut_req_qty": 25.0,
+     "cut_mfg_qty": 25.0,
+     "cut_lnth": 156.536,
+     "mark_lnth": 36.354,
+     "cut_rap_lnth": 39.052,
+     "mark_rap_lnth": 66.899,
+     "btch_cnt": 1.0,
+     "cut_std_mh": 0.0,
+     "mark_std_mh": 0.0,
+     "cut_pln_date": "20231102",
+     "cut_day_nght_id": "D",
+     "mark_pln_date": "20231102",
+     "mark_day_nght_id": "D",
+     "cut_adjt_date": "20231102",
+     "mark_adjt_date": "20231102",
+     "cut_mfg_sd": "20231108",
+     "cut_mfg_fd": "20231109",
+     "mark_mfg_sd": "20231108",
+     "mark_mfg_fd": "20231109",
+     "mark_stus_code": "2",
+     "prcs_stus_code": "2",
+     "plnt": "1000",
+     "rgsr_date": "20231025",
+     "rgsr_time": "083733",
+     "rgsr_user_id": "1008538",
+     "mnt_date": "20231109",
+     "mnt_time": "054011",
+     "mnt_user_id": "DNCSYS",
+     "pgm_id": "SP_YPWC_PROC_SQL",
+     "cut_cmp_pln_date": "00000000",
+     "outc_plat_date": "00000000",
+     "cut_mfg_time": "054011",
+     "mark_mfg_time": "054011"
+    }
+   ]
+  }
+ ]
+}

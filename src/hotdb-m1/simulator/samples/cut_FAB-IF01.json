@@ -1,0 +1,15 @@
+{
+ "profile": "cut",
+ "source_clock": "2023-11-20T00:00:00",
+ "shift_days": 0,
+ "dwg_no": "6065DS447CNE06",
+ "hulls": "6065",
+ "if": "FAB-IF01",
+ "tables": [
+  {
+   "table": "AM.STR01H",
+   "note": null,
+   "rows": []
+  }
+ ]
+}

@@ -1,0 +1,342 @@
+{
+ "profile": "cut",
+ "source_clock": "2023-11-20T00:00:00",
+ "shift_days": 0,
+ "dwg_no": "6065DS447CNE06",
+ "hulls": "6065",
+ "tables": {
+  "hot.l_work_unit": [
+   {
+    "unit_id": "6065C447CNE06CM",
+    "level": "WO",
+    "parent_id": "6065DS447CNE06",
+    "act_no": "6065C447CNE0",
+    "hull_no": "6065",
+    "block_no": "447",
+    "trade": "C",
+    "mp": "C",
+    "location_id": "CTS",
+    "plan_mh": 51.48,
+    "acc_rate": 100.0,
+    "plan_sd": "2023-11-09",
+    "plan_fd": "2023-11-09",
+    "actl_sd": "2023-11-09",
+    "actl_fd": "2023-11-09",
+    "attrs": {
+     "stus": "W",
+     "subc": "N",
+     "vendor": "",
+     "jig_code": "",
+     "assy_shop": "CTS",
+     "detl_clsf": "C00"
+    },
+    "mnt_ts": "2023-11-09T08:36:39+09:00",
+    "site": "IN",
+    "excluded": 0.0,
+    "source_table": "YPWG411M",
+    "ref_no": "6065DS447CNE06",
+    "step_code": "CM",
+    "auto_dist": 0.0,
+    "site_group": "SITE",
+    "excl_group": "EXCLUDE_REASON",
+    "src_group": "SOURCE_TABLE",
+    "src_job": "hot.l_work_unit.wo",
+    "polled_at": "2023-11-20T00:00:00+09:00"
+   },
+   {
+    "unit_id": "6065C447CNE06CT",
+    "level": "WO",
+    "parent_id": "6065DS447CNE06",
+    "act_no": "6065C447CNE0",
+    "hull_no": "6065",
+    "block_no": "447",
+    "trade": "C",
+    "mp": "C",
+    "location_id": "CTS",
+    "plan_mh": 120.06,
+    "acc_rate": 100.0,
+    "plan_sd": "2023-11-09",
+    "plan_fd": "2023-11-09",
+    "actl_sd": "2023-11-09",
+    "actl_fd": "2023-11-09",
+    "attrs": {
+     "stus": "W",
+     "subc": "N",
+     "vendor": "",
+     "jig_code": "",
+     "assy_shop": "CTS",
+     "detl_clsf": "C00"
+    },
+    "mnt_ts": "2023-11-09T08:36:39+09:00",
+    "site": "IN",
+    "excluded": 0.0,
+    "source_table": "YPWG411M",
+    "ref_no": "6065DS447CNE06",
+    "step_code": "CT",
+    "auto_dist": 0.0,
+    "site_group": "SITE",
+    "excl_group": "EXCLUDE_REASON",
+    "src_group": "SOURCE_TABLE",
+    "src_job": "hot.l_work_unit.wo",
+    "polled_at": "2023-11-20T00:00:00+09:00"
+   },
+   {
+    "unit_id": "6065DS447CNE06",
+    "level": "DWG",
+    "hull_no": "6065",
+    "block_no": "447",
+    "trade": "C",
+    "plan_mh": 171.54,
+    "plan_sd": "2023-11-02",
+    "actl_sd": "2023-11-09",
+    "actl_fd": "2023-11-09",
+    "attrs": {
+     "pgm_id": "SP_YPWC_PROC_SQL",
+     "wo_cnt": 2,
+     "cut_bay": "2",
+     "dwg_stus": "",
+     "cut_status": "2",
+     "cut_std_mh": 0.0,
+     "dwg_series": "NE",
+     "cnf_cut_bay": "",
+     "mark_status": "2",
+     "mark_std_mh": 0.0
+    },
+    "mnt_ts": "2023-11-09T05:40:11+09:00",
+    "site": "IN",
+    "excluded": 0.0,
+    "source_table": "YPWC310M",
+    "auto_dist": 0.0,
+    "anchor_type": "DWG",
+    "target_qty": 171.54,
+    "target_basis": "DWG_WO_MH",
+    "site_group": "SITE",
+    "excl_group": "EXCLUDE_REASON",
+    "src_group": "SOURCE_TABLE",
+    "src_job": "hot.l_work_unit.dwg",
+    "polled_at": "2023-11-20T00:00:00+09:00"
+   }
+  ],
+  "hot.l_event": [
+   {
+    "unit_id": "6065DS447CNE06",
+    "event_group": "CHECKPOINT",
+    "event_code": "CUT_DONE",
+    "source": "310M",
+    "event_ts": "2023-11-09T05:40:11+09:00",
+    "conf": "HIGH",
+    "src_value": "SP_YPWC_PROC_SQL",
+    "mnt_ts": "2023-11-09T05:40:11+09:00",
+    "conf_group": "CONF",
+    "src_job": "hot.l_event.310m",
+    "polled_at": "2023-11-20T00:00:00+09:00"
+   },
+   {
+    "unit_id": "6065DS447CNE06",
+    "event_group": "CHECKPOINT",
+    "event_code": "CUT_DONE",
+    "source": "WO_CT",
+    "event_ts": "2023-11-09T00:00:00+09:00",
+    "conf": "HIGH",
+    "src_value": "6065C447CNE06CT",
+    "mnt_ts": "2023-11-09T08:36:39+09:00",
+    "conf_group": "CONF",
+    "src_job": "hot.l_event.wo_ct",
+    "polled_at": "2023-11-20T00:00:00+09:00"
+   },
+   {
+    "unit_id": "6065DS447CNE06",
+    "event_group": "CHECKPOINT",
+    "event_code": "MARK_DONE",
+    "source": "310M",
+    "event_ts": "2023-11-09T05:40:11+09:00",
+    "conf": "HIGH",
+    "src_value": "SP_YPWC_PROC_SQL",
+    "mnt_ts": "2023-11-09T05:40:11+09:00",
+    "conf_group": "CONF",
+    "src_job": "hot.l_event.310m",
+    "polled_at": "2023-11-20T00:00:00+09:00"
+   },
+   {
+    "unit_id": "6065DS447CNE06",
+    "event_group": "CHECKPOINT",
+    "event_code": "PRETREAT",
+    "source": "140M",
+    "event_ts": "2023-11-02T20:46:02+09:00",
+    "conf": "HIGH",
+    "src_value": "1",
+    "conf_group": "CONF",
+    "src_job": "hot.l_event.140m",
+    "polled_at": "2023-11-20T00:00:00+09:00"
+   },
+   {
+    "unit_id": "6065DS447CNE06",
+    "event_group": "CHECKPOINT",
+    "event_code": "STEEL_ISSUE",
+    "source": "140M",
+    "event_ts": "2023-11-02T20:24:00+09:00",
+    "conf": "HIGH",
+    "src_value": "1",
+    "conf_group": "CONF",
+    "src_job": "hot.l_event.140m",
+    "polled_at": "2023-11-20T00:00:00+09:00"
+   }
+  ],
+  "hot.l_cut_part": [
+   {
+    "part_no": "6065-447-SR1A-C11",
+    "hull_no": "6065",
+    "block_no": "447",
+    "dwg_no": "6065DS447CNE06",
+    "dest_wstg": "E4",
+    "bend_flag": 1.0,
+    "cut_done_ts": "2023-11-09T00:00:00+09:00",
+    "group_ts": "2023-11-09T02:52:00+09:00",
+    "cut_site": "IN",
+    "weight_kg": 3.28,
+    "cut_req_qty": 2.0,
+    "grind_flag": 0.0,
+    "grind_done_ts": "2023-11-14T00:00:00+09:00",
+    "mnt_ts": "2023-10-13T10:24:07+09:00",
+    "src_job": "hot.l_cut_part",
+    "polled_at": "2023-11-20T00:00:00+09:00"
+   },
+   {
+    "part_no": "6065-447-SR2A-C21",
+    "hull_no": "6065",
+    "block_no": "447",
+    "dwg_no": "6065DS447CNE06",
+    "dest_wstg": "E4",
+    "bend_flag": 1.0,
+    "cut_done_ts": "2023-11-09T00:00:00+09:00",
+    "group_ts": "2023-11-09T02:52:00+09:00",
+    "cut_site": "IN",
+    "weight_kg": 3.28,
+    "cut_req_qty": 2.0,
+    "grind_flag": 0.0,
+    "grind_done_ts": "2023-11-14T00:00:00+09:00",
+    "mnt_ts": "2023-10-13T10:24:07+09:00",
+    "src_job": "hot.l_cut_part",
+    "polled_at": "2023-11-20T00:00:00+09:00"
+   }
+  ],
+  "ops.poll_state": [
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_cut_part",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 13358.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_event.140m",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 377.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_event.310m",
+    "watermark": "20231118172415",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 2.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_event.310m.resync",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 10480.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_event.cary_due",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 113.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_event.inbound",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 9.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_event.ssy",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 0.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_event.wo_ct",
+    "watermark": "20231118152822",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 1.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_event.wo_ct.resync",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 1764.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_work_unit.dwg",
+    "watermark": "20231120000000",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 57.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_work_unit.dwg.resync",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 8345.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_work_unit.wo",
+    "watermark": "20231120000000",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 351.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.l_work_unit.wo.resync",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 10889.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.m_block",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 124.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.m_hull",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 1.0
+   },
+   {
+    "agent": "rfc-sim",
+    "job": "hot.m_location",
+    "last_run_at": "2023-11-20T00:00:00+09:00",
+    "last_ok_at": "2023-11-20T00:00:00+09:00",
+    "last_rows": 261.0
+   }
+  ]
+ }
+}

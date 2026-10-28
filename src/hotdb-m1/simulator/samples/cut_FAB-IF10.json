@@ -1,0 +1,157 @@
+{
+ "profile": "cut",
+ "source_clock": "2023-11-20T00:00:00",
+ "shift_days": 0,
+ "dwg_no": "6065DS447CNE06",
+ "hulls": "6065",
+ "if": "FAB-IF10",
+ "tables": [
+  {
+   "table": "GP.YPWC820M",
+   "note": null,
+   "rows": [
+    {
+     "mandt": "100",
+     "part_plat_no": "202311091657",
+     "cut_bay_no": "C",
+     "cut_mch_code": "GRC1",
+     "work_date": "20231111",
+     "rgsr_date": "20231111",
+     "rgsr_time": "144946",
+     "rgsr_user_id": "6104385",
+     "mnt_date": "20231111",
+     "mnt_time": "000000",
+     "pgm_id": "PWC0551A_PEWS"
+    },
+    {
+     "mandt": "100",
+     "part_plat_no": "202311091652",
+     "cut_bay_no": "C",
+     "cut_mch_code": "GRC1",
+     "work_date": "20231113",
+     "rgsr_date": "20231114",
+     "rgsr_time": "094404",
+     "rgsr_user_id": "6104385",
+     "mnt_date": "20231113",
+     "mnt_time": "000000",
+     "pgm_id": "PWC0551A_PEWS"
+    },
+    {
+     "mandt": "100",
+     "part_plat_no": "202311091656",
+     "cut_bay_no": "C",
+     "cut_mch_code": "GRC1",
+     "work_date": "20231111",
+     "rgsr_date": "20231111",
+     "rgsr_time": "144727",
+     "rgsr_user_id": "6104385",
+     "mnt_date": "20231111",
+     "mnt_time": "000000",
+     "pgm_id": "PWC0551A_PEWS"
+    },
+    {
+     "mandt": "100",
+     "part_plat_no": "202311091653",
+     "cut_bay_no": "C",
+     "cut_mch_code": "GRC1",
+     "work_date": "20231113",
+     "rgsr_date": "20231114",
+     "rgsr_time": "094412",
+     "rgsr_user_id": "6104385",
+     "mnt_date": "20231113",
+     "mnt_time": "000000",
+     "pgm_id": "PWC0551A_PEWS"
+    },
+    {
+     "mandt": "100",
+     "part_plat_no": "202311091654",
+     "cut_bay_no": "C",
+     "cut_mch_code": "GRC1",
+     "work_date": "20231113",
+     "rgsr_date": "20231114",
+     "rgsr_time": "094418",
+     "rgsr_user_id": "6104385",
+     "mnt_date": "20231113",
+     "mnt_time": "000000",
+     "pgm_id": "PWC0551A_PEWS"
+    }
+   ]
+  },
+  {
+   "table": "GP.YPWC821M",
+   "note": null,
+   "rows": [
+    {
+     "mandt": "100",
+     "part_plat_no": "202311091651",
+     "dwg_no": "6065DS447CNE06",
+     "part_no": "6065-447-DK1A-B2",
+     "grnd_part_qty": 1.0,
+     "rgsr_date": "20231114",
+     "rgsr_time": "094358",
+     "rgsr_user_id": "6104385",
+     "mnt_date": "20231114",
+     "mnt_time": "094358",
+     "pgm_id": "PWC0551A_PEWS",
+     "work_date": "20231113"
+    },
+    {
+     "mandt": "100",
+     "part_plat_no": "202311091652",
+     "dwg_no": "6065DS447CNE06",
+     "part_no": "6065-457-DK1A-B3",
+     "grnd_part_qty": 2.0,
+     "rgsr_date": "20231114",
+     "rgsr_time": "094404",
+     "rgsr_user_id": "6104385",
+     "mnt_date": "20231114",
+     "mnt_time": "094404",
+     "pgm_id": "PWC0551A_PEWS",
+     "work_date": "20231113"
+    },
+    {
+     "mandt": "100",
+     "part_plat_no": "202311091653",
+     "dwg_no": "6065DS447CNE06",
+     "part_no": "6065-447-SR1A-C11",
+     "grnd_part_qty": 1.0,
+     "rgsr_date": "20231114",
+     "rgsr_time": "094412",
+     "rgsr_user_id": "6104385",
+     "mnt_date": "20231114",
+     "mnt_time": "094412",
+     "pgm_id": "PWC0551A_PEWS",
+     "work_date": "20231113"
+    },
+    {
+     "mandt": "100",
+     "part_plat_no": "202311091653",
+     "dwg_no": "6065DS447CNE06",
+     "part_no": "6065-447-SR2A-C21",
+     "grnd_part_qty": 1.0,
+     "rgsr_date": "20231114",
+     "rgsr_time": "094412",
+     "rgsr_user_id": "6104385",
+     "mnt_date": "20231114",
+     "mnt_time": "094412",
+     "pgm_id": "PWC0551A_PEWS",
+     "work_date": "20231113"
+    },
+    {
+     "mandt": "100",
+     "part_plat_no": "202311091654",
+     "dwg_no": "6065DS447CNE06",
+     "part_no": "6065-457-SR1A-C11",
+     "grnd_part_qty": 1.0,
+     "rgsr_date": "20231114",
+     "rgsr_time": "094418",
+     "rgsr_user_id": "6104385",
+     "mnt_date": "20231114",
+     "mnt_time": "094418",
+     "pgm_id": "PWC0551A_PEWS",
+     "work_date": "20231113"
+    }
+   ]
+  }
+ ]
+}

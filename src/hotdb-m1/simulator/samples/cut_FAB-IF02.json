@@ -1,0 +1,83 @@
+{
+ "profile": "cut",
+ "source_clock": "2023-11-20T00:00:00",
+ "shift_days": 0,
+ "dwg_no": "6065DS447CNE06",
+ "hulls": "6065",
+ "if": "FAB-IF02",
+ "tables": [
+  {
+   "table": "GP.YPWC140M",
+   "note": null,
+   "rows": [
+    {
+     "mandt": "100",
+     "cnvr_line_no": "C",
+     "stl_type_code_1": "P",
+     "cnvr_crry_no": "20231102-107",
+     "pick_ser_id": "20231102-0007",
+     "pick_ser_no": "001",
+     "roll_no": "B35562603",
+     "roll_no_loc": "1",
+     "iss_qty": 1.0,
+     "iss_date": "20231102",
+     "iss_time": "2024",
+     "tbay_prt_indc": "Y",
+     "mark_stus_code": "Y",
+     "auto_mark_date": "20231102",
+     "auto_mark_time": "204602",
+     "intf_rtrn_code": "S",
+     "rgsr_date": "20231102",
+     "rgsr_time": "202456",
+     "mnt_date": "20231102",
+     "mnt_time": "204602",
+     "mnt_user_id": "411060",
+     "pgm_id": "PWC0119R"
+    }
+   ]
+  },
+  {
+   "table": "GP.YPWC111M",
+   "note": null,
+   "rows": [
+    {
+     "mandt": "100",
+     "pick_ser_id": "20231102-0007",
+     "mat_desc1": "6065ALP447NE014",
+     "raw_mat_no": "6065ALP447NE014",
+     "cary_due_date": "20231101",
+     "cary_day_nght_id": "D",
+     "srfc_prep_acr": 87.281,
+     "loc_code": "5200",
+     "loc_btch_no": "F999타",
+     "dwg_no": "6065DS447CNE06",
+     "cut_bay_no": "2",
+     "cut_mch_code": "PL21",
+     "shop_prmr": "A",
+     "req_dept_code": "0000",
+     "req_emp_no": "01008538",
+     "pick_ord_qty": 1.0,
+     "pick_qty": 1.0,
+     "iss_qty": 1.0,
+     "pick_ord_indc": "3",
+     "pick_fin_date": "20231102",
+     "iss_dt_intl": "20231102",
+     "iss_dt_last": "20231102",
+     "mh_calc_date": "20231102",
+     "mat_rsv_no": "0000000000",
+     "mat_rsv_lnno": "0000",
+     "po_lnno": "00000",
+     "prmr_po_lnno": "00000",
+     "rgsr_date": "20231102",
+     "rgsr_time": "073259",
+     "rgsr_user_id": "1013683",
+     "mnt_date": "20231102",
+     "mnt_time": "073259",
+     "ord_prt_cnt": 0.0,
+     "iss_prt_cnt": 0.0,
+     "iss_prt_date": "00000000"
+    }
+   ]
+  }
+ ]
+}

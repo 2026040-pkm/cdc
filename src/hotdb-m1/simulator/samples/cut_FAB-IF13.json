@@ -1,0 +1,29 @@
+{
+ "profile": "cut",
+ "source_clock": "2023-11-20T00:00:00",
+ "shift_days": 0,
+ "dwg_no": "6065DS447CNE06",
+ "hulls": "6065",
+ "if": "FAB-IF13",
+ "tables": [
+  {
+   "table": "GP.YDEH081M",
+   "note": null,
+   "rows": [
+    {
+     "mandt": "100",
+     "dwg_no": "6065DS447CNE06",
+     "mat_no": "6065ALP447NE014",
+     "need_qty_dsgn": 1.0,
+     "shop_prmr": "A",
+     "rgsr_date": "20231013",
+     "rgsr_time": "102501",
+     "rgsr_user_id": "06440860",
+     "mnt_date": "20231013",
+     "mnt_time": "102501",
+     "mnt_user_id": "06440860"
+    }
+   ]
+  }
+ ]
+}

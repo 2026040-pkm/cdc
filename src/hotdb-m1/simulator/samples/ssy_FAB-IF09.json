@@ -1,0 +1,59 @@
+{
+ "profile": "ssy",
+ "source_clock": "2021-12-31T00:00:00",
+ "shift_days": 0,
+ "dwg_no": "2514DS662CFG03",
+ "hulls": "2514",
+ "if": "FAB-IF09",
+ "tables": [
+  {
+   "table": "GP.YPWC310M",
+   "note": null,
+   "rows": [
+    {
+     "mandt": "100",
+     "dwg_no": "2514DS662CFG03",
+     "mark_bay_no": "P",
+     "mark_mch_code": "PLP1",
+     "cut_bay_no": "P",
+     "cut_mch_code": "PLP1",
+     "cut_actl_stl_qty": 2.0,
+     "mark_stl_iss_qty": 2.0,
+     "cut_req_qty": 2.0,
+     "cut_mfg_qty": 2.0,
+     "cut_lnth": 43.852,
+     "mark_lnth": 0.0,
+     "cut_rap_lnth": 37.037,
+     "mark_rap_lnth": 0.0,
+     "btch_cnt": 2.0,
+     "cut_std_mh": 0.0,
+     "mark_std_mh": 0.0,
+     "cut_pln_date": "20211108",
+     "cut_day_nght_id": "D",
+     "mark_pln_date": "20211108",
+     "mark_day_nght_id": "D",
+     "cut_adjt_date": "20211108",
+     "mark_adjt_date": "20211108",
+     "cut_mfg_sd": "20211201",
+     "cut_mfg_fd": "20211201",
+     "mark_mfg_sd": "20211201",
+     "mark_mfg_fd": "20211201",
+     "mark_stus_code": "2",
+     "prcs_stus_code": "2",
+     "plnt": "1000",
+     "rgsr_date": "20211026",
+     "rgsr_time": "145058",
+     "rgsr_user_id": "1008034",
+     "mnt_date": "20211201",
+     "mnt_time": "091023",
+     "mnt_user_id": "DNCSYS",
+     "pgm_id": "SP_YPWC_PROC_SQL",
+     "cut_cmp_pln_date": "00000000",
+     "outc_plat_date": "00000000",
+     "cut_mfg_time": "091023",
+     "mark_mfg_time": "091023"
+    }
+   ]
+  }
+ ]
+}

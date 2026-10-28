@@ -1,0 +1,408 @@
+# 가공 적재 작업 — cdc src/hotdb/app/rfc-service/src/main/resources/poll-jobs-hot.yml 에서 가공 작업만 그대로 옮긴 것.
+# 증분 작업이 조인 상대 표의 변경을 놓치는 것은 원본처럼 하루 1회 전체 재동기화(*.resync, V20 F5)가 메운다.
+# 원본을 고치면 다시 뽑는다. 바꾼 곳은 하나뿐이다:
+#   hot.l_event.ssy — 원본은 Oracle 사본(AM."STY01H") 문법이라, PostgreSQL 사본(am.sty01h) 문법으로 같은 뜻을 적었다.
+# 시뮬레이터는 실행할 때 gp. · am. 을 sim. 으로, current_date 를 sim.today() 로 바꿔 시각 T 의 원천을 읽는다.
+jobs:
+- name: hot.m_hull
+  source: legacy
+  to: hot
+  target: hot.m_hull
+  mode: full
+  interval-ms: ${POLL_HOT_MASTER_INTERVAL_MS:600000}
+  from: |-
+    (SELECT DISTINCT proj_no AS hull_no, true AS in_scope
+       FROM gp.ypwg411m WHERE proj_no <> '') q
+- name: hot.m_block
+  source: legacy
+  to: hot
+  target: hot.m_block
+  mode: full
+  interval-ms: ${POLL_HOT_MASTER_INTERVAL_MS:600000}
+  from: |-
+    (SELECT DISTINCT proj_no AS hull_no, blk_zone_no AS block_no
+       FROM gp.ypwg411m WHERE proj_no <> '' AND blk_zone_no <> '') q
+- name: hot.m_location
+  source: legacy
+  to: hot
+  target: hot.m_location
+  mode: full
+  interval-ms: ${POLL_HOT_MASTER_INTERVAL_MS:600000}
+  from: |-
+    (SELECT location_id, level, parent_id, code, name, attrs FROM (
+       SELECT DISTINCT assy_shop AS location_id, 'SHOP' AS level, NULL::text AS parent_id, assy_shop AS code,
+              assy_shop AS name, NULL::text AS attrs, 0 AS ord
+         FROM gp.ypws120c WHERE assy_shop <> ''
+       UNION ALL
+       SELECT * FROM (
+         SELECT DISTINCT ON (j.jig_code) j.jig_code AS location_id, 'JIG' AS level, NULLIF(j.assy_shop, '') AS parent_id,
+                j.jig_code AS code, NULLIF(j.jig_desc, '') AS name,
+                jsonb_build_object('work_cntr', j.work_cntr, 'work_id', j.work_id, 'vndr_clsf_code', j.vndr_clsf_code,
+                                   'div_id', j.div_id, 'weg_code', j.weg_code, 'wcg_code', j.wcg_code)::text AS attrs, 1 AS ord
+           FROM gp.ypws120c j WHERE j.jig_code <> '' ORDER BY j.jig_code, j.mnt_date DESC, j.mnt_time DESC) jig
+     ) x ORDER BY ord) q
+- name: hot.l_work_unit.wo
+  source: legacy
+  to: hot
+  target: hot.l_work_unit
+  watermark: wm
+  from: |-
+    (SELECT w.work_ord_no AS unit_id, 'WO' AS level,
+            CASE WHEN w.flag = 'C' THEN o.dwg_no
+                 WHEN w.flag = 'S' AND w.wstg_code <> '' THEN left(w.work_ord_no, 12) || '‖' || w.wstg_code
+                 WHEN w.flag = 'P' AND w.blk_zone_no <> '' THEN w.proj_no || '‖' || w.blk_zone_no || '‖P' END AS parent_id,
+            left(w.work_ord_no, 12) AS act_no, NULLIF(w.proj_no, '') AS hull_no, NULLIF(w.blk_zone_no, '') AS block_no,
+            NULLIF(w.flag, '') AS trade, NULLIF(w.mp, '') AS mp, NULLIF(w.wstg_code, '') AS wstg_code,
+            NULLIF(w.assy_shop, '') AS location_id, w.std_mh AS plan_mh, w.accm_prgs_rate AS acc_rate,
+            CASE WHEN w.wo_pln_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_pln_sd, 'YYYYMMDD') END AS plan_sd,
+            CASE WHEN w.wo_pln_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_pln_fd, 'YYYYMMDD') END AS plan_fd,
+            CASE WHEN w.wo_actl_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_actl_sd, 'YYYYMMDD') END AS actl_sd,
+            CASE WHEN w.wo_actl_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_actl_fd, 'YYYYMMDD') END AS actl_fd,
+            jsonb_build_object('assy_shop', w.assy_shop, 'jig_code', w.jig_code, 'subc', w.subc_work_indc,
+                               'vendor', w.vndr_ogan_code, 'stus', w.stus_code, 'detl_clsf', w.detl_clsf_code)::text AS attrs,
+            CASE WHEN w.mnt_date ~ '^(19|20)[0-9]{6}$' AND w.mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(w.mnt_date || w.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+            CASE WHEN w.subc_work_indc = 'Y' THEN 'OUT' ELSE 'IN' END AS site,
+            (w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR')) AS excluded,
+            CASE WHEN w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR') THEN 'AUTO_DIST' END AS exclude_reason,
+            'YPWG411M' AS source_table,
+            CASE WHEN w.flag = 'C' THEN o.dwg_no END AS ref_no,
+            CASE WHEN w.flag = 'C' THEN right(w.work_ord_no, 2) END AS step_code,
+            (w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR')) AS auto_dist,
+            w.mnt_date || w.mnt_time AS wm
+       FROM gp.ypwg411m w
+       LEFT JOIN (SELECT m.work_ord_no, min(o.mat_desc1) AS dwg_no
+                    FROM gp.ypwg214m m JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no
+                   WHERE o.detl_clsf_code = 'C00' AND o.flag = 'C' AND o.mat_desc1 <> ''
+                   GROUP BY m.work_ord_no) o ON o.work_ord_no = w.work_ord_no
+      WHERE w.work_ord_no <> '') q
+- name: hot.l_work_unit.dwg
+  source: legacy
+  to: hot
+  target: hot.l_work_unit
+  watermark: wm
+  from: |-
+    (SELECT d.dwg_no AS unit_id, 'DWG' AS level, substr(d.dwg_no, 1, 4) AS hull_no, substr(d.dwg_no, 7, 3) AS block_no,
+            'C' AS trade,
+            CASE WHEN d.cut_pln_date ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_pln_date, 'YYYYMMDD') END AS plan_sd,
+            CASE WHEN d.cut_cmp_pln_date ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_cmp_pln_date, 'YYYYMMDD') END AS plan_fd,
+            CASE WHEN d.mark_mfg_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(d.mark_mfg_fd, 'YYYYMMDD') END AS actl_sd,
+            CASE WHEN d.prcs_stus_code = '2' AND d.cut_mfg_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_mfg_fd, 'YYYYMMDD') END AS actl_fd,
+            coalesce(wo.mh, d.cut_std_mh + d.mark_std_mh) AS plan_mh,
+            jsonb_build_object('cut_bay', d.cut_bay_no, 'cnf_cut_bay', d.cnf_cut_bay_no, 'cut_status', d.prcs_stus_code,
+                               'mark_status', d.mark_stus_code, 'dwg_series', substr(d.dwg_no, 11, 2), 'dwg_stus', d.dwg_stus_code,
+                               'cut_std_mh', d.cut_std_mh, 'mark_std_mh', d.mark_std_mh, 'pgm_id', d.pgm_id,
+                               'wo_cnt', wo.cnt)::text AS attrs,
+            CASE WHEN d.mnt_date ~ '^(19|20)[0-9]{6}$' AND d.mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(d.mnt_date || d.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+            CASE WHEN d.cut_bay_no = '9' THEN 'OUT' ELSE 'IN' END AS site,
+            (d.dwg_stus_code = 'D' OR substr(d.dwg_no, 5, 4) = 'SSYW' OR substr(d.dwg_no, 11, 1) IN ('T', 'X', 'K', 'Y')) AS excluded,
+            CASE WHEN d.dwg_stus_code = 'D' THEN 'DWG_D' WHEN substr(d.dwg_no, 5, 4) = 'SSYW' THEN 'SSYW'
+                 WHEN substr(d.dwg_no, 11, 1) IN ('T', 'X', 'K', 'Y') THEN 'TBAR' END AS exclude_reason,
+            'YPWC310M' AS source_table, 'DWG' AS anchor_type,
+            coalesce(wo.mh, d.cut_std_mh + d.mark_std_mh) AS target_qty,
+            CASE WHEN wo.mh IS NOT NULL THEN 'DWG_WO_MH' ELSE 'DWG_STD_MH' END AS target_basis,
+            d.mnt_date || d.mnt_time AS wm
+       FROM gp.ypwc310m d
+       LEFT JOIN (SELECT o.mat_desc1 AS dwg_no, sum(w.std_mh) AS mh, count(*) AS cnt
+                    FROM gp.ypwg411m w
+                    JOIN gp.ypwg214m m ON m.work_ord_no = w.work_ord_no
+                    JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no AND o.detl_clsf_code = 'C00' AND o.flag = 'C'
+                   WHERE w.flag = 'C' AND right(w.work_ord_no, 2) IN ('CT', 'CM')
+                   GROUP BY o.mat_desc1) wo ON wo.dwg_no = d.dwg_no
+      WHERE length(d.dwg_no) = 14) q
+- name: hot.l_event.310m
+  source: legacy
+  to: hot
+  target: hot.l_event
+  watermark: wm
+  from: |-
+    (SELECT dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'MARK_DONE' AS event_code, '310M' AS source,
+            to_timestamp(mark_mfg_fd || lpad(coalesce(NULLIF(mark_mfg_time, ''), '0'), 6, '0'), 'YYYYMMDDHH24MISS') AS event_ts,
+            CASE WHEN pgm_id = 'SCHEDULER' THEN 'LOW' ELSE 'HIGH' END AS conf, pgm_id AS src_value,
+            CASE WHEN mnt_date ~ '^(19|20)[0-9]{6}$' AND mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(mnt_date || mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+            mnt_date || mnt_time AS wm
+       FROM gp.ypwc310m
+      WHERE length(dwg_no) = 14 AND mark_mfg_fd ~ '^(19|20)[0-9]{6}$' AND coalesce(mark_mfg_time, '') ~ '^[0-9]{0,6}$'
+     UNION ALL
+     SELECT dwg_no, 'CHECKPOINT', 'CUT_DONE', '310M',
+            to_timestamp(cut_mfg_fd || lpad(coalesce(NULLIF(cut_mfg_time, ''), '0'), 6, '0'), 'YYYYMMDDHH24MISS'),
+            CASE WHEN pgm_id = 'SCHEDULER' THEN 'LOW' ELSE 'HIGH' END, pgm_id,
+            CASE WHEN mnt_date ~ '^(19|20)[0-9]{6}$' AND mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(mnt_date || mnt_time, 'YYYYMMDDHH24MISS') END,
+            mnt_date || mnt_time
+       FROM gp.ypwc310m
+      WHERE length(dwg_no) = 14 AND prcs_stus_code = '2' AND cut_mfg_fd ~ '^(19|20)[0-9]{6}$'
+        AND coalesce(cut_mfg_time, '') ~ '^[0-9]{0,6}$') q
+- name: hot.l_event.wo_ct
+  source: legacy
+  to: hot
+  target: hot.l_event
+  watermark: wm
+  from: |-
+    (SELECT o.dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'CUT_DONE' AS event_code, 'WO_CT' AS source,
+            to_date(w.wo_actl_fd, 'YYYYMMDD')::timestamptz AS event_ts, 'HIGH' AS conf, w.work_ord_no AS src_value,
+            CASE WHEN w.mnt_date ~ '^(19|20)[0-9]{6}$' AND w.mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(w.mnt_date || w.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+            w.mnt_date || w.mnt_time AS wm
+       FROM gp.ypwg411m w
+       JOIN (SELECT m.work_ord_no, min(o.mat_desc1) AS dwg_no
+               FROM gp.ypwg214m m JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no
+              WHERE o.detl_clsf_code = 'C00' AND o.flag = 'C' AND o.mat_desc1 <> ''
+              GROUP BY m.work_ord_no) o ON o.work_ord_no = w.work_ord_no
+      WHERE w.flag = 'C' AND right(w.work_ord_no, 2) = 'CT' AND w.wo_actl_fd ~ '^(19|20)[0-9]{6}$') q
+- name: hot.l_event.140m
+  source: legacy
+  to: hot
+  target: hot.l_event
+  mode: full
+  mark-missing: true
+  interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+  from: |-
+    (SELECT x.dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'STEEL_ISSUE' AS event_code, '140M' AS source,
+            min(to_timestamp(x.iss_date || rpad(coalesce(x.iss_time, ''), 6, '0'), 'YYYYMMDDHH24MISS')) AS event_ts,
+            'HIGH' AS conf, count(*)::text AS src_value
+       FROM (SELECT coalesce(NULLIF(c.dwg_no, ''), p.dwg_no) AS dwg_no, c.iss_date, c.iss_time, c.auto_mark_date, c.auto_mark_time,
+                    c.mark_stus_code
+               FROM gp.ypwc140m c
+               LEFT JOIN (SELECT pick_ser_id, min(dwg_no) AS dwg_no FROM gp.ypwc111m WHERE length(dwg_no) = 14 GROUP BY pick_ser_id) p
+                      ON p.pick_ser_id = c.pick_ser_id) x
+      WHERE length(x.dwg_no) = 14 AND x.iss_date ~ '^(19|20)[0-9]{6}$' AND coalesce(x.iss_time, '') ~ '^[0-9]{0,6}$'
+      GROUP BY x.dwg_no
+     UNION ALL
+     SELECT x.dwg_no, 'CHECKPOINT', 'PRETREAT', '140M',
+            max(to_timestamp(x.auto_mark_date || rpad(coalesce(x.auto_mark_time, ''), 6, '0'), 'YYYYMMDDHH24MISS')),
+            'HIGH', count(*)::text
+       FROM (SELECT coalesce(NULLIF(c.dwg_no, ''), p.dwg_no) AS dwg_no, c.auto_mark_date, c.auto_mark_time, c.mark_stus_code
+               FROM gp.ypwc140m c
+               LEFT JOIN (SELECT pick_ser_id, min(dwg_no) AS dwg_no FROM gp.ypwc111m WHERE length(dwg_no) = 14 GROUP BY pick_ser_id) p
+                      ON p.pick_ser_id = c.pick_ser_id) x
+      WHERE length(x.dwg_no) = 14 AND x.auto_mark_date ~ '^(19|20)[0-9]{6}$' AND coalesce(x.auto_mark_time, '') ~ '^[0-9]{0,6}$'
+      GROUP BY x.dwg_no
+     HAVING bool_and(x.mark_stus_code = 'Y')) q
+- name: hot.l_event.ssy
+  source: legacy
+  to: hot
+  target: hot.l_event
+  mode: full
+  mark-missing: true
+  interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+  from: |-
+    (SELECT dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'STEEL_IN' AS event_code, 'SSY' AS source,
+            min(acpt_date)::timestamptz AS event_ts, 'MID' AS conf, count(*)::text AS src_value
+       FROM am.sty01h WHERE length(dwg_no) = 14 AND acpt_date IS NOT NULL GROUP BY dwg_no
+     UNION ALL
+     SELECT dwg_no, 'CHECKPOINT', 'PICK1', 'SSY', min(frst_pick_actl_date_1)::timestamptz, 'MID', count(*)::text
+       FROM am.sty01h WHERE length(dwg_no) = 14 AND frst_pick_actl_date_1 IS NOT NULL GROUP BY dwg_no
+     UNION ALL
+     SELECT dwg_no, 'CHECKPOINT', 'PICK2', 'SSY', min(scnd_pick_actl_date)::timestamptz, 'MID', count(*)::text
+       FROM am.sty01h WHERE length(dwg_no) = 14 AND scnd_pick_actl_date IS NOT NULL GROUP BY dwg_no
+     UNION ALL
+     SELECT dwg_no, 'CHECKPOINT', 'STEEL_ISSUE', 'SSY', max(iss_actl_date)::timestamptz, 'MID', count(*)::text
+       FROM am.sty01h WHERE length(dwg_no) = 14 AND iss_actl_date IS NOT NULL GROUP BY dwg_no) q
+- name: hot.l_event.cary_due
+  source: legacy
+  to: hot
+  target: hot.l_event
+  mode: full
+  mark-missing: true
+  interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+  from: |-
+    (SELECT dwg_no AS unit_id, 'EVENT' AS event_group, 'CARY_DUE' AS event_code, '111M' AS source,
+            min(to_date(cary_due_date, 'YYYYMMDD'))::timestamptz AS event_ts, 'HIGH' AS conf, count(*)::text AS src_value
+       FROM gp.ypwc111m
+      WHERE length(dwg_no) = 14 AND cary_due_date ~ '^(19|20)[0-9]{6}$'
+        AND to_date(cary_due_date, 'YYYYMMDD') < current_date
+        AND NOT (iss_dt_last ~ '^(19|20)[0-9]{6}$')
+      GROUP BY dwg_no) q
+- name: hot.l_event.inbound
+  source: legacy
+  to: hot
+  target: hot.l_event
+  mode: full
+  mark-missing: true
+  interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+  from: |-
+    (SELECT b.dwg_no AS unit_id, 'EVENT' AS event_group, 'PART_INBOUND' AS event_code, '301M' AS source,
+            min(to_date(n.rgsr_date, 'YYYYMMDD'))::timestamptz AS event_ts, 'MID' AS conf, count(*)::text AS src_value
+       FROM gp.ycps301m n
+       JOIN (SELECT part_no, min(dwg_no) AS dwg_no FROM gp.ydeh090m GROUP BY part_no) b ON b.part_no = n.mat_code
+      WHERE n.ref_dcmt_type = 'DC04' AND n.rgsr_date ~ '^(19|20)[0-9]{6}$' AND length(b.dwg_no) = 14
+      GROUP BY b.dwg_no) q
+- name: hot.l_cut_part
+  source: legacy
+  to: hot
+  target: hot.l_cut_part
+  mode: full
+  mark-missing: true
+  interval-ms: ${POLL_HOT_INTERVAL_MS:300000}
+  from: |-
+    (SELECT p.part_no, NULLIF(p.proj_no, '') AS hull_no, NULLIF(p.blk_no, '') AS block_no, b.dwg_no,
+            NULLIF(p.assy_wstg_code, '') AS dest_wstg, (coalesce(p.bend_clsf_code, '') <> '') AS bend_flag,
+            coalesce(CASE WHEN p.cut_mfg_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(p.cut_mfg_fd, 'YYYYMMDD')::timestamptz END,
+                     CASE WHEN d.prcs_stus_code = '2' AND d.cut_mfg_fd ~ '^(19|20)[0-9]{6}$'
+                          THEN to_date(d.cut_mfg_fd, 'YYYYMMDD')::timestamptz END,
+                     ct.ct_done) AS cut_done_ts,
+            g.group_ts,
+            coalesce(wo.assy_sd, i.iss_ts) AS issue_ts,
+            CASE WHEN wo.assy_sd IS NOT NULL THEN 'ASSY_WO' WHEN i.iss_ts IS NOT NULL THEN '100M' END AS issue_src,
+            n.inbound_ts,
+            CASE WHEN d.cut_bay_no = '9' THEN 'OUT' WHEN d.dwg_no IS NOT NULL THEN 'IN' END AS cut_site,
+            p.part_wt AS weight_kg,
+            CASE WHEN p.cut_req_qty ~ '^[0-9]+$' THEN p.cut_req_qty::int END AS cut_req_qty,
+            bd.bend_done_ts, (p.grnd_work_indc = 'Y') AS grind_flag, gr.grind_done_ts,
+            CASE WHEN p.mnt_date ~ '^(19|20)[0-9]{6}$' AND p.mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(p.mnt_date || p.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts
+       FROM gp.ydeh060m p
+       LEFT JOIN (SELECT DISTINCT ON (part_no) part_no, dwg_no FROM (
+                    SELECT part_no, dwg_no, 1 AS pri FROM gp.ydeh090m WHERE length(dwg_no) = 14
+                    UNION ALL SELECT part_no, dwg_no, 2 FROM gp.ypdg002m WHERE length(dwg_no) = 14
+                    UNION ALL SELECT part_no, dwg_no, 3 FROM gp.ypwc821m WHERE length(dwg_no) = 14
+                    UNION ALL SELECT part_no, dwg_no, 4 FROM gp.ypdg800m WHERE length(dwg_no) = 14) x
+                   ORDER BY part_no, pri, dwg_no) b ON b.part_no = p.part_no
+       LEFT JOIN gp.ypwc310m d ON d.dwg_no = b.dwg_no
+       LEFT JOIN (SELECT o.mat_desc1 AS dwg_no, min(to_date(w.wo_actl_fd, 'YYYYMMDD'))::timestamptz AS ct_done
+                    FROM gp.ypwg411m w JOIN gp.ypwg214m m ON m.work_ord_no = w.work_ord_no
+                    JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no AND o.detl_clsf_code = 'C00' AND o.flag = 'C'
+                   WHERE w.flag = 'C' AND right(w.work_ord_no, 2) = 'CT' AND w.wo_actl_fd ~ '^(19|20)[0-9]{6}$'
+                   GROUP BY o.mat_desc1) ct ON ct.dwg_no = b.dwg_no
+       LEFT JOIN (SELECT part_no, max(to_timestamp(part_plat_date || lpad(part_plat_time, 4, '0'), 'YYYYMMDDHH24MI')) AS group_ts
+                    FROM gp.ypdg002m WHERE part_plat_date ~ '^(19|20)[0-9]{6}$' AND part_plat_time ~ '^[0-9]{1,4}$'
+                   GROUP BY part_no) g ON g.part_no = p.part_no
+       LEFT JOIN (SELECT part_no, max(to_date(iss_fd, 'YYYYMMDD'))::timestamptz AS iss_ts
+                    FROM gp.ypdg100m WHERE part_stus_code = 'S' AND iss_fd ~ '^(19|20)[0-9]{6}$' GROUP BY part_no) i ON i.part_no = p.part_no
+       LEFT JOIN (SELECT part_no, max(to_date(bend_mfg_fd, 'YYYYMMDD'))::timestamptz AS bend_done_ts
+                    FROM gp.ypwc510m WHERE bend_mfg_fd ~ '^(19|20)[0-9]{6}$' GROUP BY part_no) bd ON bd.part_no = p.part_no
+       LEFT JOIN (SELECT part_no, max(to_date(rgsr_date, 'YYYYMMDD'))::timestamptz AS grind_done_ts
+                    FROM gp.ypwc821m WHERE rgsr_date ~ '^(19|20)[0-9]{6}$' AND part_no <> '' GROUP BY part_no) gr ON gr.part_no = p.part_no
+       LEFT JOIN (SELECT mat_code, min(to_date(rgsr_date, 'YYYYMMDD'))::timestamptz AS inbound_ts
+                    FROM gp.ycps301m WHERE ref_dcmt_type = 'DC04' AND rgsr_date ~ '^(19|20)[0-9]{6}$' GROUP BY mat_code) n ON n.mat_code = p.part_no
+       LEFT JOIN (SELECT proj_no, blk_zone_no, wstg_code, min(to_date(wo_actl_sd, 'YYYYMMDD'))::timestamptz AS assy_sd
+                    FROM gp.ypwg411m WHERE flag = 'S' AND wo_actl_sd ~ '^(19|20)[0-9]{6}$'
+                   GROUP BY proj_no, blk_zone_no, wstg_code) wo
+              ON wo.proj_no = p.proj_no AND wo.blk_zone_no = p.blk_no AND wo.wstg_code = p.assy_wstg_code || p.next_wstg_code
+      WHERE p.part_no <> '') q
+- name: hot.l_work_unit.wo.resync
+  source: legacy
+  to: hot
+  target: hot.l_work_unit
+  mode: full
+  scope: hot.l_work_unit.wo
+  mark-missing: true
+  interval-ms: ${POLL_HOT_RESYNC_INTERVAL_MS:86400000}
+  from: |-
+    (SELECT w.work_ord_no AS unit_id, 'WO' AS level,
+            CASE WHEN w.flag = 'C' THEN o.dwg_no
+                 WHEN w.flag = 'S' AND w.wstg_code <> '' THEN left(w.work_ord_no, 12) || '‖' || w.wstg_code
+                 WHEN w.flag = 'P' AND w.blk_zone_no <> '' THEN w.proj_no || '‖' || w.blk_zone_no || '‖P' END AS parent_id,
+            left(w.work_ord_no, 12) AS act_no, NULLIF(w.proj_no, '') AS hull_no, NULLIF(w.blk_zone_no, '') AS block_no,
+            NULLIF(w.flag, '') AS trade, NULLIF(w.mp, '') AS mp, NULLIF(w.wstg_code, '') AS wstg_code,
+            NULLIF(w.assy_shop, '') AS location_id, w.std_mh AS plan_mh, w.accm_prgs_rate AS acc_rate,
+            CASE WHEN w.wo_pln_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_pln_sd, 'YYYYMMDD') END AS plan_sd,
+            CASE WHEN w.wo_pln_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_pln_fd, 'YYYYMMDD') END AS plan_fd,
+            CASE WHEN w.wo_actl_sd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_actl_sd, 'YYYYMMDD') END AS actl_sd,
+            CASE WHEN w.wo_actl_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(w.wo_actl_fd, 'YYYYMMDD') END AS actl_fd,
+            jsonb_build_object('assy_shop', w.assy_shop, 'jig_code', w.jig_code, 'subc', w.subc_work_indc,
+                               'vendor', w.vndr_ogan_code, 'stus', w.stus_code, 'detl_clsf', w.detl_clsf_code)::text AS attrs,
+            CASE WHEN w.mnt_date ~ '^(19|20)[0-9]{6}$' AND w.mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(w.mnt_date || w.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+            CASE WHEN w.subc_work_indc = 'Y' THEN 'OUT' ELSE 'IN' END AS site,
+            (w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR')) AS excluded,
+            CASE WHEN w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR') THEN 'AUTO_DIST' END AS exclude_reason,
+            'YPWG411M' AS source_table,
+            CASE WHEN w.flag = 'C' THEN o.dwg_no END AS ref_no,
+            CASE WHEN w.flag = 'C' THEN right(w.work_ord_no, 2) END AS step_code,
+            (w.flag = 'C' AND right(w.work_ord_no, 2) IN ('PR', 'DB', 'GR')) AS auto_dist,
+            w.mnt_date || w.mnt_time AS wm
+       FROM gp.ypwg411m w
+       LEFT JOIN (SELECT m.work_ord_no, min(o.mat_desc1) AS dwg_no
+                    FROM gp.ypwg214m m JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no
+                   WHERE o.detl_clsf_code = 'C00' AND o.flag = 'C' AND o.mat_desc1 <> ''
+                   GROUP BY m.work_ord_no) o ON o.work_ord_no = w.work_ord_no
+      WHERE w.work_ord_no <> '') q
+- name: hot.l_work_unit.dwg.resync
+  source: legacy
+  to: hot
+  target: hot.l_work_unit
+  mode: full
+  scope: hot.l_work_unit.dwg
+  mark-missing: true
+  interval-ms: ${POLL_HOT_RESYNC_INTERVAL_MS:86400000}
+  from: |-
+    (SELECT d.dwg_no AS unit_id, 'DWG' AS level, substr(d.dwg_no, 1, 4) AS hull_no, substr(d.dwg_no, 7, 3) AS block_no,
+            'C' AS trade,
+            CASE WHEN d.cut_pln_date ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_pln_date, 'YYYYMMDD') END AS plan_sd,
+            CASE WHEN d.cut_cmp_pln_date ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_cmp_pln_date, 'YYYYMMDD') END AS plan_fd,
+            CASE WHEN d.mark_mfg_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(d.mark_mfg_fd, 'YYYYMMDD') END AS actl_sd,
+            CASE WHEN d.prcs_stus_code = '2' AND d.cut_mfg_fd ~ '^(19|20)[0-9]{6}$' THEN to_date(d.cut_mfg_fd, 'YYYYMMDD') END AS actl_fd,
+            coalesce(wo.mh, d.cut_std_mh + d.mark_std_mh) AS plan_mh,
+            jsonb_build_object('cut_bay', d.cut_bay_no, 'cnf_cut_bay', d.cnf_cut_bay_no, 'cut_status', d.prcs_stus_code,
+                               'mark_status', d.mark_stus_code, 'dwg_series', substr(d.dwg_no, 11, 2), 'dwg_stus', d.dwg_stus_code,
+                               'cut_std_mh', d.cut_std_mh, 'mark_std_mh', d.mark_std_mh, 'pgm_id', d.pgm_id,
+                               'wo_cnt', wo.cnt)::text AS attrs,
+            CASE WHEN d.mnt_date ~ '^(19|20)[0-9]{6}$' AND d.mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(d.mnt_date || d.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+            CASE WHEN d.cut_bay_no = '9' THEN 'OUT' ELSE 'IN' END AS site,
+            (d.dwg_stus_code = 'D' OR substr(d.dwg_no, 5, 4) = 'SSYW' OR substr(d.dwg_no, 11, 1) IN ('T', 'X', 'K', 'Y')) AS excluded,
+            CASE WHEN d.dwg_stus_code = 'D' THEN 'DWG_D' WHEN substr(d.dwg_no, 5, 4) = 'SSYW' THEN 'SSYW'
+                 WHEN substr(d.dwg_no, 11, 1) IN ('T', 'X', 'K', 'Y') THEN 'TBAR' END AS exclude_reason,
+            'YPWC310M' AS source_table, 'DWG' AS anchor_type,
+            coalesce(wo.mh, d.cut_std_mh + d.mark_std_mh) AS target_qty,
+            CASE WHEN wo.mh IS NOT NULL THEN 'DWG_WO_MH' ELSE 'DWG_STD_MH' END AS target_basis,
+            d.mnt_date || d.mnt_time AS wm
+       FROM gp.ypwc310m d
+       LEFT JOIN (SELECT o.mat_desc1 AS dwg_no, sum(w.std_mh) AS mh, count(*) AS cnt
+                    FROM gp.ypwg411m w
+                    JOIN gp.ypwg214m m ON m.work_ord_no = w.work_ord_no
+                    JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no AND o.detl_clsf_code = 'C00' AND o.flag = 'C'
+                   WHERE w.flag = 'C' AND right(w.work_ord_no, 2) IN ('CT', 'CM')
+                   GROUP BY o.mat_desc1) wo ON wo.dwg_no = d.dwg_no
+      WHERE length(d.dwg_no) = 14) q
+- name: hot.l_event.310m.resync
+  source: legacy
+  to: hot
+  target: hot.l_event
+  mode: full
+  scope: hot.l_event.310m
+  mark-missing: true
+  interval-ms: ${POLL_HOT_RESYNC_INTERVAL_MS:86400000}
+  from: |-
+    (SELECT dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'MARK_DONE' AS event_code, '310M' AS source,
+            to_timestamp(mark_mfg_fd || lpad(coalesce(NULLIF(mark_mfg_time, ''), '0'), 6, '0'), 'YYYYMMDDHH24MISS') AS event_ts,
+            CASE WHEN pgm_id = 'SCHEDULER' THEN 'LOW' ELSE 'HIGH' END AS conf, pgm_id AS src_value,
+            CASE WHEN mnt_date ~ '^(19|20)[0-9]{6}$' AND mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(mnt_date || mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+            mnt_date || mnt_time AS wm
+       FROM gp.ypwc310m
+      WHERE length(dwg_no) = 14 AND mark_mfg_fd ~ '^(19|20)[0-9]{6}$' AND coalesce(mark_mfg_time, '') ~ '^[0-9]{0,6}$'
+     UNION ALL
+     SELECT dwg_no, 'CHECKPOINT', 'CUT_DONE', '310M',
+            to_timestamp(cut_mfg_fd || lpad(coalesce(NULLIF(cut_mfg_time, ''), '0'), 6, '0'), 'YYYYMMDDHH24MISS'),
+            CASE WHEN pgm_id = 'SCHEDULER' THEN 'LOW' ELSE 'HIGH' END, pgm_id,
+            CASE WHEN mnt_date ~ '^(19|20)[0-9]{6}$' AND mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(mnt_date || mnt_time, 'YYYYMMDDHH24MISS') END,
+            mnt_date || mnt_time
+       FROM gp.ypwc310m
+      WHERE length(dwg_no) = 14 AND prcs_stus_code = '2' AND cut_mfg_fd ~ '^(19|20)[0-9]{6}$'
+        AND coalesce(cut_mfg_time, '') ~ '^[0-9]{0,6}$') q
+- name: hot.l_event.wo_ct.resync
+  source: legacy
+  to: hot
+  target: hot.l_event
+  mode: full
+  scope: hot.l_event.wo_ct
+  mark-missing: true
+  interval-ms: ${POLL_HOT_RESYNC_INTERVAL_MS:86400000}
+  from: |-
+    (SELECT o.dwg_no AS unit_id, 'CHECKPOINT' AS event_group, 'CUT_DONE' AS event_code, 'WO_CT' AS source,
+            to_date(w.wo_actl_fd, 'YYYYMMDD')::timestamptz AS event_ts, 'HIGH' AS conf, w.work_ord_no AS src_value,
+            CASE WHEN w.mnt_date ~ '^(19|20)[0-9]{6}$' AND w.mnt_time ~ '^[0-9]{6}$'
+                 THEN to_timestamp(w.mnt_date || w.mnt_time, 'YYYYMMDDHH24MISS') END AS mnt_ts,
+            w.mnt_date || w.mnt_time AS wm
+       FROM gp.ypwg411m w
+       JOIN (SELECT m.work_ord_no, min(o.mat_desc1) AS dwg_no
+               FROM gp.ypwg214m m JOIN gp.ypwg211m o ON o.prod_ord_no = m.prod_ord_no
+              WHERE o.detl_clsf_code = 'C00' AND o.flag = 'C' AND o.mat_desc1 <> ''
+              GROUP BY m.work_ord_no) o ON o.work_ord_no = w.work_ord_no
+      WHERE w.flag = 'C' AND right(w.work_ord_no, 2) = 'CT' AND w.wo_actl_fd ~ '^(19|20)[0-9]{6}$') q

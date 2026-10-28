@@ -1,0 +1,20 @@
+{
+ "profile": "ssy",
+ "source_clock": "2021-12-31T00:00:00",
+ "shift_days": 0,
+ "dwg_no": "2514DS662CFG03",
+ "hulls": "2514",
+ "if": "FAB-IF10",
+ "tables": [
+  {
+   "table": "GP.YPWC820M",
+   "note": null,
+   "rows": []
+  },
+  {
+   "table": "GP.YPWC821M",
+   "note": null,
+   "rows": []
+  }
+ ]
+}

@@ -1,0 +1,171 @@
+# 원천 표별 "시각 T 의 모습" 규칙 — fabsim.py 가 이 규칙으로 inshoplocal 에 sim._<표>(대상 호선 행만 뜬 사본)와
+# sim.<표>(시각 T 로 거른 뷰)를 만든다.
+#
+# 사본(inshoplocal)은 2026-08~09 에 떠 온 "마지막 상태" 하나뿐이다. 시뮬레이터는 시계 T 를 두고
+# 그때 원천이 어떻게 보였을지를 뷰로 되돌린다.
+#   appear  : 행이 원천에 생기는 시각 (날짜[, 시각] 열). T 전이면 행이 없다. 없으면 처음부터 있는 기준정보
+#   plan    : 계획 · 예정일 — 행이 생길 때부터 보인다. 날짜만 shift 한다
+#   actual  : 실적 날짜 — T 를 지나야 값이 보인다 (전에는 '' / NULL). 값은 시각 열 이름 (없으면 null)
+#   hide    : 다른 실적이 보일 때만 보이는 열 (상태 코드 · 시각 열). when 이 안 보이면 else_when → else_value, 그것도 아니면 ''
+#   interp  : 착수 ~ 완료 사이 직선 보간 (누적 진척률)
+#   hull    : 호선 4자리를 내는 식 — 대상 호선 행만 sim._<표> 로 뜬다
+#   follow  : 호선 열이 없는 표 — 먼저 뜬 sim._<표> 에 이어진 행만 뜬다 (IN 조건)
+#   sample  : fabsim.py samples 가 샘플 도면(%(dwg)s)과 이어진 행을 고르는 조건
+# mnt_date · mnt_time 은 appear · actual 중 T 까지 보인 가장 늦은 시각으로 바뀐다 → RFC Service 의 증분(워터마크) 작업이 그대로 돈다.
+# 날짜 열은 모두 shift_days(7의 배수) 만큼 옮겨진다 — 요일이 유지된다.
+
+tables:
+  # ── FAB-IF09 절단 · 마킹 (CHC 도면별 작업 진행상태) ─────────────────────
+  gp.ypwc310m:
+    if: FAB-IF09
+    sample: "dwg_no = %(dwg)s"
+    hull: left(dwg_no, 4)
+    appear: [rgsr_date, rgsr_time]
+    plan: [rgsr_date, cut_pln_date, mark_pln_date, cut_adjt_date, mark_adjt_date, cut_cmp_pln_date]
+    actual: {mark_mfg_sd: null, mark_mfg_fd: mark_mfg_time, cut_mfg_sd: null, cut_mfg_fd: cut_mfg_time, outc_plat_date: null}
+    hide:
+      mark_mfg_time: {when: [mark_mfg_fd, mark_mfg_time]}
+      cut_mfg_time: {when: [cut_mfg_fd, cut_mfg_time]}
+      mark_stus_code: {when: [mark_mfg_fd, mark_mfg_time], else_when: [mark_mfg_sd], else_value: '1'}
+      prcs_stus_code: {when: [cut_mfg_fd, cut_mfg_time], else_when: [cut_mfg_sd], else_value: '1'}
+
+  # ── FAB-IF02 불출 · 전처리 (140M 컨베이어 1행 = 강판 1장, 111M 선별 지시) ──
+  gp.ypwc140m:
+    if: FAB-IF02
+    sample: "pick_ser_id IN (SELECT pick_ser_id FROM sim.ypwc111m WHERE dwg_no = %(dwg)s)"
+    follow: pick_ser_id IN (SELECT pick_ser_id FROM sim._ypwc111m)
+    appear: [iss_date, iss_time]
+    plan: [rgsr_date]
+    actual: {iss_date: iss_time, auto_mark_date: auto_mark_time}
+    hide:
+      auto_mark_time: {when: [auto_mark_date, auto_mark_time]}
+      mark_stus_code: {when: [auto_mark_date, auto_mark_time], else_value: 'N'}
+
+  gp.ypwc111m:
+    if: FAB-IF02
+    sample: "dwg_no = %(dwg)s"
+    hull: left(dwg_no, 4)
+    appear: [rgsr_date, rgsr_time]
+    plan: [rgsr_date, cary_due_date, mh_calc_date]
+    actual: {pick_fin_date: null, iss_dt_intl: null, iss_dt_last: null, iss_prt_date: null}
+
+  # ── FAB-IF10 사상 · 모듬 (DAB · CLC) ─────────────────────────────────────
+  gp.ypwc820m:
+    if: FAB-IF10
+    sample: "part_plat_no IN (SELECT part_plat_no FROM sim.ypwc821m WHERE dwg_no = %(dwg)s)"
+    follow: part_plat_no IN (SELECT part_plat_no FROM sim._ypdg002m)
+    appear: [work_date, null]
+    plan: [rgsr_date]
+    actual: {work_date: null}
+
+  gp.ypwc821m:
+    if: FAB-IF10
+    sample: "dwg_no = %(dwg)s"
+    hull: left(dwg_no, 4)
+    appear: [rgsr_date, rgsr_time]
+    plan: [rgsr_date]
+    actual: {work_date: null}
+
+  # ── FAB-IF11 부재 전개 (절단BOM 090M 은 기준정보, 모듬 배치 002M 은 사건) ──
+  gp.ydeh090m:
+    if: FAB-IF11
+    sample: "dwg_no = %(dwg)s"
+    hull: left(dwg_no, 4)
+
+  gp.ypdg002m:
+    if: FAB-IF11
+    sample: "dwg_no = %(dwg)s"
+    hull: left(dwg_no, 4)
+    appear: [part_plat_date, part_plat_time]
+    plan: [rgsr_date, pnt_fd_pln]
+    actual: {part_plat_date: part_plat_time, iss_fd: null, mac_muft_fd: null}
+
+  # ── FAB-IF12 · IF13 기준정보 (설계 확정 — 처음부터 있다. 060M 의 절단 실적 열만 시간을 탄다) ──
+  gp.ydeh060m:
+    if: FAB-IF12
+    sample: "part_no IN (SELECT part_no FROM sim.ydeh090m WHERE dwg_no = %(dwg)s UNION SELECT part_no FROM sim.ypdg002m WHERE dwg_no = %(dwg)s)"
+    hull: proj_no
+    plan: [rgsr_date]
+    actual: {cut_mfg_sd: null, cut_mfg_fd: null, cut_iss_sd: null, cut_iss_fd: null}
+
+  gp.ydeh050m:
+    if: FAB-IF12
+    sample: "proj_no = left(%(dwg)s, 4) AND blk_no = substr(%(dwg)s, 7, 3)"
+    hull: proj_no
+
+  gp.ydeh081m:
+    if: FAB-IF13
+    sample: "dwg_no = %(dwg)s"
+    hull: left(dwg_no, 4)
+
+  # ── FAB-IF01 · IF14 ProSSYS (Oracle AM — 사본은 inshoplocal 의 am 스키마) ──
+  am.str01h:
+    if: FAB-IF01
+    sample: "roll_no IN (SELECT roll_no FROM sim.sty01h WHERE dwg_no = %(dwg)s)"
+    follow: roll_no IN (SELECT roll_no FROM sim._sty01h)
+    appear: [end_date, null]
+    actual: {start_date: null, end_date: null}
+    plan: [rgsr_date]
+
+  am.sty01h:
+    if: FAB-IF14
+    sample: "dwg_no = %(dwg)s"
+    hull: left(dwg_no, 4)
+    appear: [chng_date, chng_time]
+    plan: [iss_pln_date, rgsr_date]
+    actual: {acpt_date: null, frst_pick_ord_date_1: null, frst_pick_actl_date_1: null, frst_pick_ord_date_2: null,
+             frst_pick_actl_date_2: null, scnd_pick_ord_date: null, scnd_pick_actl_date: null, iss_ord_date: null, iss_actl_date: null}
+
+  am.sty02c:
+    if: FAB-IF14
+    sample: "dwg_no = %(dwg)s"
+    hull: left(dwg_no, 4)
+    appear: [rgsr_date, rgsr_time]
+    plan: [rgsr_date, acpt_pln_date, iss_pln_date, iss_pln_date_1, iss_pln_date_2, iss_pln_date_3]
+    actual: {iss_actl_date: null}
+
+  # ── 가공 적재 작업이 같이 읽는 표 (FAB-IF 밖 — W/O 는 CMN 계열, 곡가공 · 부재 불출 · 사외 반입) ──
+  gp.ypwg411m:
+    if: (W/O)
+    sample: "work_ord_no IN (SELECT m.work_ord_no FROM sim.ypwg214m m JOIN sim.ypwg211m o ON o.prod_ord_no = m.prod_ord_no WHERE o.mat_desc1 = %(dwg)s AND o.detl_clsf_code = 'C00')"
+    hull: proj_no
+    appear: [rgsr_date, rgsr_time]
+    plan: [rgsr_date, wo_pln_sd, wo_pln_fd]
+    actual: {wo_actl_sd: null, wo_actl_fd: null}
+    interp: {accm_prgs_rate: [wo_actl_sd, wo_actl_fd]}
+
+  gp.ypwg214m: {if: (W/O), follow: work_ord_no IN (SELECT work_ord_no FROM sim._ypwg411m)}
+  gp.ypwg211m: {if: (W/O), follow: prod_ord_no IN (SELECT prod_ord_no FROM sim._ypwg214m)}
+
+  gp.ypwc510m:
+    if: (곡가공)
+    sample: "part_no IN (SELECT part_no FROM sim.ydeh090m WHERE dwg_no = %(dwg)s UNION SELECT part_no FROM sim.ypdg002m WHERE dwg_no = %(dwg)s)"
+    hull: left(part_no, 4)
+    appear: [rgsr_date, rgsr_time]
+    plan: [rgsr_date, bend_pln_date, bend_adjt_date]
+    actual: {bend_mfg_sd: null, bend_mfg_fd: null, intc_acpt_date: null}
+    hide:
+      prcs_stus_code: {when: [bend_mfg_fd]}
+
+  gp.ypdg100m:
+    if: (부재 불출)
+    sample: "part_no IN (SELECT part_no FROM sim.ydeh090m WHERE dwg_no = %(dwg)s UNION SELECT part_no FROM sim.ypdg002m WHERE dwg_no = %(dwg)s)"
+    hull: left(part_no, 4)
+    appear: [rgsr_date, rgsr_time]
+    plan: [rgsr_date]
+    actual: {iss_fd: null}
+    hide:
+      part_stus_code: {when: [iss_fd]}
+
+  gp.ypdg800m:
+    if: (부재 전개)
+    hull: left(dwg_no, 4)
+
+  gp.ycps301m:
+    if: (사외 반입)
+    sample: "mat_code IN (SELECT part_no FROM sim.ydeh090m WHERE dwg_no = %(dwg)s UNION SELECT part_no FROM sim.ypdg002m WHERE dwg_no = %(dwg)s)"
+    hull: left(mat_code, 4)
+    appear: [rgsr_date, rgsr_time]
+    plan: [rgsr_date, send_date]
+
+  gp.ypws120c: {if: (위치)}
