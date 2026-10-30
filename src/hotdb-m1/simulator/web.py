@@ -4,6 +4,8 @@
   python web.py                  http://127.0.0.1:8765  (이 PC 에서만)
   python web.py --port 8800      포트 바꾸기 (Windows 예약 구간 59248~59347 은 피한다)
 
+내릴 때는 화면 오른쪽 위 "서버 종료" 또는 Ctrl+C. 도는 리플레이는 이번 주기를 마치고 위치를 저장한 뒤 내린다.
+
 실행 스레드 하나가 원천 · Hot DB 연결을 쥐고 fabsim.tick 을 돈다. 화면은 /api/state 를 1초마다 읽는다.
 """
 import argparse
@@ -302,6 +304,10 @@ class H(BaseHTTPRequestHandler):
             R.step_once()
         elif path == '/api/stop':
             R.stop()
+        elif path == '/api/shutdown':
+            R.stop()
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+            return '서버를 내린다'
         elif path == '/api/speed':
             R.set_speed(float(b['speed']) if b.get('speed') else None)
         elif path == '/api/prepare':
@@ -330,6 +336,8 @@ def main():
         srv.serve_forever()
     except KeyboardInterrupt:
         R.stop()
+    srv.server_close()
+    print('fabsim 웹 제어: 서버 내림', flush=True)
 
 
 if __name__ == '__main__':

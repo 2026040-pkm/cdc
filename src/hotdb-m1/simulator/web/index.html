@@ -71,6 +71,7 @@ td.err { color: var(--err); }
     <h1>가공 리플레이 제어</h1>
     <span id="pill" class="pill">대기</span>
     <span class="dsn" id="dsn"></span>
+    <button class="danger" id="b-shutdown" style="margin-left:auto">서버 종료</button>
   </header>
 
   <div class="grid">
@@ -242,6 +243,17 @@ function init() {
   $("#b-continue").onclick = () => api("/api/resume");
   $("#b-step").onclick = () => api("/api/step");
   $("#b-stop").onclick = () => api("/api/stop");
+  $("#b-shutdown").onclick = async () => {
+    const live = S.state === "running" || S.state === "paused";
+    if (!confirm(live ? "리플레이를 멈추고(이번 주기는 마치고 위치 저장) 서버를 내립니다." : "서버를 내립니다.")) return;
+    clearInterval(timer);
+    $("#b-shutdown").disabled = true;
+    $("#pill").textContent = "내리는 중"; $("#pill").className = "pill";
+    await fetch("/api/shutdown", { method: "POST" }).catch(() => {});
+    $("#pill").textContent = "서버 내림 — 다시 쓰려면 python web.py";
+    $("#pill").className = "pill error";
+    document.querySelectorAll("button, input, select").forEach(e => e.disabled = true);
+  };
   $("#b-prepare").onclick = () => api("/api/prepare");
   $("#b-clean").onclick = () => { if (confirm("시뮬레이터(rfc-sim)가 쓴 Hot DB 행과 워터마크를 지웁니다.")) api("/api/clean"); };
   $("#b-samples").onclick = () => api("/api/samples", { profile: $("#profile").value, at: $("#s-at").value.replace("T", " "),
@@ -303,7 +315,7 @@ async function refresh() {
   } catch (e) { $("#pill").textContent = "서버 연결 끊김"; $("#pill").className = "pill error"; }
 }
 refresh();
-setInterval(refresh, 1000);
+const timer = setInterval(refresh, 1000);
 </script>
 </body>
 </html>
